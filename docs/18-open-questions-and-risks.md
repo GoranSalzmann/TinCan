@@ -33,8 +33,8 @@ added there as later batches surface them.
 | Ref | Item | Doc |
 |---|---|---|
 | T1 | Fastify vs Hono final pick | 03, 05 |
-| T2 | Kysely vs Drizzle final pick | 03, 06 |
-| T3 | Cert sharing Caddy ↔ LiveKit TURN/TLS. **Proposed (14 §2.3):** shared read-only cert volume, TURN/TLS on 5349; TURN on 443 via SNI router is an optional advanced setup; confirm in D6 | 03, 14 |
+| T2 | Kysely vs Drizzle final pick (SQLite only in v1, T32) | 03, 06 |
+| T3 | Cert sharing Caddy ↔ LiveKit TURN/TLS. **Proposed (14 §2.3):** shared read-only cert volume, TURN/TLS on 5349; TURN on 443 via SNI router is an optional advanced setup; confirm in D6. **Decided (T30):** LiveKit reload deferred until no rooms are active | 03, 14 |
 | T4 | ~~UDP strategy~~ **Resolved (08 §3.2):** single UDP mux port 7882 + TCP 7881 + TURN/TLS; confirm in spike D6 | 02, 08, 14 |
 | T5 | ~~Webhook exposure~~ **Resolved (14 §2.1):** `/api/internal/*` blocked at Caddy; LiveKit calls the app over the internal Docker network. **Reasoning reopened by T26:** with LiveKit on host networking (T21) there is no shared Docker network | 05, 14 |
 | T6 | ~~E2EE key storage and rotation~~ **Resolved (10 §4):** HKDF-derived from instance secret, epoch counter in kv, rotation policy table | 06, 10 |
@@ -56,16 +56,16 @@ added there as later batches surface them.
 | T22 | Gateway resume ring-buffer placement when running multiple app nodes | 14 §10 |
 | T23 | Missing deliverable: UI/UX design (wireframes, design tokens, brand, icon) | 12, 17 |
 | T24 | Calendar dates and weekly time budget to turn sizes in 17 into a schedule | 17 |
-| T25 | **Review blocker (K-29).** Make the presence reconciler also reconcile permissions: each pass, recompute CONNECT/SPEAK/VIDEO/SCREEN_SHARE for every LiveKit participant from the DB; `removeParticipant`/`updateParticipant` on mismatch; rotate the E2EE key if anyone was removed. Failure-path enforcement becomes ≤ 30 s (the 2 s SLO still holds on the happy path) | 05 §6.3, 10 §4.3, 11 §2.6 |
-| T26 | **Review blocker (K-30).** Rework default compose routing for LiveKit host networking: publish the app on `127.0.0.1:3000` and point the webhook there; reach LiveKit via `host-gateway`; bind LiveKit's HTTP port 7880 to loopback; restate T5's reasoning. Narrow the Caddy route `/livekit/*` to the signalling path (`/livekit/rtc*`) so LiveKit's Twirp RoomService API is not proxied publicly | 05, 14 §2.1–2.2, 15 §4.7 |
-| T27 | Move E2EE room-session state out of app memory so a restart re-derives the same key: salt = LiveKit room SID (create the room explicitly on first join), epoch in room metadata; or persist `(channelId, salt, epoch)` in the DB. Stop `keyIndex` restarting at 0 across sessions (K-31) | 06 §3.13, 10 §4.1 |
-| T28 | SQLite on the event loop: incremental `.backup()` for scheduled **and** pre-migration backups (no `VACUUM INTO`, no file copy); replace full `VACUUM` with `PRAGMA optimize` + `incremental_vacuum`; bound FTS query cost; decide whether the DB moves to a worker thread (K-32, K-36) | 05 §3.1, §7, 06 §7–8, 14 §7 |
-| T29 | Derived data: compute mention counts from `message_mention` after `last_read` instead of keeping a counter; make ack `max(existing, new)`; index search from an in-transaction outbox row (core-provided, so module boundaries hold) plus a `tincan search reindex` command; add the crash window to the SearchIndex contract tests (K-33) | 04 §6, 06 §3.8–3.9, 07 §3.6, 16 §3 |
-| T30 | TURN/TLS termination: Caddy layer4 (SNI) terminates TLS and LiveKit TURN runs with `external_tls`, removing cert sharing and the renewal restart, and making TURN on 443 the default on one IP. Cost: a custom Caddy build. Fallback: defer the LiveKit reload until no rooms are active, with a deadline before expiry. Reopens T3 and the §F "TURN on 443 optional" decision (K-34, K-01) | 03 ADR-014, 14 §2.3 |
-| T31 | Desktop file access: Electron `webRequest.onBeforeSendHeaders` injects `Authorization` for the instance origin (plus the origin in the desktop CSP `img-src`), or the local storage adapter mints HMAC-signed expiring URLs with bucketed expiry so `signedUrl` never returns null (K-35) | 05 §3.2, 07 §3.7, 13 §3, 15 §5 |
-| T32 | Decide now whether v1 ships one adapter per port (SQLite, local, memory; port interfaces and contract tests kept), rather than building Postgres/Redis in M2 and cutting them in M5 after paying the portability cost. Cost: a later move off SQLite needs a data-migration tool, not a config flip (K-09) | 01 R-063, 02 §5, 17 §6 |
+| T25 | **Decided (§F): accepted.** Review blocker (K-29). Make the presence reconciler also reconcile permissions: each pass, recompute CONNECT/SPEAK/VIDEO/SCREEN_SHARE for every LiveKit participant from the DB; `removeParticipant`/`updateParticipant` on mismatch; rotate the E2EE key if anyone was removed. Failure-path enforcement becomes ≤ 30 s (the 2 s SLO still holds on the happy path) | 05 §6.3, 10 §4.3, 11 §2.6 |
+| T26 | **Decided (§F): accepted.** Review blocker (K-30). Rework default compose routing for LiveKit host networking: publish the app on `127.0.0.1:3000` and point the webhook there; reach LiveKit via `host-gateway`; bind LiveKit's HTTP port 7880 to loopback; restate T5's reasoning. Narrow the Caddy route `/livekit/*` to the signalling path (`/livekit/rtc*`) so LiveKit's Twirp RoomService API is not proxied publicly | 05, 14 §2.1–2.2, 15 §4.7 |
+| T27 | **Decided (§F): LiveKit room SID + room metadata; confirm in D4.** Move E2EE room-session state out of app memory so a restart re-derives the same key: salt = LiveKit room SID (create the room explicitly on first join), epoch in room metadata; or persist `(channelId, salt, epoch)` in the DB. Stop `keyIndex` restarting at 0 across sessions (K-31) | 06 §3.13, 10 §4.1 |
+| T28 | **Decided (§F): accepted.** SQLite on the event loop: incremental `.backup()` for scheduled **and** pre-migration backups (no `VACUUM INTO`, no file copy); replace full `VACUUM` with `PRAGMA optimize` + `incremental_vacuum`; bound FTS query cost; decide whether the DB moves to a worker thread (K-32, K-36) | 05 §3.1, §7, 06 §7–8, 14 §7 |
+| T29 | **Decided (§F): accepted.** Derived data: compute mention counts from `message_mention` after `last_read` instead of keeping a counter; make ack `max(existing, new)`; index search from an in-transaction outbox row (core-provided, so module boundaries hold) plus a `tincan search reindex` command; add the crash window to the SearchIndex contract tests (K-33) | 04 §6, 06 §3.8–3.9, 07 §3.6, 16 §3 |
+| T30 | **Decided (§F): keep TURN/TLS on 5349 with a shared certificate; defer the LiveKit reload until no rooms are active, with a deadline before expiry. Caddy layer4 not adopted.** TURN/TLS termination: Caddy layer4 (SNI) terminates TLS and LiveKit TURN runs with `external_tls`, removing cert sharing and the renewal restart, and making TURN on 443 the default on one IP. Cost: a custom Caddy build. Fallback: defer the LiveKit reload until no rooms are active, with a deadline before expiry. Reopens T3 and the §F "TURN on 443 optional" decision (K-34, K-01) | 03 ADR-014, 14 §2.3 |
+| T31 | **Decided (§F): Electron header injection.** Desktop file access: Electron `webRequest.onBeforeSendHeaders` injects `Authorization` for the instance origin (plus the origin in the desktop CSP `img-src`), or the local storage adapter mints HMAC-signed expiring URLs with bucketed expiry so `signedUrl` never returns null (K-35) | 05 §3.2, 07 §3.7, 13 §3, 15 §5 |
+| T32 | **Decided (§F): v1 ships SQLite, local storage and in-memory pub/sub only; Postgres, Redis and S3 adapters are post-v1.** Decide now whether v1 ships one adapter per port (SQLite, local, memory; port interfaces and contract tests kept), rather than building Postgres/Redis in M2 and cutting them in M5 after paying the portability cost. Cost: a later move off SQLite needs a data-migration tool, not a config flip (K-09) | 01 R-063, 02 §5, 17 §6 |
 | T33 | If D4 confirms speaker detection survives E2EE via the RTP audio-level header extension: close K-18, drop the client-shared-levels fallback, and add "who is speaking, and when" to the metadata E2EE does not protect (K-11) | 10 §2, §6 |
-| T34 | Observability at the seams: emit `reconcile_repairs_total{kind}` and alert on a sustained non-zero rate (a reconciler silently masks a broken primary path, as in K-30); carry the request ID into bus events and handler logs | 05 §8, 14 §8 |
+| T34 | **Decided (§F): accepted.** Observability at the seams: emit `reconcile_repairs_total{kind}` and alert on a sustained non-zero rate (a reconciler silently masks a broken primary path, as in K-30); carry the request ID into bus events and handler logs | 05 §8, 14 §8 |
 
 ## C. Risk register
 
@@ -73,15 +73,15 @@ Likelihood (L) and impact (I): H/M/L.
 
 | ID | Risk | L | I | Mitigation |
 |---|---|---|---|---|
-| K-01 | Users cannot connect media because of UDP/NAT/firewall issues | H | H | Built-in TURN/TLS on 5349 + TURN/UDP 3478 (TURN on 443 is optional per §F; T30 would make it the default), connectivity-check page in the client, clear Host docs, startup self-test |
+| K-01 | Users cannot connect media because of UDP/NAT/firewall issues | H | H | Built-in TURN/TLS on 5349 + TURN/UDP 3478 (TURN on 443 stays an optional advanced setup, §F and T30), connectivity-check page in the client, clear Host docs, startup self-test |
 | K-02 | Server bandwidth exhausted by screenshare fan-out | M | H | Documented sizing; per-channel bitrate cap; simulcast + adaptive stream; low-upload and viewer-quality controls; warn Host in docs about metered VPS |
 | K-03 | Dependency on LiveKit (breaking changes, licence change, abandonment) | L | H | Pin versions, track releases, keep LiveKit calls inside few modules; accept lock-in knowingly (ADR-002) |
 | K-04 | Neural denoiser costs too much CPU on low-end machines or has glitches | M | M | Auto-fallback to RNNoise/browser NS; presets; off switch; benchmark in CI on reference hardware |
 | K-05 | Wayland (Linux) screen capture and global hotkeys behave differently | H | M | Test matrix includes GNOME/KDE on Wayland; PipeWire portal path; X11 fallback; document limits |
 | K-06 | macOS system-audio capture during screenshare unsupported or needs extra permissions/driver | H | M | Declare as known limitation; offer window/app capture without audio; investigate ScreenCaptureKit-based path in Electron |
 | K-07 | Electron security misconfiguration | M | H | Hardened defaults, contextIsolation, sandbox, strict CSP, no remote code, review checklist (13, 15) |
-| K-08 | SQLite write contention under busy chat | L | M | WAL, single writer queue, batch ops; Postgres escape hatch |
-| K-09 | Dual-DB support doubles testing/bugs | M | M | Common SQL subset; CI on both; SearchIndex is the only divergence (not quite: its consistency differs, K-33). Decide the v1 adapter set now (T32) |
+| K-08 | SQLite write contention under busy chat | L | M | WAL, single writer queue, batch ops; Postgres escape hatch is post-v1 (T32) |
+| K-09 | Dual-DB support doubles testing/bugs | L | M | Resolved for v1 by T32 (SQLite only). Returns when the Postgres adapter is built; its SearchIndex consistency differs from SQLite's (K-33) |
 | K-10 | Webhook loss → wrong presence | M | M | Idempotent handlers + reconciliation job + client-side tolerance |
 | K-11 | E2EE gives false sense of security (Host controls key distribution) | M | M | Document threat model plainly (10); no overclaiming in UI |
 | K-12 | Scope creep from "extremely modular" ambitions | H | M | Bounded modularity (ADR-003/004), no plugin API in v1, build order in 17 |
@@ -106,7 +106,7 @@ Likelihood (L) and impact (I): H/M/L.
 | K-31 | With E2EE on by default and the in-memory kv, every app restart (config change, upgrade, crash) loses room session and epoch and forces an unnecessary rekey. Late joiners get a key existing participants lack, and `keyIndex` restarts at 0, colliding with the old key. Seconds to tens of seconds of silence in every encrypted call, contradicting "app restart doesn't drop calls" (02 §3, 14 §7) | H | M | T27; D4 |
 | K-32 | better-sqlite3 runs every query on the main thread: the weekly `VACUUM` and `VACUUM INTO` backups on a multi-GB DB (≈4 GB/year with FTS, 06 §9) freeze HTTP and the gateway; past ~50 s every client reconnects at once. "N read connections" add no concurrency on one thread | M | M | T28; D5 |
 | K-33 | The SQLite search index and `read_state.mention_count` are updated by bus handlers after commit; a crash or `SQLITE_BUSY` in that window leaves permanent drift and nothing rebuilds them. Postgres `tsvector` is in-transaction, so the adapters differ and the SearchIndex contract tests miss it. A stale device's ack can move `last_read_message_id` backwards | M | M | T29 |
-| K-34 | TURN/TLS certificate renewal reloads (restarts) LiveKit (14 §2.3), dropping every call roughly every 60 days at a time chosen by ACME | H | M | T30; D6 |
+| K-34 | TURN/TLS certificate renewal reloads (restarts) LiveKit (14 §2.3), dropping every call roughly every 60 days at a time chosen by ACME | H | M | T30 (decided: reload deferred until no rooms are active, so the restart lands in an empty moment); D6 |
 | K-35 | Desktop renderer (`app://`, bearer token) cannot load `/files/*` through `<img>`: no header, and no cookie cross-site. Avatars (R-006) and inline images return 401 in the primary client | H | M | T31 |
 | K-36 | Pre-migration backup is a plain file copy (06 §8, 14 §7); after an unclean stop it misses committed transactions still in the WAL, so an upgrade rollback loses recent data | L | M | T28 |
 
@@ -120,10 +120,10 @@ Referenced elsewhere as D1 to D6.
 - **D3.** Electron `desktopCapturer` with audio on Windows/Linux; behaviour on Wayland and macOS.
 - **D4.** LiveKit E2EE + simulcast + dynacast (+ VP9/AV1 SVC) working together; active-speaker approach under E2EE (K-18).
   - *Design review (§G):* room SID semantics (a new SID per room instance after `emptyTimeout`), creating the room before minting the token, server-set room metadata for the epoch, and keyring index behaviour across sessions (K-31, T27). Whether active-speaker detection reads the RTP audio-level header extension, which frame encryption leaves in clear (K-18, T33).
-- **D5.** Dual-dialect migration tooling (Kysely/Drizzle) with FTS divergence.
+- **D5.** Query-builder tooling (Kysely/Drizzle) on better-sqlite3 with FTS5. v1 is SQLite-only (T32), so dual-dialect migrations are no longer in scope.
   - *Design review (§G):* the Db port's async `transaction(fn)` must work on better-sqlite3 for the chosen builder (Kysely serialises through a mutex; Drizzle's better-sqlite3 transactions are reportedly synchronous only, confirm). Measure main-thread blocking for `VACUUM INTO`, `.backup()` and FTS queries on a ~4 GB fixture (K-32, T28).
 - **D6.** TURN/TLS on 443 sharing a port/cert with Caddy (T3, T4); single-port UDP mux behaviour.
-  - *Design review (§G):* whether LiveKit can reload TURN certificates without a restart (expected: no), and `turn.external_tls` behind Caddy layer4 (K-34, T30). Loopback/`host-gateway` routing with LiveKit on host networking, `bind_addresses`, and LiveKit's signalling path prefix for narrowing the Caddy route (K-30, T26).
+  - *Design review (§G):* whether LiveKit can reload TURN certificates without a restart (expected: no), and that the deferred reload sees active rooms correctly through `ListRooms` (K-34, T30). Loopback/`host-gateway` routing with LiveKit on host networking, `bind_addresses`, and LiveKit's signalling path prefix for narrowing the Caddy route (K-30, T26).
 
 ## E. Sign-off checklist
 
@@ -181,10 +181,24 @@ Pending your call: the product-feature candidates found in the audit (stream pre
 | GIF picker, custom emoji, soundboard | **None in v1** (GIF picker would also need an opt-in third-party provider) | 17 backlog |
 | Separate stream-audio volume | **v1** (R-047) | 01, 08 §5.7, 12 |
 
+### Design review decisions (2026-10-27)
+| Ref | Decision | Docs touched |
+|---|---|---|
+| T25 | **Accepted.** The voice reconciler also re-checks permissions every pass; failure-path enforcement ≤ 30 s | 02, 04, 05, 08, 10, 11, 15, 16, 17 |
+| T26 | **Accepted.** Loopback/host-gateway routing for host-networked LiveKit; port 7880 off the public interface; Caddy proxies only `/livekit/rtc*` | 14, 15, 17 |
+| T27 | **LiveKit room SID + room metadata** carry the E2EE session, so app restarts need no rekey (confirm in D4) | 02, 05, 06, 08, 10, 16, 17 |
+| T28 | **Accepted.** Incremental `.backup()` for scheduled and pre-migration backups; no full `VACUUM`; bounded search | 03, 05, 06, 14, 16, 17 |
+| T29 | **Accepted.** Computed mention counts, monotonic acks, search fed by a core outbox, `tincan search reindex` | 04, 05, 06, 07, 16, 17 |
+| T30 | **Keep 5349, defer the reload.** Shared Caddy certificate; LiveKit restarts only when no rooms are active, or near expiry. Caddy layer4 not adopted; TURN on 443 stays optional | 03, 14, 17 |
+| T31 | **Electron header injection** for `/files/*` and other subresources | 05, 07, 13, 15 |
+| T32 | **v1 ships SQLite, local storage and in-memory pub/sub.** Ports and contract tests stay; Postgres, Redis and S3 adapters are post-v1 | 00, 01, 02, 03, 04, 05, 06, 07, 14, 16, 17 |
+| T34 | **Accepted.** `reconcile_repairs_total` with an alert; request IDs carried through the bus | 04, 05, 14 |
+
+Still open: T33 (waits for spike D4).
+
 ### Remaining sign-off blockers
 - You review docs 12–17 (batch 3) and any corrections to 07–11.
 - Roadmap and cut lines (17 §6) accepted.
-- Decide the two design-review blockers, T25 and T26 (§G).
 
 ## G. Design review findings (2026-10-27)
 
@@ -210,5 +224,6 @@ consistency, maintainability and observability **at-risk**; durability **holds**
 once T28 lands. Set aside as not load-bearing at this scale: scalability, cost,
 testability.
 
-Docs to update once these are decided: 04, 05, 06, 07, 10, 11, 13, 14, 15, 16,
-and the M0 spike table in 17 §3 (it should pick up the §D additions).
+Decisions on these findings are recorded in §F, and docs 00–08, 10, 11 and 13–17
+now reflect them (the M0 spike table in 17 §3 carries the §D additions). T33
+stays open until spike D4.

@@ -176,7 +176,9 @@ Triggered by role/overwrite/membership events on the bus:
 | Timeout | Set `timeout_until`; schedule a job to emit `PERMISSIONS_UPDATE` at expiry; enforce on write |
 | Account disabled/deleted | Revoke all sessions, close sockets, remove from voice |
 
-SLO: ≤ 2 s from change to enforcement on live connections.
+SLO: ≤ 2 s from change to enforcement on live connections while the event path
+works. If a LiveKit call fails or the app restarts mid-propagation, the voice
+reconciler (05 §6.3) enforces the change within one pass (≤ 30 s by default; 18 T25).
 
 ## 3. Moderation features (module `moderation`) summary
 - Kick, ban (with optional message purge window 0–7 days, reason), timeout (1 min – 28 days), server-mute/move/disconnect in voice, delete messages, slowmode per channel.

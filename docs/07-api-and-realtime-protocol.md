@@ -114,14 +114,14 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | PUT/DELETE `/channels/:id/pins/:mid` | Pin / unpin |
 | PUT/DELETE `/channels/:id/messages/:mid/reactions/:emoji/@me` | Reactions (module `reactions`) |
 | POST `/channels/:id/typing` | Typing hint (also available via gateway) |
-| POST `/channels/:id/ack` | Mark read up to `{messageId}` (module `read-state`) |
+| POST `/channels/:id/ack` | Mark read up to `{messageId}`; never moves the read position backwards (module `read-state`, 06 §3.8) |
 | GET `/search` | `q`, optional `channelId`, `authorId`, `before`, `after`, paged (module `search`) |
 
 ### 3.7 Uploads (module `uploads`)
 | Method & path | Purpose |
 |---|---|
 | POST `/uploads` | `multipart/form-data` single file → `{id, filename, contentType, size, width?, height?}`; attached later by ID in message create |
-| GET `/files/:id/:filename` | Download/serve (auth required; short-lived signed URL when storage supports it) |
+| GET `/files/:id/:filename` | Download/serve. Auth required: cookie on web; on desktop the Electron main process adds the `Authorization` header, so `<img>` and other subresources work (13 §3). Signed URLs only with the post-v1 S3 adapter |
 Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads.userQuotaBytes`, otherwise `QUOTA_EXCEEDED`; `GET /users/@me/storage` returns `{usedBytes, quotaBytes}` and the UI shows it in settings. Rules: size limit from config, extension and content-sniff checks, images get dimensions + generated thumbnail. Files served with `nosniff`; non-image types served as attachment. See 05 §9.
 
 ### 3.8 Voice (modules `voice`, `video`, `screenshare`, `voice-e2ee`)
@@ -257,6 +257,7 @@ device replaces the first (the first receives `VOICE_SERVER_DISCONNECT`
 - Optimistic UI: the client shows the message with its `nonce` immediately, then reconciles when the server message with the same `nonce` arrives (REST response or `MESSAGE_CREATE`).
 - Edits and deletes are last-writer-wins; events carry `editedAt` so out-of-order arrival is resolved by timestamp.
 - Voice presence is eventually consistent (webhook + reconciliation, 05 §6.3); clients also trust the LiveKit client's own participant list for the room they are in.
+- Search results follow commits through the outbox (06 §3.14) and can trail a new message briefly; unread state and mention counts are computed from committed rows (06 §3.8).
 
 ## 6. Version negotiation
 

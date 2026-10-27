@@ -43,7 +43,8 @@ to ship JavaScript that can reach native bridges.
 
 Consequence: cross-origin requests from `app://` to the server require CORS
 allowances for that origin (07 §7), and the gateway accepts it in `Origin`
-checks.
+checks. Subresources such as `<img>` cannot carry the bearer token themselves;
+the main process adds it (§3).
 
 ## 3. Security hardening (non-negotiable defaults)
 
@@ -59,7 +60,8 @@ checks.
 | IPC | Channels allow-listed; every handler validates sender frame/origin (`event.senderFrame.url`) and validates arguments with zod |
 | Navigation | `will-navigate` and `setWindowOpenHandler` deny everything except the app origin; external links go to `shell.openExternal` after URL scheme allow-list (`https:`, `http:`, `mailto:`), never `file:`/custom schemes |
 | Permissions | `session.setPermissionRequestHandler` / `setPermissionCheckHandler`: allow only `media` (mic/camera), `display-capture`, `notifications`, `clipboard-sanitized-write` for the app origin; deny everything else |
-| CSP | Strict CSP via meta/headers for the app scheme (15); `connect-src` limited to the configured instance origin(s) and LiveKit URL |
+| CSP | Strict CSP via meta/headers for the app scheme (15); `connect-src` limited to the configured instance origin(s) and LiveKit URL; `img-src` and `media-src` also allow the instance origin(s) for `/files/*` |
+| Authenticated subresources | `session.webRequest.onBeforeSendHeaders` adds `Authorization: Bearer <token>` only to requests for the configured instance origin(s), so avatars, inline images and downloads under `/files/*` load; never for any other origin (18 T31) |
 | Webviews | Disabled; no `<webview>`, no embedded third-party content |
 | DevTools | Disabled in production builds unless a developer flag is set |
 | Fuses | Electron Fuses set at build time: disable `RunAsNode`, `NODE_OPTIONS`, `--inspect` CLI, enable ASAR integrity validation, cookie encryption, `onlyLoadAppFromAsar` (verify available fuses) |

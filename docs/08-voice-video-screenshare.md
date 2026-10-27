@@ -87,7 +87,7 @@ automatically, defeating "viewer opts in". So:
 ### 4.4 Reconnection
 - `livekit-client` performs ICE restarts and full reconnects automatically.
 - Client UI states: connected, reconnecting (spinner on avatar), disconnected (offer rejoin).
-- Token refresh: LiveKit signals when the token nears expiry; client calls `/voice/channels/:id/token` (server re-checks CONNECT/permissions each time).
+- Token refresh: LiveKit may refresh tokens for connected participants itself (verify in D1). The app's `/voice/channels/:id/token` serves rejoins and re-checks CONNECT/permissions. Token expiry is not relied on for revocation (05 §6.2–6.3).
 - Network switch (Wi-Fi ↔ Ethernet) must be tested explicitly (16).
 
 ### 4.5 One session per user
@@ -181,7 +181,8 @@ Sidebar data flow: webhook → presence store → bus event `voice.participant.*
 
 Stale-state protections: joined users are marked with `joinedAt`; entries not
 seen in LiveKit for two reconciliations are dropped; the client trusts its own
-LiveKit room list over the sidebar for the channel it is in.
+LiveKit room list over the sidebar for the channel it is in. The same
+reconciliation pass re-checks each participant's permissions (05 §6.3).
 
 ## 8. Permissions mapping
 
@@ -196,7 +197,8 @@ LiveKit room list over the sidebar for the channel it is in.
 
 Permission changes during a call are applied with `updateParticipant`
 (and by disconnecting when CONNECT is lost), triggered by the `roles` event
-(`PERMISSIONS_UPDATE`).
+(`PERMISSIONS_UPDATE`). If that call fails, the next reconciliation pass
+(≤ 30 s) applies the change (18 T25).
 
 ## 9. Voice channel settings (per channel, in `channel.settings`)
 
@@ -219,7 +221,8 @@ while people are connected forces a rejoin (10).
 | Failure | Behaviour |
 |---|---|
 | LiveKit down at join | `UNAVAILABLE`; UI says voice is offline; text unaffected |
-| App server restarts mid-call | Calls continue; presence rebuilt by reconciliation; token refresh retries |
+| App server restarts mid-call | Calls continue, encrypted ones included (keys are re-derived from the LiveKit room, 10 §4.1); presence rebuilt by reconciliation |
+| Ban or permission change while the LiveKit API call fails | Next reconciliation pass removes or downgrades the participant and rotates the E2EE key (05 §6.3) |
 | Webhook delayed/missed | Reconciliation within 30 s |
 | Client loses network | Auto-reconnect up to the departure timeout; then dropped and shown as left |
 | Publisher uplink collapses | LiveKit congestion control lowers layers; viewers see lower quality; UI shows "poor connection" on the stream |

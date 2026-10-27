@@ -56,17 +56,19 @@ No per-room keys are stored in the database.
 
 ```
 instanceSecret   : 32 random bytes, generated at first run, stored in config/secret store
-roomSession      : random 128-bit id created when a room goes from empty → non-empty
-epoch            : integer, starts at 0 for a room session, increments on rotation
+roomSession      : the LiveKit room's ID (SID). The app creates the room explicitly on the
+                   first join to an empty channel, so the SID exists before the first key
+                   is minted; a room recreated after emptyTimeout gets a new SID
+epoch            : integer in the LiveKit room's metadata, starts at 0, increments on rotation
 roomKey(epoch)   = HKDF-SHA256(ikm = instanceSecret,
                                salt = roomSession,
                                info = "tincan/e2ee/v1/" + channelId + "/" + epoch,
                                len  = 32)
 keyIndex         = epoch mod keyringSize          (keyringSize = 16, verify limit)
 ```
-- `roomSession` and `epoch` are kept in the pubsub `kv` (TTL while the room is active), so any app node derives the same key; there is nothing sensitive in Redis because the secret needed to derive keys never leaves the app config.
-- If the kv state is lost while a room is live (Redis restart), the app starts a **new roomSession**, bumps everyone to the new key via a gateway event, and clients re-key. Brief media glitch at worst.
-- `instanceSecret` rotation: supported by CLI (`tincan e2ee rotate-secret`), which forces all active rooms to a new session.
+- `roomSession` and `epoch` live in the LiveKit room itself (its SID and its metadata), not in app memory or `kv`. Any app node, and the same node after a restart, derives the same key, so an app restart needs no rekey and encrypted calls continue untouched (18 T27; SID and metadata semantics verified in spike D4).
+- Neither value is sensitive: participants can read room metadata, but the secret needed to derive keys never leaves the app config. Only the app (server API key) can change the metadata.
+- `instanceSecret` rotation: supported by CLI (`tincan e2ee rotate-secret`), which forces a rotation in every active room (epoch bump, keys derived from the new secret).
 
 ### 4.2 Distribution
 - Keys are delivered only over the authenticated, TLS-protected channel: in the REST join response (`e2ee: {keyIndex, key(base64), epoch}`) and, on rotation, via gateway event `E2EE_KEY_UPDATE {channelId, keyIndex, key, epoch}` to current participants only.
@@ -77,9 +79,9 @@ keyIndex         = epoch mod keyringSize          (keyringSize = 16, verify limi
 | Event | Action |
 |---|---|
 | Participant leaves voluntarily | Rotate **lazily**: rotate if the room still has others and ≥ 5 min have passed since last rotation (avoid churn) |
-| Participant kicked/banned/permission revoked | **Immediate rotation** (forward secrecy against the removed user) |
+| Participant kicked/banned/permission revoked | **Immediate rotation** (forward secrecy against the removed user); also triggered by the reconciler when it removes someone the event path missed (05 §6.3) |
 | Participant joins | No rotation needed (they get only the current key and can't decrypt past media) |
-| Room empties | Session discarded; next join starts a new session (epoch 0, new salt) |
+| Room empties | LiveKit closes the room after `emptyTimeout`; the next join creates a new room (new SID, epoch 0) |
 | Periodic | Optional every N hours for long-lived rooms (default 6 h, configurable) |
 
 Receivers keep the previous 1–2 keys briefly so late frames decrypt during a
@@ -100,8 +102,8 @@ trivial.
 | inherit + module true | Encrypt when client supports it |
 | off | Plain SRTP via SFU (allows recording, server-side features) |
 
-Changing the mode while the room is occupied: server sets a new room session
-and forces connected clients to rejoin (they receive `VOICE_SERVER_DISCONNECT`
+Changing the mode while the room is occupied: server closes the LiveKit room
+(the rejoin creates a new one with a new SID) and forces connected clients to rejoin (they receive `VOICE_SERVER_DISCONNECT`
 `{reason:"e2ee_mode_changed"}`) to avoid mixed encrypted/unencrypted states.
 
 UI: a lock indicator on the channel and in the call; tooltip explains the model
@@ -115,7 +117,7 @@ UI: a lock indicator on the channel and in the call; tooltip explains the model
 | `screenshare` / `video` | Fully covered (all tracks encrypted); screenshare audio too |
 | `voice` presence | Unaffected (metadata is visible by design) |
 | Moderation | Server mute/kick still work (they act on the connection, not the content) |
-| Speaker detection | Server-side audio level detection fails on encrypted audio. LiveKit's active-speaker events depend on server-visible audio levels; with E2EE the server cannot compute them. **Fallback:** clients compute local speaking level and share via participant attributes/metadata or the gateway (`voice.state`). Needs design in the spike (D4) |
+| Speaker detection | Server-side audio level detection fails on encrypted audio. LiveKit's active-speaker events depend on server-visible audio levels; with E2EE the server cannot compute them. **Fallback:** clients compute local speaking level and share via participant attributes/metadata or the gateway (`voice.state`). Needs design in the spike (D4). Possibly unnecessary: LiveKit may read the RTP audio-level header extension, which frame encryption leaves in clear (18 T33) |
 | Server-side thumbnails / transcoding | Not possible, not planned |
 | Bots/transcription | Not possible (non-goal) |
 
@@ -151,7 +153,7 @@ client code) means steps 1–3 replace only key derivation/distribution.
 
 ## 10. Testing
 
-- Unit: HKDF derivation determinism, rotation schedule, kv-loss recovery.
+- Unit: HKDF derivation determinism, rotation schedule, same key re-derived after an app restart (no rekey).
 - Integration: two clients with the right key hear/see each other; a client with a wrong key sees no content (decryption fails visibly); SFU capture shows undecodable payload.
 - Rotation: kick during a call → kicked client can no longer decode after rotation; other clients continue without >1 s interruption.
 - Simulcast/dynacast/adaptive stream with E2EE on (spike D4).

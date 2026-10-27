@@ -25,7 +25,7 @@ desktop app (plus a browser client), runnable by a non-expert with one command.
 **Target scale:** one instance serves roughly 5 to 200 registered users, with up
 to ~25 concurrent in voice across channels and up to ~10 viewers per stream.
 Larger scale is not a design goal but should not be architecturally blocked
-(multi-node pubsub, Postgres).
+(the DB, storage and pubsub ports stay; Postgres, Redis and S3 adapters are post-v1, 18 T32).
 
 ## 3. Goals
 
@@ -34,7 +34,7 @@ Larger scale is not a design goal but should not be architecturally blocked
 - G3. Camera and screenshare published ad hoc inside a voice channel.
 - G4. Publisher upload does **not** grow with viewer count.
 - G5. Best practical noise suppression and audio processing.
-- G6. Feature toggles; swappable DB/storage/pubsub/auth.
+- G6. Feature toggles; swappable DB/storage/pubsub/auth behind ports (v1 ships one adapter per port, plus local and OIDC auth; 18 T32).
 - G7. Voice/video end-to-end encryption available.
 - G8. First-class cross-platform desktop app.
 
@@ -48,6 +48,7 @@ Larger scale is not a design goal but should not be architecturally blocked
 - Large-event / webinar scale, live streaming to public audiences.
 - Server-side transcription, AI features.
 - Billing, multi-tenant SaaS operation.
+- Postgres, Redis and S3 adapters (the ports and their contract tests are in v1; 18 T32).
 - Deferred to v1.1+ (decided in 18 §F): stream preview thumbnails, camera background blur/virtual backgrounds, welcome/rules/announcement features, GIF picker, custom emoji, soundboard.
 
 ## 5. Functional requirements
@@ -105,7 +106,7 @@ Larger scale is not a design goal but should not be architecturally blocked
 - R-060 MUST allow each feature module to be enabled/disabled by config.
 - R-061 MUST validate module dependencies at boot with clear errors.
 - R-062 MUST expose enabled capabilities to clients so UI adapts.
-- R-063 MUST support DB adapters SQLite and Postgres, storage adapters local and S3, pubsub adapters in-memory and Redis.
+- R-063 MUST define ports for DB, storage and pubsub, each with a contract test suite; v1 MUST ship the SQLite, local-storage and in-memory pubsub adapters. Postgres, S3 and Redis adapters are post-v1 (18 T32).
 
 ## 6. Non-functional requirements
 

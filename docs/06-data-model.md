@@ -1,6 +1,7 @@
 # 06. Data Model
 
-Portable across SQLite and Postgres (ADR-007). Notation is engine-neutral;
+SQLite in v1; conventions stay portable so a post-v1 Postgres adapter remains cheap
+(ADR-007, 18 T32). Notation is engine-neutral;
 `id` is a text ULID, `ts` is integer epoch milliseconds (UTC), `bool` is 0/1,
 `json` is text containing validated JSON (native JSON column on Postgres where
 the adapter chooses to).
@@ -123,7 +124,7 @@ Ephemeral login state that is **not** stored in the DB: OIDC `state`/PKCE verifi
 
 Index: `(channel_id, id)`; partial/secondary on `(author_id)` for moderation views.
 **pin** is a flag on message (v1) to avoid a table.
-**message_mention** : message_id, target_type ('user'|'role'|'everyone'), target_id. Used to compute unread-mention counts cheaply.
+**message_mention** : message_id, channel_id (denormalised for counting), target_type ('user'|'role'|'everyone'), target_id. Mention badges are computed from it (§3.8).
 
 ### 3.6 Attachments (module `uploads`)
 **attachment** : id, message_id? (null until message sent, enables orphan GC), uploader_id, storage_key, filename, content_type, size, width?, height?, sha256, created_at, deleted_at?.
@@ -132,12 +133,12 @@ Index: `(channel_id, id)`; partial/secondary on `(author_id)` for moderation vie
 **reaction** : (message_id, user_id, emoji) PK, created_at. `emoji` is a Unicode string (custom emoji deferred).
 
 ### 3.8 Read state (module `read-state`)
-**read_state** : (user_id, channel_id) PK, last_read_message_id, mention_count int, updated_at.
-Unread = channel's latest message id > `last_read_message_id`. Mention count updated on message creation (increment for mentioned users) and reset on ack.
+**read_state** : (user_id, channel_id) PK, last_read_message_id, updated_at.
+Unread = channel's latest message id > `last_read_message_id`. Acks only move forward: `last_read_message_id = max(existing, acked)`, so a stale device cannot un-read a channel. The mention count is computed, not stored: the number of `message_mention` rows in that channel targeting the user, one of their roles, or `everyone`, with `message_id > last_read_message_id` (indexed, §5). Nothing to keep in sync, so nothing can drift (18 T29).
 
 ### 3.9 Search (module `search`)
-- SQLite: FTS5 virtual table `message_fts(content, channel_id UNINDEXED, message_id UNINDEXED)` kept in sync by module event handlers (`message.created/updated/deleted`) so it never couples to the `text-chat` write path.
-- Postgres: generated `tsvector` column or separate `message_search` table with GIN index.
+- SQLite: FTS5 virtual table `message_fts(content, channel_id UNINDEXED, message_id UNINDEXED)`. When `search` is enabled, `text-chat` appends a `search.message` row to the core outbox (§3.14) in the same transaction as each create, edit or delete; the `search` module consumes it. The index therefore catches up after a crash, and `search` stays decoupled from `text-chat` tables. `tincan search reindex` rebuilds the index from `message` (18 T29).
+- Postgres (post-v1 adapter): generated `tsvector` column or separate `message_search` table with GIN index.
 - Search results are filtered by the *current* channel visibility of the caller before return (never index-time permission).
 
 ### 3.10 Moderation and audit (modules `moderation`, `audit-log`)
@@ -151,7 +152,11 @@ Voice **presence is ephemeral** and is not stored in the DB; it lives in the pub
 **recording** : id, channel_id, started_by, started_at, ended_at?, storage_key?, status ('recording'|'processing'|'ready'|'failed'), size?.
 
 ### 3.13 E2EE (module `voice-e2ee`)
-E2EE keys are **never stored in the DB**. Per 10 §4: room keys are derived with HKDF from the instance secret (config), a per-room-session random salt and an epoch counter; the salt and epoch live only in the pubsub `kv` with a TTL while the room is active. Nothing for this module is persisted in the database.
+E2EE keys are **never stored in the DB**. Per 10 §4: room keys are derived with HKDF from the instance secret (config), the LiveKit room's ID (one per room instance, so it changes whenever the room is recreated) and an epoch counter kept in the LiveKit room's metadata (18 T27). Nothing for this module is persisted in the database or in `kv`, so an app restart re-derives the same keys.
+
+### 3.14 Outbox (module `core`)
+**outbox** : id (ULID; delivery order), topic text (e.g. `search.message`), payload json, request_id text, created_at.
+Written by a use case inside its own transaction; drained in ID order by the core `outbox.drain` job, which deletes a row only after its handler succeeds. Handlers are idempotent, so redelivery after a crash is safe. Used in v1 for the search index (§3.9); 05 §3.1, 18 T29.
 
 ## 4. Pagination and ordering
 
@@ -164,7 +169,7 @@ E2EE keys are **never stored in the DB**. Per 10 §4: room keys are derived with
 |---|---|---|
 | message | (channel_id, id) | history paging |
 | message | (author_id, id) | moderation lookups |
-| message_mention | (target_type, target_id, message_id) | mention inbox |
+| message_mention | (target_type, target_id, channel_id, message_id) | mention inbox, computed mention counts (§3.8) |
 | session | token_hash unique; (user_id) | auth, session list |
 | member_role | (user_id, space_id) | permission calc |
 | invite | code unique | redemption |
@@ -186,9 +191,9 @@ E2EE keys are **never stored in the DB**. Per 10 §4: room keys are derived with
 
 ## 7. Backup and restore
 
-- SQLite: online backup using the SQLite backup API (`VACUUM INTO` or `.backup`) producing a consistent snapshot while running; scheduled by the `backup.hook` job.
-- Postgres: standard `pg_dump` / PITR; documented, not reinvented.
-- Storage: directory copy (local) or bucket versioning (S3).
+- SQLite: online backup through better-sqlite3's incremental `.backup()` API, which copies pages in steps and produces a consistent snapshot without stalling the event loop (`VACUUM INTO` would block it for the whole copy, 05 §3.1); scheduled by the `backup.hook` job.
+- Postgres (post-v1 adapter): standard `pg_dump` / PITR; documented, not reinvented.
+- Storage: directory copy (local); bucket versioning once the post-v1 S3 adapter exists.
 - Config file + LiveKit config included in backup docs.
 - Restore procedure documented and **tested in CI** (restore from snapshot → boot → smoke test) (16).
 
@@ -197,7 +202,7 @@ E2EE keys are **never stored in the DB**. Per 10 §4: room keys are derived with
 - Forward-only, versioned per module, idempotent when re-run.
 - Destructive migrations (drop column/table) require two releases: stop using → remove.
 - Boot refuses if the DB schema is *newer* than the server understands (downgrade protection).
-- Backup recommended automatically before applying pending migrations (SQLite: copy file; configurable).
+- Automatic backup before applying pending migrations (configurable), using the same `.backup()` API. Never a plain file copy: after an unclean stop, committed transactions can still be in the WAL file, and a copy of `app.db` alone would miss them (18 T28).
 
 ## 9. Sizing estimates (sanity check)
 

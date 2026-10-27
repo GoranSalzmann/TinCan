@@ -8,9 +8,9 @@ Wire formats are in 07; schema in 06; permissions in 11.
 
 - **One Node.js process** for HTTP, WebSocket and background jobs (v1).
 - CPU-heavy work (image thumbnails, avatar resize) runs in `worker_threads` or via `sharp` (native, off-thread).
-- State that must be shared between processes (presence, rate-limit counters, pub/sub) goes through the **pubsub port**, so a second process is a config change.
+- State that must be shared between processes (presence, rate-limit counters, pub/sub) goes through the **pubsub port**, so a second process needs only the (post-v1) Redis adapter.
 - Graceful shutdown: stop accepting connections, send WS `RECONNECT` hint, flush in-flight writes, close DB. SIGTERM timeout 15 s.
-- Clustering (multiple app nodes) is supported by design (Postgres + Redis) but only tested in CI at 2 nodes, not a v1 operating target.
+- Clustering (multiple app nodes) needs the Postgres and Redis adapters, which are post-v1 (18 T32). The ports keep it possible; v1 neither ships nor tests it.
 
 ## 2. Layering
 
@@ -23,7 +23,7 @@ Wire formats are in 07; schema in 06; permissions in 11.
     │
  ports         db · storage · pubsub · auth · livekit(client wrapper)
     │
- adapters      sqlite · postgres · local-fs · s3 · memory · redis · local · oidc
+ adapters      sqlite · local-fs · memory · local · oidc   (postgres · s3 · redis: post-v1)
 ```
 
 Rules:
@@ -54,7 +54,9 @@ interface SearchIndex {
   query(q: string, filter: {channelIds: string[]}, page: Cursor): Promise<Hit[]>;
 }
 ```
-SQLite specifics: WAL, `synchronous=NORMAL`, `busy_timeout=5000`, one write connection (serialised), N read connections, `foreign_keys=ON`. Postgres: pooled connections, `statement_timeout`.
+SQLite specifics: WAL, `synchronous=NORMAL`, `busy_timeout=5000`, one write connection (serialised), `foreign_keys=ON`. better-sqlite3 runs every statement on the calling thread, so in v1 the database shares the event loop with HTTP, the gateway and jobs. Rules: no full `VACUUM` and no `VACUUM INTO` on the live process; backups use the incremental `.backup()` API; search queries are bounded (`LIMIT` plus a cost cap). If spike D5 measures unacceptable blocking, the database moves to a worker thread (18 T28). Postgres (post-v1 adapter): pooled connections, `statement_timeout`.
+
+**Outbox.** A use case that feeds derived data appends a row to the core-owned `outbox` table (06 §3.14) inside its own transaction. The core `outbox.drain` job delivers rows in ID order to the subscribed module and deletes each row only after its handler succeeds; handlers are idempotent, so redelivery after a crash is safe. In v1 the only consumer is the search index (06 §3.9, 18 T29).
 
 ### 3.2 Storage port
 ```ts
@@ -66,7 +68,7 @@ interface Storage {
   exists(key: string): Promise<boolean>;
 }
 ```
-Local adapter: files under a configured directory sharded by key prefix; path traversal-safe key validation. S3 adapter: presigned URLs.
+Local adapter (v1): files under a configured directory sharded by key prefix; path traversal-safe key validation; `signedUrl` returns null, so files are served by the app with session auth. The desktop app authenticates `<img>` and other subresource requests by having the Electron main process add the `Authorization` header for the instance origin (13 §3, 18 T31). S3 adapter (post-v1): presigned URLs.
 
 ### 3.3 PubSub port
 ```ts
@@ -77,7 +79,7 @@ interface PubSub {
   kv: { get; set; del; incr; expire; sadd; srem; smembers };
 }
 ```
-Memory adapter: in-process maps. Redis adapter: pub/sub + keys with TTL.
+Memory adapter (v1): in-process maps, lost on restart. Redis adapter (post-v1): pub/sub + keys with TTL. Nothing that must survive an app restart lives in `kv`; E2EE room state lives in the LiveKit room (10 §4.1).
 
 ### 3.4 Auth port
 ```ts
@@ -119,17 +121,18 @@ events reliably in order, support resume, apply backpressure.
 Lives in modules `voice`, `video`, `screenshare`, `voice-e2ee`, `recording`.
 
 ### 6.1 Room model
-- One LiveKit room per voice channel: name `vc_<channelId>`. Rooms are created lazily on first join (LiveKit auto-creates; we set `emptyTimeout` and `maxParticipants` via room settings/token).
+- One LiveKit room per voice channel: name `vc_<channelId>`. On the first join to an empty channel the app creates the room explicitly (`RoomService.createRoom` with `emptyTimeout` and `maxParticipants`) before minting the token, because the room's ID salts the E2EE key (10 §4.1, 18 T27).
 - The app is the **only** issuer of tokens; clients never hold API keys.
 
 ### 6.2 Token minting
-Claims (LiveKit `VideoGrant`): `room`, `roomJoin`, `canSubscribe`, `canPublish`, `canPublishData`, `canPublishSources` (subset of `microphone`, `camera`, `screen_share`, `screen_share_audio` according to the user's permissions), `canUpdateOwnMetadata`. `identity` = user ID (stable), `name` = display name, `metadata` = small JSON (avatar hash, etc.). TTL short (e.g. 10 min); the LiveKit client refreshes by asking the app for a new token on `TokenRefresh` events, and the app re-checks permissions each time.
+Claims (LiveKit `VideoGrant`): `room`, `roomJoin`, `canSubscribe`, `canPublish`, `canPublishData`, `canPublishSources` (subset of `microphone`, `camera`, `screen_share`, `screen_share_audio` according to the user's permissions), `canUpdateOwnMetadata`. `identity` = user ID (stable), `name` = display name, `metadata` = small JSON (avatar hash, etc.). TTL short (e.g. 10 min). The TTL limits reuse of a leaked token; it is **not** a revocation mechanism, because LiveKit may refresh tokens for connected participants itself (verify in D1). Revocation is enforced through `RoomService` (§6.4) and the reconciler (§6.3). The app re-checks permissions whenever it mints a token, including on `POST /voice/channels/:id/token`.
 
 ### 6.3 Webhooks
 - Endpoint `/api/internal/livekit/webhook`, verified with LiveKit's webhook receiver (signature header; API secret). Not exposed through Caddy to the public beyond what is needed; allow-list the LiveKit host where possible.
 - Handled events: `participant_joined`, `participant_left`, `track_published`, `track_unpublished`, `room_finished`.
 - Handlers are idempotent; each updates the presence store and emits bus events (`voice.participant.joined` …).
 - **Reconciliation job** every 30 s (configurable): `RoomServiceClient.listRooms/listParticipants` vs presence store; repair drift (missed webhooks, app downtime).
+- The same job reconciles **authorisation**: for every participant it recomputes CONNECT/SPEAK/VIDEO/SCREEN_SHARE from the DB, calls `removeParticipant` or `updateParticipant` on any mismatch, and rotates the room's E2EE key if anyone was removed. When the event-driven path fails (LiveKit call timed out, app restarted mid-propagation), enforcement still lands within one interval (18 T25). Every repair is counted (`reconcile_repairs_total{kind}`, §8).
 
 ### 6.4 Server-initiated media actions
 Using `RoomServiceClient`: remove participant (kick/ban), mute published track (server-mute), update participant permissions (e.g. revoke screenshare mid-call), move user (remove + instruct client to join another room).
@@ -143,19 +146,20 @@ Tiny internal scheduler (no external queue): interval and cron-ish jobs with jit
 
 | Job | Frequency | Purpose |
 |---|---|---|
-| `presence.reconcile` | 30 s | Sync LiveKit participants with presence |
+| `presence.reconcile` | 30 s | Sync LiveKit participants with presence and permissions (§6.3) |
+| `outbox.drain` | continuous (short poll) | Deliver outbox rows to derived-data handlers (§3.1) |
 | `sessions.purge` | hourly | Delete expired sessions |
 | `invites.purge` | hourly | Delete expired/used-up invites |
 | `uploads.gc` | daily | Remove orphaned files (no referencing message, > 24 h) |
 | `messages.retention` | daily | Optional message retention policy |
-| `db.maintenance` | weekly | SQLite `PRAGMA optimize`/vacuum, Postgres analyze hints |
-| `backup.hook` | configurable | Optional scheduled DB snapshot to storage |
+| `db.maintenance` | weekly | SQLite `PRAGMA optimize` and `incremental_vacuum`; never a full `VACUUM` (§3.1) |
+| `backup.hook` | configurable | Optional scheduled DB snapshot via the incremental backup API (§3.1) |
 
 ## 8. Errors, logging, metrics
 
 - Domain errors are typed (`class AppError { code; httpStatus; safeMessage }`); everything else is logged with a request ID and returned as `INTERNAL`.
-- pino JSON logs; levels per module; redaction of tokens, passwords, cookies, `Authorization`.
-- Metrics (if `metrics` enabled): HTTP latency/error counters, WS connections, events/s, queue depth, DB latency, job durations, voice participants per room, webhook lag.
+- pino JSON logs; levels per module; redaction of tokens, passwords, cookies, `Authorization`. The request ID is carried into bus events and outbox rows, so a handler's log line names the request that triggered it (18 T34).
+- Metrics (if `metrics` enabled): HTTP latency/error counters, WS connections, events/s, queue depth, DB latency, job durations, voice participants per room, webhook lag, outbox backlog, and reconciler repairs by kind (`reconcile_repairs_total{kind}`). A reconciler that quietly fixes drift hides a broken primary path such as webhooks, so a sustained non-zero repair rate is an alert (14 §8).
 - `/healthz` (process alive), `/readyz` (DB reachable, migrations applied, LiveKit reachable if voice enabled).
 
 ## 9. Security-relevant server behaviours (detail in 15)

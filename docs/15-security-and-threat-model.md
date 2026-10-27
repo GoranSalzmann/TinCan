@@ -81,6 +81,7 @@ catalogue, and the security process.
 |---|---|
 | Joining without permission | Tokens only from the app after `CONNECT` check; short TTL; LiveKit API secret never leaves server |
 | Token sharing | Identity bound; duplicate identity displaces the old connection; TTL short |
+| Revoked user stays in a call | Revocation never relies on token expiry: `RoomService` removal on the event, plus a reconciler that re-checks every participant's permissions each pass and rotates the E2EE key when it removes someone (05 §6.3) |
 | Unauthorised publishing | `canPublishSources` limited per permission; server-mute/revoke via `updateParticipant` |
 | Eavesdropping at the SFU | DTLS-SRTP in transit; optional frame-level E2EE (10) |
 | Webhook forgery | Signature verification; internal-only route; shared secret |
@@ -101,12 +102,13 @@ See 10 §2 for what it does and does not protect. Additional controls: keys in m
 | Malicious deep links | Strict parsing/validation of `tincan://` arguments; never execute |
 | Update channel compromise | HTTPS + code-signature verification; signed releases; protected CI secrets; channel pinning |
 | Token theft from disk | `safeStorage` encryption (OS keychain bound); logs redact tokens |
+| Token sent to other sites by header injection | The main process adds `Authorization` only for the configured instance origin(s) (13 §3) |
 | Global keyboard capture abuse | No native input hook in v1; only Electron `globalShortcut` registrations for toggle-mute/deafen/leave (no raw key stream). If a hook is added in v1.1: opt-in, binding-only events, no logging, active only in call |
 
 ### 4.7 Infrastructure / deployment
 | Threat | Control |
 |---|---|
-| Open ports/misconfigured services | Compose exposes only §14.3 ports; internal network for DB/Redis; doctor warns on exposed ports |
+| Open ports/misconfigured services | Compose exposes only §14.3 ports; internal network for DB/Redis; doctor warns on exposed ports; LiveKit's port 7880 (signalling plus the RoomService admin API) stays off the public interface, and Caddy proxies only `/livekit/rtc*` (14 §2) |
 | Leaked secrets in images/repos | Secrets via env/volumes; secret scanning in CI; `.env` gitignored; permission 0600 |
 | Outdated components | Pinned versions plus Renovate/Dependabot, image scanning, release notes list advisories |
 | Container escape/privilege | Non-root, read-only fs, dropped capabilities, no privileged mode (host networking only for LiveKit) |
@@ -172,6 +174,7 @@ are documented as out-of-scope for v1 (Q9, K-13).
 | S-13 | Release artifacts signed; update integrity verified |
 | S-14 | Dependencies scanned in CI; critical advisories block release |
 | S-15 | E2EE-required channels cannot be joined unencrypted |
+| S-16 | Losing CONNECT (ban, kick, role change) removes the user from voice within one reconciliation interval, even when the first removal attempt fails |
 
 ## 9. Security process
 

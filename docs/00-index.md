@@ -44,7 +44,8 @@ The docs go top-down. Each level assumes the one above it.
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:
 facts marked "(verify)" are checked in the M0 spikes (17), and open items in each doc
-are triaged through 18.
+are triaged through 18. Design-review findings and the decisions taken on them are
+in 18 §F and §G.
 
 ## Coverage checklist ("is everything accounted for?")
 
@@ -67,7 +68,7 @@ with a doc number are covered by that doc once written.
 
 **Cross-cutting**
 - [x] Feature toggles + capability discovery (04)
-- [x] Interchangeable DB / storage / pubsub / auth (04, 05, 06)
+- [x] Interchangeable DB / storage / pubsub / auth: ports in v1, one adapter each (auth: local + OIDC); more adapters post-v1 (04, 05, 06, 18 T32)
 - [x] Voice/video E2EE (10)
 - [x] Upload bandwidth that does not scale with viewers (08)
 - [x] Best-available noise suppression and audio processing (09)
@@ -95,7 +96,7 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 | D4 | Swappable ports only for DB, storage, pubsub, auth | Settled |
 | D5 | TypeScript end to end | Proposed |
 | D6 | Electron desktop shell (not Tauri) | Proposed |
-| D7 | SQLite default, Postgres supported | Proposed |
+| D7 | SQLite only in v1; Postgres, Redis, S3 adapters post-v1 (18 T32) | Settled |
 | D8 | Voice/video E2EE yes; text E2EE no (v1) | Proposed |
 | D9 | One instance = one community (schema allows more) | Settled |
 | D11 | Name "Tin Can"; licence AGPL-3.0 | Settled |

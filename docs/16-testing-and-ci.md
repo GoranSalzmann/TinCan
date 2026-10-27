@@ -40,9 +40,9 @@ global % gate that encourages low-value tests.
 ## 3. Contract tests (ports)
 
 Shared suites that **every adapter must pass**:
-- **Database:** CRUD, transactions, constraint behaviour, pagination ordering, FTS `SearchIndex` semantics, migration up path; run against SQLite and Postgres (container) in CI.
-- **Storage:** put/get/delete, range reads, signed URL behaviour, key validation (traversal attempts) for local and S3 (MinIO container).
-- **PubSub:** publish/subscribe, kv TTL semantics, atomic `incr`, lease behaviour; memory and Redis.
+- **Database:** CRUD, transactions, constraint behaviour, pagination ordering, FTS `SearchIndex` semantics including catch-up after a crash between commit and indexing (outbox, 06 §3.14), migration up path. SQLite only in v1; Postgres joins when its post-v1 adapter does (18 T32).
+- **Storage:** put/get/delete, range reads, signed URL behaviour, key validation (traversal attempts) for local; S3 (MinIO container) with the post-v1 adapter.
+- **PubSub:** publish/subscribe, kv TTL semantics, atomic `incr`, lease behaviour; memory (Redis with the post-v1 adapter).
 - **Auth adapters:** `Identity` mapping, failure modes; OIDC against a mock provider (e.g. a local test IdP container).
 
 ## 4. Module matrix tests
@@ -60,10 +60,10 @@ Server booted in-process with real adapters and a real LiveKit container
 (dev mode):
 - REST + gateway scenarios: register via invite, login, create channel, send message, edit/delete, reactions, uploads, search, read-state, role changes mid-session (events delivered/withdrawn), kick/ban propagation.
 - **Authorisation matrix:** generated tests of every endpoint × representative roles (owner, admin, moderator, member, restricted member, outsider) × channel overwrite scenarios; asserts allow/deny and absence of data leakage (11, 15 S-04/S-05).
-- Voice server flow: join → token claims decode correctly → webhook processing → presence → reconciliation after dropped webhooks → permission revoke triggers `updateParticipant`.
+- Voice server flow: join → token claims decode correctly → webhook processing → presence → reconciliation after dropped webhooks → permission revoke triggers `updateParticipant`; a ban whose `removeParticipant` call is forced to fail is still enforced by the next reconciler pass (S-16); an app restart mid-call keeps E2EE keys (no rekey).
 - Rate limiting, setup flow (token required), invite races, session revocation, resume replay correctness (including `INVALID_SESSION`).
 - Migration tests: apply all migrations from empty; **upgrade tests** from fixtures of the previous N−1 and N−2 released schemas with sample data; downgrade-protection test.
-- Backup/restore test: create data → `tincan backup` → wipe → `tincan restore` → boot → smoke-check counts and a file download (N-008).
+- Backup/restore test: create data → `tincan backup` → wipe → `tincan restore` → boot → smoke-check counts and a file download (N-008). Also: the pre-migration backup taken after an unclean stop contains every committed transaction (18 T28).
 - Failure injection: DB busy (SQLite), Redis down (degraded behaviour), LiveKit down (`UNAVAILABLE`, text fine), webhook duplicates/out-of-order.
 
 ## 6. Media tests
@@ -101,6 +101,7 @@ Visual regression: optional screenshots for core screens; thresholds to avoid no
 |---|---|---|---|
 | REST/gateway | k6 (or custom WS load script) | 200 users, 20 msgs/s total, gateway fan-out | p95 < 300 ms (N-002), steady memory |
 | SQLite | custom | Sustained writes with concurrent reads | No lock errors, p95 write < 50 ms |
+| Event-loop blocking | custom | Scheduled backup, maintenance job and heavy search on a ~4 GB fixture while 200 sockets heartbeat | No missed heartbeats; p95 delivery stays < 300 ms (18 T28) |
 | SFU | `lk load-test` (LiveKit CLI, verify) | 25 audio publishers; 1 video publisher × 10 subscribers | CPU/egress per 08 §13 expectations |
 | Client | Playwright traces/Lighthouse | Open busy channel (10k messages), scroll | 60 fps scroll, memory bounded |
 | Reconnect storm | custom | 200 sockets drop & resume simultaneously | No server overload; resume works |
@@ -130,7 +131,7 @@ Results are recorded per release in `docs/qa/<version>.md`.
 | Stage | Trigger | Jobs |
 |---|---|---|
 | **PR checks** (target < 10 min) | every PR | install (frozen lockfile), typecheck, lint, unit, contract (SQLite/memory/local), module matrix, build, licence+secret scan, SAST |
-| **Integration** (target < 25 min) | PR (label/paths) and main | Postgres/Redis/MinIO/LiveKit containers, integration + authorisation matrix + migrations + backup/restore |
+| **Integration** (target < 25 min) | PR (label/paths) and main | LiveKit container (Postgres/Redis/MinIO join with their post-v1 adapters), integration + authorisation matrix + migrations + backup/restore |
 | **E2E & media** | main + nightly | Playwright web, media tests, TURN-path test, upload-independence test |
 | **Desktop builds** | main + tags | Matrix build on Windows/macOS/Linux runners; packaging; Playwright-Electron smoke on each OS |
 | **Nightly** | schedule | Audio harness, load tests, dependency/image scans, long-run soak (30 min call) |
@@ -158,7 +159,7 @@ Audio/video fixtures committed via Git LFS or generated in CI.
 
 - Requirements in 01 mapped to tests; permission checks and error paths tested.
 - Works with the module disabled (no residue) and enabled.
-- Both DB dialects pass.
+- The DB contract suite passes (SQLite in v1; both dialects once the Postgres adapter exists).
 - Capabilities, docs (user + admin + design delta) updated.
 - Accessibility pass (keyboard, labels).
 - No new security checklist items unaddressed (15).

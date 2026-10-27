@@ -95,7 +95,7 @@ Config error: module "screenshare" is enabled but its dependency "voice" is disa
 - **Conflict** → refuse or warn depending on rule severity:
   - `voice-e2ee` + `recording`: **error** ("recorded media would be undecodable or E2EE would be bypassed"). Host must choose.
   - `voice-e2ee` + `link-previews`: no conflict (text only).
-  - `search` + Postgres without `pg_trgm`/FTS configured: **warn**, falls back to basic LIKE.
+  - `search` + Postgres without `pg_trgm`/FTS configured: **warn**, falls back to basic LIKE (applies once the post-v1 Postgres adapter exists, 18 T32).
 - **Disabling a module with existing data:** tables are kept (never dropped automatically). Re-enabling restores the feature. A CLI `module purge <id>` (explicit, confirmed) can delete a module's data.
 - **Module data ownership:** a module may *read* another module's data only through that module's exported read interface (a small typed `ModuleApi` object registered on `ctx.api`). It never queries another module's tables directly.
 
@@ -122,12 +122,17 @@ interface Events {
 Rules:
 - Handlers must be idempotent (webhook duplicates, retries).
 - Events are facts, not commands. A handler failing never fails the publisher; it is logged and counted.
+- Events are not a delivery guarantee: they live in memory and are lost on a crash or a failed handler. Anything that **must** happen is also covered by a level-triggered path that re-derives the desired state from the DB:
+  - Enforcement in voice (removing banned or kicked users, applying permission changes, rotating E2EE keys) is repeated by the voice reconciler on every pass (05 §6.3, 18 T25).
+  - Derived data (the search index) is fed from a core outbox written in the same transaction as the source row, not from the bus (05 §3.1, 06 §3.14, 18 T29).
+- Each event carries the request ID of the use case that published it, so a failed handler's log line traces back to its request (18 T34).
 - Events flagged `broadcast: true` are forwarded over the pubsub port to other nodes; the rest stay local.
 - The gateway subscribes to the bus to produce client-facing events (e.g. `message.created` → WS `MESSAGE_CREATE` to authorised sockets).
 
 Example decoupling: `moderation` publishes `member.banned`; `voice` subscribes and
 disconnects the person from LiveKit; `audit-log` subscribes and records it.
-Moderation knows nothing about voice or audit-log.
+Moderation knows nothing about voice or audit-log. If the LiveKit disconnect
+fails, the next voice reconciler pass removes the person anyway.
 
 ## 7. Capability discovery
 
@@ -176,9 +181,9 @@ boot; unknown keys are an error (catches typos).
 ```yaml
 instance: { name: "Our Place", publicUrl: "https://chat.example.com" }
 adapters:
-  database: { kind: sqlite, path: /data/app.db }     # or postgres: { url: ... }
-  storage:  { kind: local,  path: /data/files }      # or s3: { bucket, endpoint, ... }
-  pubsub:   { kind: memory }                         # or redis: { url }
+  database: { kind: sqlite, path: /data/app.db }     # postgres: post-v1 (18 T32)
+  storage:  { kind: local,  path: /data/files }      # s3: post-v1
+  pubsub:   { kind: memory }                         # redis: post-v1
   auth:     { kinds: [local] }                       # [local, oidc]
 livekit: { url: wss://chat.example.com/livekit, apiKey: ..., apiSecret: ... }
 modules:

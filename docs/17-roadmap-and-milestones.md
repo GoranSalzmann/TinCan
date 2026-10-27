@@ -41,12 +41,12 @@ usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
 **Goals:** replace "(verify)" guesses with measured facts; finalise open choices.
 | Spike | Question | Exit criteria |
 |---|---|---|
-| D1 | LiveKit self-hosted behaviour: ports, config keys, dynacast flatness, egress per viewer | Config sketch in 08/14 corrected; measured numbers recorded |
+| D1 | LiveKit self-hosted behaviour: ports, config keys, dynacast flatness, egress per viewer; whether LiveKit refreshes tokens for connected participants itself (18 T25) | Config sketch in 08/14 corrected; measured numbers recorded |
 | D2 | Denoiser worklet CPU/latency/quality; AEC vs Web Audio playback; model licence | Tier choice made (T16); numbers in 09 |
 | D3 | Electron screenshare + audio on Windows/Linux/macOS/Wayland; `globalShortcut` behaviour per OS/Wayland (native PTT hook feasibility only as v1.1 input) | Support matrix written (13 §5) |
-| D4 | E2EE + simulcast/SVC + speaker detection | Decision on defaults (T12, T17) |
-| D5 | Kysely vs Drizzle with dual dialect + FTS | Pick + migration pattern (T2) |
-| D6 | TURN/TLS and cert sharing; single-port UDP | Final network docs (T3) |
+| D4 | E2EE + simulcast/SVC + speaker detection; LiveKit room SID and metadata as the E2EE session (T27); audio-level header under E2EE (T33) | Decision on defaults (T12, T17); T27 confirmed; T33 closed |
+| D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded |
+| D6 | TURN/TLS cert sharing with deferred LiveKit reload (T30); single-port UDP; host-network routing and the narrowed Caddy route (T26) | Final network docs (T3) |
 Also: Fastify vs Hono (T1), electron-builder vs Forge, **low-fi wireframes and a
 token/style guide for the main screens (drafted by Claude, approved by you)**,
 app icon/brand basics, repo creation and licence headers (`AGPL-3.0-or-later`
@@ -66,14 +66,15 @@ empty layout; CI green; module boot matrix test exists.
 Channels/categories, roles + permission engine + overwrites, invites + register,
 messages (create/edit/delete/history/pagination/replies/mentions), realtime
 delivery, unread/read-state, uploads + thumbnails + per-user quotas, member list + presence,
-search (FTS5), Postgres adapter + contract tests, local+S3 storage, Redis pubsub
-adapter (contract tests; may land in M5 if time-boxed), markdown rendering, notifications (web),
-admin panes (roles, channels, invites).
+search (FTS5, fed by the core outbox), contract tests for the DB, storage and pubsub
+ports (one adapter each in v1: SQLite, local, memory; 18 T32), markdown rendering,
+notifications (web), admin panes (roles, channels, invites).
 **Exit:** a text-only Tin Can is pleasant enough for a friends group to use
-daily; authorisation matrix tests pass; both DBs pass.
+daily; authorisation matrix tests pass; the DB contract suite passes on SQLite.
 
 ### M3. Voice
-LiveKit integration (token minting, webhooks, presence + reconciliation),
+LiveKit integration (explicit room creation, token minting, webhooks, presence
+and permission reconciliation),
 voice channels UI with sidebar presence, voice manager + device manager, audio
 pipeline v1 (browser AEC + DeepFilterNet tier + fallback, presets, mic test,
 PTT in-window), connectivity diagnostics, TURN configured, Electron shell
@@ -135,8 +136,8 @@ UI/UX design: **Claude drafts low-fi wireframes and a token/style guide in M0; y
 
 If time runs short, cut in this order (last first):
 1. Reactions, link previews, search UI polish (modules can ship disabled).
-2. Postgres adapter and Redis pubsub (keep contract tests; ship SQLite only).
-3. S3 storage adapter.
+2. ~~Postgres adapter and Redis pubsub~~ Already out of v1 (18 T32).
+3. ~~S3 storage adapter~~ Already out of v1 (18 T32).
 4. OIDC.
 5. Pop-out windows (keep PiP).
 6. macOS system audio, Linux Flatpak.
@@ -150,6 +151,7 @@ basics, docs.
 | Item | Notes |
 |---|---|
 | TOTP 2FA, passkeys | 11 §1.8 |
+| Postgres, Redis pub/sub and S3 adapters | 18 T32; the ports and contract tests are already in v1 |
 | Account data export | 11, 15 §6 |
 | Email adapter (verification, reset, digests) | optional |
 | Threads, DMs/group DMs, custom emoji | Q2/Q3 reversals |

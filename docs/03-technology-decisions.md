@@ -31,7 +31,7 @@ Each record: context, options, decision, consequences. Status is one of
 ## ADR-004: Ports only where real alternatives exist
 **Status:** Settled
 **Decision:** Interchangeable: database, file storage, pub/sub, auth. Fixed: LiveKit, Caddy-or-equivalent proxy, TypeScript runtime.
-**Consequences:** Each port requires a shared contract test suite that every adapter passes (16).
+**Consequences:** Each port requires a shared contract test suite that every adapter passes (16). v1 ships one adapter per port, except auth (local + OIDC); Postgres, S3 and Redis adapters are post-v1 (18 T32).
 
 ## ADR-005: Language and server framework
 **Status:** Proposed
@@ -49,20 +49,20 @@ Each record: context, options, decision, consequences. Status is one of
 **Consequences:** We own reconnect/resume logic (well understood; specified in 07).
 
 ## ADR-007: Database access layer and engines
-**Status:** Proposed
+**Status:** Engines settled (18 T32); query builder Proposed
 **Options:** Drizzle, Kysely, Prisma, raw SQL.
-**Decision:** SQLite default, Postgres supported. Kysely or Drizzle with a restricted common SQL subset. Final pick at scaffolding time; criteria: dual-dialect migrations, typed queries, no code generation step in the dev loop.
-**Rules for the common subset:**
-- No engine-specific types in the schema (IDs are text/ULID, timestamps are integer ms or ISO text, booleans are 0/1, JSON stored as text with app-level validation, or JSON columns accessed through the adapter).
-- Full-text search goes through a `SearchIndex` helper with per-engine implementations (SQLite FTS5, Postgres tsvector). This is the *one* area where adapters are not trivially identical.
-- Migrations are written once in the portable subset; engine-specific migration steps are allowed only via an explicit per-dialect branch.
-**Consequences:** CI runs the full suite on both engines. SQLite uses WAL mode, a single writer connection, and busy timeout. See 06.
+**Decision:** SQLite only in v1; Postgres is a post-v1 adapter behind the same port (18 T32). Kysely or Drizzle; final pick at scaffolding time; criteria: typed queries, async transactions that work on better-sqlite3 (spike D5), no code generation step in the dev loop.
+**Conventions kept so a later Postgres adapter stays cheap:**
+- No engine-specific types in the schema (IDs are text/ULID, timestamps are integer ms or ISO text, booleans are 0/1, JSON stored as text with app-level validation).
+- Full-text search goes through a `SearchIndex` helper (SQLite FTS5 in v1; Postgres tsvector later), fed from the core outbox (06 §3.14).
+- Migrations target SQLite in v1; a Postgres adapter would add its own per-dialect branch.
+**Consequences:** CI runs one engine in v1. SQLite uses WAL mode, a single writer connection and busy timeout. better-sqlite3 runs on the event loop, so long statements are banned and backups use the incremental backup API (05 §3.1, 18 T28). See 06.
 
 ## ADR-008: Storage, pubsub, auth adapters
-**Status:** Proposed
+**Status:** Settled (18 T32)
 **Decision:**
-- Storage: `local` (default), `s3` (any S3-compatible).
-- PubSub: `memory` (default, single node), `redis`.
+- Storage: `local` in v1; `s3` (any S3-compatible) post-v1.
+- PubSub: `memory` in v1 (single node); `redis` post-v1.
 - Auth: `local` (argon2id), `oidc`. Both resolve to a normalised `Identity`.
 **Consequences:** Interfaces are intentionally tiny (see 05).
 
@@ -96,7 +96,7 @@ Each record: context, options, decision, consequences. Status is one of
 
 ## ADR-014: Reverse proxy and TLS
 **Status:** Proposed
-**Decision:** Caddy 2 for automatic HTTPS. LiveKit's own TURN/TLS needs certificates too; Caddy-issued certs are shared with LiveKit or LiveKit's built-in ACME is used (decide in 14).
+**Decision:** Caddy 2 for automatic HTTPS. LiveKit's own TURN/TLS needs certificates too; Caddy-issued certs are shared with LiveKit or LiveKit's built-in ACME is used (decide in 14). **Decided (18 T30):** Caddy's certificate is shared with LiveKit for TURN/TLS on 5349, and LiveKit is reloaded only when no rooms are active or the certificate nears expiry (14 §2.3).
 **Consequences:** Hosts need a domain and ports 80/443 reachable.
 
 ## ADR-015: One instance = one community?
@@ -129,5 +129,5 @@ Each record: context, options, decision, consequences. Status is one of
 ## Open items
 - ADR-005 Fastify vs Hono (final at scaffold).
 - ADR-007 Kysely vs Drizzle (final at scaffold).
-- ADR-014 cert sharing between Caddy and LiveKit.
+- ~~ADR-014 cert sharing between Caddy and LiveKit~~ Resolved: shared certificate, deferred reload (18 T30; confirm in D6).
 - ADR-018 resolved: SPDX `AGPL-3.0-or-later` with DCO sign-off, no CLA (triage, 18 §F).
