@@ -40,7 +40,7 @@ global % gate that encourages low-value tests.
 ## 3. Contract tests (ports)
 
 Shared suites that **every adapter must pass**:
-- **Database:** CRUD, transactions, constraint behaviour, pagination ordering, FTS `SearchIndex` semantics including catch-up after a crash between commit and indexing (outbox, 06 §3.14), migration up path. SQLite only in v1; Postgres joins when its post-v1 adapter does (18 T32).
+- **Database:** CRUD, transactions (concurrent requests never interleave with an open transaction or see its uncommitted rows; the root handle throws inside one, 05 §3.1), constraint behaviour, pagination ordering, FTS `SearchIndex` semantics including catch-up after a crash between commit and indexing (outbox, 06 §3.14), migration up path. SQLite only in v1; Postgres joins when its post-v1 adapter does (18 T32).
 - **Storage:** put/get/delete, range reads, signed URL behaviour, key validation (traversal attempts) for local; S3 (MinIO container) with the post-v1 adapter.
 - **PubSub:** publish/subscribe, kv TTL semantics, atomic `incr`, lease behaviour; memory (Redis with the post-v1 adapter).
 - **Auth adapters:** `Identity` mapping, failure modes; OIDC against a mock provider (e.g. a local test IdP container).
@@ -101,7 +101,7 @@ Visual regression: optional screenshots for core screens; thresholds to avoid no
 |---|---|---|---|
 | REST/gateway | k6 (or custom WS load script) | 200 users, 20 msgs/s total, gateway fan-out | p95 < 300 ms (N-002), steady memory |
 | SQLite | custom | Sustained writes with concurrent reads | No lock errors, p95 write < 50 ms |
-| Event-loop blocking | custom | Scheduled backup, maintenance job and heavy search on a ~4 GB fixture while 200 sockets heartbeat | No missed heartbeats; p95 delivery stays < 300 ms (18 T28) |
+| Event-loop blocking | custom (start from `spikes/d5-db/src/bench/blocking.ts`) | Scheduled snapshot, maintenance job, retention batch and the worst bounded search shapes (common term newest first, bounded relevance, shortest allowed prefix, a small channel's filter; 05 §3.1) on a ~4 GB fixture while 200 sockets heartbeat | No missed heartbeats; p95 delivery stays < 300 ms (18 T28) |
 | SFU | `lk load-test` (LiveKit CLI, verify) | 25 audio publishers; 1 video publisher × 10 subscribers | CPU/egress per 08 §13 expectations |
 | Client | Playwright traces/Lighthouse | Open busy channel (10k messages), scroll | 60 fps scroll, memory bounded |
 | Reconnect storm | custom | 200 sockets drop & resume simultaneously | No server overload; resume works |

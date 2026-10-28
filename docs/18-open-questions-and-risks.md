@@ -32,8 +32,8 @@ added there as later batches surface them.
 
 | Ref | Item | Doc |
 |---|---|---|
-| T1 | Fastify vs Hono final pick | 03, 05 |
-| T2 | Kysely vs Drizzle final pick (SQLite only in v1, T32) | 03, 06 |
+| T1 | ~~Fastify vs Hono final pick~~ **Decided (2026-10-28): Fastify**, on spike T1's evidence. It validates and strips responses at runtime (Hono sent an internal field and a schema-breaking body unchecked), enforces the 64 KiB gateway frame cap (Hono's WS adapter cannot set one), and served validated POSTs 1.9× faster; Hono is lighter (10 vs 70 packages). Evidence in 03 ADR-005 | 02, 03, 05 |
+| T2 | ~~Kysely vs Drizzle final pick (SQLite only in v1, T32)~~ **Decided (2026-10-28): Kysely**, on spike D5's evidence. Its async transactions serialise correctly on one better-sqlite3 connection; Drizzle's better-sqlite3 transactions are synchronous only, and an async callback type-checks but loses atomicity (silently in 1.0.0-rc.5). Evidence in 03 ADR-007 | 02, 03, 05, 06 |
 | T3 | Cert sharing Caddy ↔ LiveKit TURN/TLS. **Proposed (14 §2.3):** shared read-only cert volume, TURN/TLS on 5349; TURN on 443 via SNI router is an optional advanced setup; confirm in D6. **Decided (T30):** LiveKit reload deferred until no rooms are active | 03, 14 |
 | T4 | ~~UDP strategy~~ **Resolved (08 §3.2):** single UDP mux port 7882 + TCP 7881 + TURN/TLS; confirm in spike D6 | 02, 08, 14 |
 | T5 | ~~Webhook exposure~~ **Resolved (14 §2.1):** `/api/internal/*` blocked at Caddy; LiveKit calls the app over the internal Docker network. **Reasoning reopened by T26:** with LiveKit on host networking (T21) there is no shared Docker network | 05, 14 |
@@ -59,7 +59,7 @@ added there as later batches surface them.
 | T25 | **Decided (§F): accepted.** Review blocker (K-29). Make the presence reconciler also reconcile permissions: each pass, recompute CONNECT/SPEAK/VIDEO/SCREEN_SHARE for every LiveKit participant from the DB; `removeParticipant`/`updateParticipant` on mismatch; rotate the E2EE key if anyone was removed. Failure-path enforcement becomes ≤ 30 s (the 2 s SLO still holds on the happy path) | 05 §6.3, 10 §4.3, 11 §2.6 |
 | T26 | **Decided (§F): accepted.** Review blocker (K-30). Rework default compose routing for LiveKit host networking: publish the app on `127.0.0.1:3000` and point the webhook there; reach LiveKit via `host-gateway`; bind LiveKit's HTTP port 7880 to loopback; restate T5's reasoning. Narrow the Caddy route `/livekit/*` to the signalling path (`/livekit/rtc*`) so LiveKit's Twirp RoomService API is not proxied publicly | 05, 14 §2.1–2.2, 15 §4.7 |
 | T27 | **Decided (§F): LiveKit room SID + room metadata; confirm in D4.** Move E2EE room-session state out of app memory so a restart re-derives the same key: salt = LiveKit room SID (create the room explicitly on first join), epoch in room metadata; or persist `(channelId, salt, epoch)` in the DB. Stop `keyIndex` restarting at 0 across sessions (K-31) | 06 §3.13, 10 §4.1 |
-| T28 | **Decided (§F): accepted.** SQLite on the event loop: incremental `.backup()` for scheduled **and** pre-migration backups (no `VACUUM INTO`, no file copy); replace full `VACUUM` with `PRAGMA optimize` + `incremental_vacuum`; bound FTS query cost; decide whether the DB moves to a worker thread (K-32, K-36) | 05 §3.1, §7, 06 §7–8, 14 §7 |
+| T28 | **Decided (§F): accepted.** SQLite on the event loop: incremental `.backup()` for scheduled **and** pre-migration backups (no `VACUUM INTO`, no file copy); replace full `VACUUM` with `PRAGMA optimize` + `incremental_vacuum`; bound FTS query cost; decide whether the DB moves to a worker thread (K-32, K-36). **D5 result (2026-10-28):** no full move. One DB worker thread with its own read-only connection runs search and scheduled snapshots; snapshots use `VACUUM INTO` there, because `.backup()` stalls the main thread and never finishes from a second connection under writes. No `PRAGMA optimize`/`ANALYZE` on the live loop; maintenance runs in small steps on the main thread (05 §3.1, §D D5) | 05 §3.1, §7, 06 §7–8, 14 §7 |
 | T29 | **Decided (§F): accepted.** Derived data: compute mention counts from `message_mention` after `last_read` instead of keeping a counter; make ack `max(existing, new)`; index search from an in-transaction outbox row (core-provided, so module boundaries hold) plus a `tincan search reindex` command; add the crash window to the SearchIndex contract tests (K-33) | 04 §6, 06 §3.8–3.9, 07 §3.6, 16 §3 |
 | T30 | **Decided (§F): keep TURN/TLS on 5349 with a shared certificate; defer the LiveKit reload until no rooms are active, with a deadline before expiry. Caddy layer4 not adopted.** TURN/TLS termination: Caddy layer4 (SNI) terminates TLS and LiveKit TURN runs with `external_tls`, removing cert sharing and the renewal restart, and making TURN on 443 the default on one IP. Cost: a custom Caddy build. Fallback: defer the LiveKit reload until no rooms are active, with a deadline before expiry. Reopens T3 and the §F "TURN on 443 optional" decision (K-34, K-01) | 03 ADR-014, 14 §2.3 |
 | T31 | **Decided (§F): Electron header injection.** Desktop file access: Electron `webRequest.onBeforeSendHeaders` injects `Authorization` for the instance origin (plus the origin in the desktop CSP `img-src`), or the local storage adapter mints HMAC-signed expiring URLs with bucketed expiry so `signedUrl` never returns null (K-35) | 05 §3.2, 07 §3.7, 13 §3, 15 §5 |
@@ -104,11 +104,12 @@ Likelihood (L) and impact (I): H/M/L.
 | K-29 | A ban, kick or permission loss fails to remove the user from a live voice call: enforcement is a single fire-and-forget bus handler calling LiveKit (04 §6), nothing retries, and the reconciler checks presence, not permission. The user keeps the current E2EE key | M | H | T25 (reconcile permissions every pass); D1 checks whether token refresh is a backstop at all |
 | K-30 | Default compose topology doesn't route: with LiveKit on host networking (T21) it cannot resolve `tincan`, and Caddy/app cannot resolve `livekit`. Webhook failure is masked by the 30 s reconciler, so it looks like presence lag | H | H | T26; T34 (count reconciler repairs) |
 | K-31 | With E2EE on by default and the in-memory kv, every app restart (config change, upgrade, crash) loses room session and epoch and forces an unnecessary rekey. Late joiners get a key existing participants lack, and `keyIndex` restarts at 0, colliding with the old key. Seconds to tens of seconds of silence in every encrypted call, contradicting "app restart doesn't drop calls" (02 §3, 14 §7) | H | M | T27; D4 |
-| K-32 | better-sqlite3 runs every query on the main thread: the weekly `VACUUM` and `VACUUM INTO` backups on a multi-GB DB (≈4 GB/year with FTS, 06 §9) freeze HTTP and the gateway; past ~50 s every client reconnects at once. "N read connections" add no concurrency on one thread | M | M | T28; D5 |
+| K-32 | better-sqlite3 runs every query on the main thread: the weekly `VACUUM` and `VACUUM INTO` backups on a multi-GB DB (≈8.5 GB/year with FTS as measured in D5, 06 §9) freeze HTTP and the gateway; past ~50 s every client reconnects at once. "N read connections" add no concurrency on one thread | M | M | T28; measured in D5 (`VACUUM INTO` 45 s, first `ANALYZE` 19–34 s, unbounded search ranking up to 4.5 s on 4 GB): search and snapshots on a DB worker thread, step-wise maintenance (05 §3.1) |
 | K-33 | The SQLite search index and `read_state.mention_count` are updated by bus handlers after commit; a crash or `SQLITE_BUSY` in that window leaves permanent drift and nothing rebuilds them. Postgres `tsvector` is in-transaction, so the adapters differ and the SearchIndex contract tests miss it. A stale device's ack can move `last_read_message_id` backwards | M | M | T29 |
 | K-34 | TURN/TLS certificate renewal reloads (restarts) LiveKit (14 §2.3), dropping every call roughly every 60 days at a time chosen by ACME | H | M | T30 (decided: reload deferred until no rooms are active, so the restart lands in an empty moment); D6 |
 | K-35 | Desktop renderer (`app://`, bearer token) cannot load `/files/*` through `<img>`: no header, and no cookie cross-site. Avatars (R-006) and inline images return 401 in the primary client | H | M | T31 |
 | K-36 | Pre-migration backup is a plain file copy (06 §8, 14 §7); after an unclean stop it misses committed transactions still in the WAL, so an upgrade rollback loses recent data | L | M | T28 |
+| K-37 | A search cannot be cancelled once running: better-sqlite3 has no `interrupt()` or progress handler. A query shape that escapes the bounds in 05 §3.1 holds the DB worker for seconds (D5: 43 s for an UNINDEXED channel filter), queuing every other search behind it | L | M | Bounded query shapes (05 §3.1), search only on the DB worker, per-user search rate limit; add the worst shapes to the event-loop perf test (16) |
 
 ## D. Assumptions to validate early (spike list)
 
@@ -122,6 +123,25 @@ Referenced elsewhere as D1 to D6.
   - *Design review (§G):* room SID semantics (a new SID per room instance after `emptyTimeout`), creating the room before minting the token, server-set room metadata for the epoch, and keyring index behaviour across sessions (K-31, T27). Whether active-speaker detection reads the RTP audio-level header extension, which frame encryption leaves in clear (K-18, T33).
 - **D5.** Query-builder tooling (Kysely/Drizzle) on better-sqlite3 with FTS5. v1 is SQLite-only (T32), so dual-dialect migrations are no longer in scope.
   - *Design review (§G):* the Db port's async `transaction(fn)` must work on better-sqlite3 for the chosen builder (Kysely serialises through a mutex; Drizzle's better-sqlite3 transactions are reportedly synchronous only, confirm). Measure main-thread blocking for `VACUUM INTO`, `.backup()` and FTS queries on a ~4 GB fixture (K-32, T28).
+  - *Result (2026-10-28), done.* Code in `spikes/d5-db/`, raw numbers in its `RESULTS.md`. Measured in Docker on a Ryzen 5800X with NVMe, capped at 2 CPUs and 2 GB; a cheap VPS will be slower, so rerun `src/bench/blocking.ts` there before quoting absolute numbers.
+    - **Transactions.** Kysely 0.29.7 passes every concurrency scenario once two fixes from the spike are in: `begin immediate`, and a guard so the root handle cannot be used inside a transaction (it deadlocks otherwise). Drizzle's better-sqlite3 transactions are confirmed synchronous only (0.45.4 and 1.0.0-rc.5). → T2 decided: Kysely.
+    - **Typed queries and migrations.** Both builders give typed queries with no codegen. Kysely migrations are plain TS objects and a small runner; Drizzle needs `drizzle-kit generate` on every schema change and a custom file for FTS5.
+    - **Outbox → FTS5.** The prototype caught up after a kill between commit and indexing. It survived redelivery and eight random kills under load. `search reindex` rebuilt a damaged index online (≈ 9 min for 3.4M messages).
+    - **Main-thread blocking (4 GB fixture: 3.38M messages, 4.00 GB).**
+      - Fine in small steps: `incremental_vacuum(1000)` 46 ms; FTS5 `'merge', 100` 9 ms; retention deletes, 500 per batch, 64 ms; newest-first search ≤ 25 ms.
+      - Not fine on the main thread: `VACUUM INTO` 45 s; first `PRAGMA optimize`/`ANALYZE` 19–34 s; FTS5 `'optimize'` 9 s; unbounded `ORDER BY rank` up to 4.5 s; `.backup()` stalls of 0.4–2.8 s.
+      - `.backup()` from any connection but the writer's never completes under 100 writes/s.
+      - `VACUUM INTO` on a worker thread finished in 40 s with main-thread writes at p99 4.1 ms. → T28: one DB worker thread for search and snapshots (05 §3.1).
+    - **Schema findings.**
+      - 06 §3.9 keys FTS rows by an UNINDEXED `message_id`, which costs 0.5 s per edit or delete; the fix is a `message_id → rowid` map owned by `search`.
+      - Filtering by the UNINDEXED `channel_id` took 43 s for a channel with no hits; the fix is an indexed channel column in FTS5 (1 ms).
+      - FTS5's own copy of the text is 1.26 GB of the 4 GB. An external-content or contentless table would avoid that copy; not measured.
+    - **Docs updated to match (2026-10-28).**
+      - 06 §3.9: `search_doc` map, channel and author as indexed FTS5 columns, query bounds.
+      - 06 §7–8, 05 §7 `backup.hook`, 14 §6–7: snapshots via `VACUUM INTO` on their own connection (DB worker, or the CLI process), fsynced and renamed. The boot-time pre-migration backup may block.
+      - 05 §7 `db.maintenance`: no `PRAGMA optimize`; `incremental_vacuum` and FTS5 `merge` in steps.
+      - 16 §3 and §9: transaction-isolation contract tests; the search shapes from 05 §3.1 in the event-loop test.
+      - 17 M0: D5 and T1 done.
 - **D6.** TURN/TLS on 443 sharing a port/cert with Caddy (T3, T4); single-port UDP mux behaviour.
   - *Design review (§G):* whether LiveKit can reload TURN certificates without a restart (expected: no), and that the deferred reload sees active rooms correctly through `ListRooms` (K-34, T30). Loopback/`host-gateway` routing with LiveKit on host networking, `bind_addresses`, and LiveKit's signalling path prefix for narrowing the Caddy route (K-30, T26).
 
@@ -143,12 +163,15 @@ Referenced elsewhere as D1 to D6.
 | F3 | **AGPL-3.0-or-later** (SPDX `AGPL-3.0-or-later`) with **DCO** sign-off for contributors. No CLA; commercial relicensing would need every contributor's consent. | 03 ADR-018 |
 | T23 | **Claude drafts low-fi wireframes and a token/style guide in M0**; you approve before UI code starts. | 17 M0 |
 | T24 | **You plus Claude doing most of the coding.** You steer and review; implementation proceeds milestone by milestone. Pace depends on your review time, not coding time. | 17 §5 |
+| T1 | **Fastify** as the HTTP framework (2026-10-28, after spike T1). | 02, 03 ADR-005, 05 |
+| T2 | **Kysely** on better-sqlite3 as the query builder (2026-10-28, after spike D5). | 02, 03 ADR-007, 05, 06 |
 
 ### Accepted recommendations
 T10 typing events gateway-only · T13 2FA/export/deletion semantics deferred to v1.1 (v1: account deletion keeps messages as "Deleted User") · T15 warn on system-audio capture, prefer per-app · T19 no persistent message cache in v1 · T20 uploads on main origin with sandbox CSP, separate files domain optional · T21 LiveKit host networking by default on Linux · T22 single app node in v1.
 
 ### Deferred to M0 spikes (evidence decides)
 T1 Fastify vs Hono · T2 Kysely vs Drizzle · T3 TURN cert sharing · T11 "(verify)" facts · T12 speaking indicators under E2EE · T14 pop-out approach · T16 RNNoise tier · T18 electron-builder vs Forge.
+Spike results so far (2026-10-28): D5 is done (§D). On its evidence and spike T1's you decided **T1 Fastify** and **T2 Kysely** (03 ADR-005, ADR-007), which unblocks M1's DB port and HTTP layer.
 
 ### Chores before first public commit (not sign-off blockers)
 F4 name/trademark check for "Tin Can" and slug `tincan` · F5 rename the project folder.
@@ -187,7 +210,7 @@ Pending your call: the product-feature candidates found in the audit (stream pre
 | T25 | **Accepted.** The voice reconciler also re-checks permissions every pass; failure-path enforcement ≤ 30 s | 02, 04, 05, 08, 10, 11, 15, 16, 17 |
 | T26 | **Accepted.** Loopback/host-gateway routing for host-networked LiveKit; port 7880 off the public interface; Caddy proxies only `/livekit/rtc*` | 14, 15, 17 |
 | T27 | **LiveKit room SID + room metadata** carry the E2EE session, so app restarts need no rekey (confirm in D4) | 02, 05, 06, 08, 10, 16, 17 |
-| T28 | **Accepted.** Incremental `.backup()` for scheduled and pre-migration backups; no full `VACUUM`; bounded search | 03, 05, 06, 14, 16, 17 |
+| T28 | **Accepted.** Incremental `.backup()` for scheduled and pre-migration backups; no full `VACUUM`; bounded search. Revised after D5 (2026-10-28): snapshots via `VACUUM INTO` on their own connection, search on a DB worker thread (05 §3.1) | 03, 05, 06, 14, 16, 17 |
 | T29 | **Accepted.** Computed mention counts, monotonic acks, search fed by a core outbox, `tincan search reindex` | 04, 05, 06, 07, 16, 17 |
 | T30 | **Keep 5349, defer the reload.** Shared Caddy certificate; LiveKit restarts only when no rooms are active, or near expiry. Caddy layer4 not adopted; TURN on 443 stays optional | 03, 14, 17 |
 | T31 | **Electron header injection** for `/files/*` and other subresources | 05, 07, 13, 15 |

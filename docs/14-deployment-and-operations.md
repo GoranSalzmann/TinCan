@@ -135,7 +135,7 @@ config/  config.yaml, livekit.yaml, Caddyfile
 caddy-data/  ACME account & certificates
 ```
 - **Backup set:** database snapshot + files + `config/` + `.env` (secrets are needed to keep E2EE derivation and API keys; protect the backup).
-- `tincan backup` produces a timestamped archive: SQLite online backup through the incremental backup API (consistent while running, without stalling the server, 06 §7), files (rsync-style or tar), config. (`pg_dump` and S3 bucket versioning apply once those post-v1 adapters exist.)
+- `tincan backup` produces a timestamped archive: a SQLite snapshot via `VACUUM INTO` from the CLI's own connection (consistent while the server keeps writing, without stalling it, 06 §7), files (rsync-style or tar), config. (`pg_dump` and S3 bucket versioning apply once those post-v1 adapters exist.)
 - Scheduled via the `backup.hook` job (05 §7) or host cron; retention settings (e.g. keep 7 daily, 4 weekly); optional upload to another storage target (S3/rclone).
 - `tincan restore <archive>` into an empty directory; steps documented; **CI tests restore** (16).
 - Recommend off-host copies; docs include a 3-2-1 reminder.
@@ -143,7 +143,7 @@ caddy-data/  ACME account & certificates
 ## 7. Upgrades
 
 - Images are tagged with explicit versions (`tincan:1.2.3`); `latest` not recommended. Pinned LiveKit version tested with each Tin Can release (compatibility matrix in release notes).
-- Procedure: `tincan backup` → read release notes → bump versions → `docker compose pull && docker compose up -d`. Migrations run automatically at boot (06 §8) after an automatic pre-migration backup (SQLite backup API, not a file copy, 06 §8).
+- Procedure: `tincan backup` → read release notes → bump versions → `docker compose pull && docker compose up -d`. Migrations run automatically at boot (06 §8) after an automatic pre-migration backup (the same `VACUUM INTO` snapshot, not a file copy, 06 §8).
 - Zero-downtime is not a goal; expected downtime seconds. LiveKit restarts drop calls; the app server restart doesn't.
 - Rollback: restore the pre-upgrade backup and previous image tag (the server refuses to start on a newer schema, 06 §8, to prevent silent corruption).
 - Desktop clients update independently; `apiVersion` negotiation covers skew (07 §6). Release notes flag breaking protocol changes and the minimum client version.

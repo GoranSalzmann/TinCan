@@ -34,11 +34,18 @@ Each record: context, options, decision, consequences. Status is one of
 **Consequences:** Each port requires a shared contract test suite that every adapter passes (16). v1 ships one adapter per port, except auth (local + OIDC); Postgres, S3 and Redis adapters are post-v1 (18 T32).
 
 ## ADR-005: Language and server framework
-**Status:** Proposed
+**Status:** Proposed (TypeScript). HTTP framework **Settled: Fastify** (you, 2026-10-28, after spike T1; 18 T1).
 **Options:** TypeScript (Node), Go, Rust.
 **Decision:** TypeScript end to end; Fastify as the HTTP framework (mature plugin ecosystem, schema validation, good WS support via `@fastify/websocket`).
 **Alternatives considered:** Hono (lighter, portable across runtimes; fewer batteries), Go (matches LiveKit, but splits the language between server and client and prevents shared types/zod schemas).
 **Why:** Shared types and validation schemas between server, web and desktop clients is a big maintenance saver for a small team. You said language preference does not matter, so this optimises for team size.
+**Spike T1 (2026-10-28).** Fastify 5.12 (+ `@fastify/websocket`, `fastify-type-provider-zod`, `@fastify/swagger`) against Hono 4.13 (+ `@hono/node-server`, `@hono/node-ws`, `@hono/zod-openapi`), same zod 4 schemas and same gateway code on both. Raw output: `spikes/t1-http/RESULTS.md`.
+- Equal: zod validation of params, query and body with our error envelope; OpenAPI 3.1 generated from the route schemas and valid on both; WebSocket Origin check before the upgrade (403); gateway fan-out (both hand frames to `ws`: 1,000 sockets at 50 msg/s, p99 10.7 ms vs 9.9 ms).
+- Fastify validates responses at runtime: a handler that returned an extra internal field had it stripped, and a body that broke its schema became a 500. Hono sent both as-is (`@hono/zod-openapi` 1.6.3 has no response validation).
+- Fastify passes `maxPayload` to `ws`, so a 70 KiB frame closes with 1009 (07 §4.1 caps client frames at 64 KiB). `@hono/node-ws` 1.3.1 cannot set it; a 20 MiB frame was buffered and processed.
+- Throughput: validated POST 16.1k vs 8.4k req/s; history GET with 50 messages 8.2k vs 7.0k req/s (Fastify was also validating the response).
+- Hono is lighter: 10 vs 70 packages, 15 vs 27 MB installed, startup 133 vs 235 ms, 96 vs 114 MB RSS at ready.
+- **Recommendation: Fastify.** Response stripping and the frame cap guard against leaking internal fields and memory abuse (15) without per-handler code. Hono would need `Schema.parse()` in every handler and a hand-attached `ws` server.
 **Consequences:** Node single-threaded; fine at target scale (media is offloaded to LiveKit). CPU-heavy tasks (image thumbnailing) go to worker threads or a library using native code (sharp).
 
 ## ADR-006: Realtime transport for app events
@@ -49,14 +56,21 @@ Each record: context, options, decision, consequences. Status is one of
 **Consequences:** We own reconnect/resume logic (well understood; specified in 07).
 
 ## ADR-007: Database access layer and engines
-**Status:** Engines settled (18 T32); query builder Proposed
+**Status:** Engines settled (18 T32). Query builder **Settled: Kysely** (you, 2026-10-28, after spike D5; 18 T2).
 **Options:** Drizzle, Kysely, Prisma, raw SQL.
-**Decision:** SQLite only in v1; Postgres is a post-v1 adapter behind the same port (18 T32). Kysely or Drizzle; final pick at scaffolding time; criteria: typed queries, async transactions that work on better-sqlite3 (spike D5), no code generation step in the dev loop.
+**Decision:** SQLite only in v1; Postgres is a post-v1 adapter behind the same port (18 T32). Kysely on better-sqlite3, chosen against these criteria: typed queries, async transactions that work on better-sqlite3, no code generation step in the dev loop.
+**Spike D5 (2026-10-28).** Kysely 0.29.7 and drizzle-orm 0.45.4 (plus 1.0.0-rc.5) on better-sqlite3 13 with FTS5. Raw output: `spikes/d5-db/RESULTS.md`.
+- Async transactions: Kysely serialises every query on the single connection through a mutex, and a transaction holds it from `begin` to `commit`. In 300 concurrent requests with awaits inside transactions and 25 % rollbacks, nothing interleaved, no write was lost and no read saw uncommitted rows. The control (BEGIN, await, COMMIT without a mutex) failed all of these.
+- Drizzle's better-sqlite3 transactions are synchronous only, and an async callback type-checks. 0.45.4 throws at the first `await` and runs the rest in autocommit. 1.0.0-rc.5 commits before the first `await` and still hands the caller the callback's error, so a "failed" transaction keeps its rows. Drizzle is only safe through its async `sqlite-proxy` driver plus our own mutex (71 µs per point query).
+- Typed queries: both reject unknown columns, wrong value types, missing required columns and unselected fields at compile time. With FTS5, Kysely keeps the query typed and uses `sql` only for `MATCH`/`bm25()`. Drizzle cannot declare virtual tables, so those queries are raw SQL with an unchecked row type. `Kysely<DB>` narrows to a module's own tables without a cast, which gives each module a handle that cannot name other modules' tables (04).
+- Migrations: Kysely uses plain TS migration objects per module with a ~40-line runner that does what 06 §8 asks (per-module versions, refuses a newer schema, a failing migration leaves nothing behind). Drizzle runs `drizzle-kit generate` on every schema change (SQL plus snapshot JSON, 0.7 s) and needs a hand-written custom migration for FTS5. Drizzle's schema is one source for types and DDL. Kysely's table types are hand-written next to the migrations, so a test must apply all migrations to an empty database and exercise the queries.
+- Cost per point query on the main thread: raw 3.9 µs, Kysely 41.5 µs, Kysely with a prepared-statement cache 9.7 µs, Drizzle 66.6 µs (4.8 µs with `.prepare()`).
+**Conventions for the Kysely adapter (from D5):** `begin immediate` instead of Kysely's deferred `begin`; the root handle throws inside a transaction (an AsyncLocalStorage guard; without it, using `db` instead of `tx` deadlocks every later query); a prepared-statement cache; per-module table types and migrations; `auto_vacuum=INCREMENTAL` before the first table is created.
 **Conventions kept so a later Postgres adapter stays cheap:**
 - No engine-specific types in the schema (IDs are text/ULID, timestamps are integer ms or ISO text, booleans are 0/1, JSON stored as text with app-level validation).
 - Full-text search goes through a `SearchIndex` helper (SQLite FTS5 in v1; Postgres tsvector later), fed from the core outbox (06 §3.14).
 - Migrations target SQLite in v1; a Postgres adapter would add its own per-dialect branch.
-**Consequences:** CI runs one engine in v1. SQLite uses WAL mode, a single writer connection and busy timeout. better-sqlite3 runs on the event loop, so long statements are banned and backups use the incremental backup API (05 §3.1, 18 T28). See 06.
+**Consequences:** CI runs one engine in v1. SQLite uses WAL mode, a single writer connection and busy timeout. better-sqlite3 runs on the event loop. D5 measured what may run there; search queries and scheduled snapshots go to one DB worker thread with its own read connection (05 §3.1, 18 T28). See 06.
 
 ## ADR-008: Storage, pubsub, auth adapters
 **Status:** Settled (18 T32)
@@ -119,7 +133,7 @@ Each record: context, options, decision, consequences. Status is one of
 **Status:** Settled. The project is **AGPL-3.0**; the product name is **Tin Can** (D11).
 **Context:** You want protection against closed-source forks and hosted clones.
 **Consequences:**
-- Dependencies are compatible: LiveKit (Apache-2.0), DeepFilterNet (MIT/Apache-2.0), Electron (MIT), React, Fastify, Kysely/Drizzle (MIT/Apache) can all be combined into an AGPL work. Every new dependency must be checked in CI with a licence scanner (GPL-incompatible or proprietary licences rejected).
+- Dependencies are compatible: LiveKit (Apache-2.0), DeepFilterNet (MIT/Apache-2.0), Electron (MIT), React, Fastify, Kysely (MIT) can all be combined into an AGPL work. Every new dependency must be checked in CI with a licence scanner (GPL-incompatible or proprietary licences rejected).
 - **AGPL section 13:** anyone who runs a *modified* Tin Can as a network service must offer their users the corresponding source. Build in a "Source code" link (About dialog and `/capabilities`, configurable URL) so Hosts can comply easily.
 - Contributions: decide whether to require a CLA/DCO. Recommendation: DCO sign-off only. If you later want to offer a commercial licence, you would need a CLA, so choose before accepting outside contributions.
 - Copyright headers/SPDX tags (`AGPL-3.0-or-later` vs `-only`) to be chosen at scaffold; recommendation `AGPL-3.0-or-later`.
@@ -127,7 +141,7 @@ Each record: context, options, decision, consequences. Status is one of
 - The Electron installers and Docker images carry the licence text and a source offer.
 
 ## Open items
-- ADR-005 Fastify vs Hono (final at scaffold).
-- ADR-007 Kysely vs Drizzle (final at scaffold).
+- ~~ADR-005 Fastify vs Hono~~ Resolved: Fastify (18 T1).
+- ~~ADR-007 Kysely vs Drizzle~~ Resolved: Kysely (18 T2).
 - ~~ADR-014 cert sharing between Caddy and LiveKit~~ Resolved: shared certificate, deferred reload (18 T30; confirm in D6).
 - ADR-018 resolved: SPDX `AGPL-3.0-or-later` with DCO sign-off, no CLA (triage, 18 §F).
