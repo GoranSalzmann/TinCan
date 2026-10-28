@@ -75,6 +75,9 @@ A module exports `ClientModule` (04 §10). The shell loads
 - **Stream view:** clicking a live badge or "Watch" opens the stream in the main area (focus mode) with a filmstrip of other participants; grid mode when several streams are watched. Desktop: pop-out window (R-045).
 - One server in the left rail in v1 (single community), but the rail exists for the desktop app's saved-instances switcher (13 §6).
 
+Low-fi wireframes for these screens and the token and style guide are in
+[design/](design/README.md) (draft, awaiting approval; 18 T23).
+
 ## 5. State & data flow
 
 ### 5.1 Stores (Zustand slices)
@@ -215,7 +218,8 @@ limits ("Push-to-talk only works while Tin Can is focused in the browser").
 Design tokens as CSS variables (`--color-bg`, `--color-accent`, …); light, dark,
 and a high-contrast theme at launch; accent colour customisable per user. The
 instance name/icon is Host-customisable. No third-party fonts loaded from
-CDNs; ship a system font stack plus one bundled font if desired.
+CDNs; ship a system font stack plus one bundled font if desired. Token values,
+contrast checks and the component inventory: [design/style-guide.md](design/style-guide.md).
 
 ## 14. Mobile web (responsive)
 
@@ -241,5 +245,5 @@ option (Q10); keep audio and E2EE code free of desktop-only assumptions.
 - TanStack Query vs bespoke REST cache: decide at scaffold.
 - Persistent local message cache (IndexedDB) in v1 or later.
 - Command palette (`Ctrl/Cmd+K`): v1 nice-to-have for channel switching.
-- Message context menu set and keyboard shortcuts finalised during UI design.
-- Visual design: no design system or mockups exist yet; a UI design pass (wireframes → components) is a missing deliverable (flag in 17).
+- Message context menu set and keyboard shortcuts: proposed in design/ (W-03, style guide §11); final on approval.
+- Visual design: low-fi wireframes and a token/style guide are drafted in [design/](design/README.md), awaiting approval (18 T23). Approved calls feed back here (U1 moves mute/deafen from the voice panel in §4 to the user panel).

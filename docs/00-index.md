@@ -41,6 +41,7 @@ The docs go top-down. Each level assumes the one above it.
 | 16 | Testing & CI | Written |
 | 17 | Roadmap & milestones | Written |
 | 18 | Open questions & risks (living) | Written; updated each batch |
+| design/ | UI design: wireframes and style guide ([README](design/README.md)) | Drafted, awaiting approval (18 T23) |
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:
 facts marked "(verify)" are checked in the M0 spikes (17), and open items in each doc
@@ -110,4 +111,4 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 - **MUST / SHOULD / MAY** are used in the RFC 2119 sense in requirement lists.
 - Diagrams are ASCII or Mermaid so they diff well in git.
 - Every doc ends with an **Open items** section that feeds doc 18.
-- IDs: requirements are `R-xxx`, decisions `D-n`/`ADR-nnn`, risks `K-nn`.
+- IDs: requirements are `R-xxx`, decisions `D-n`/`ADR-nnn`, risks `K-nn`, wireframe screens `W-nn` and UI design calls `Un` (design/README.md).
