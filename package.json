@@ -1,0 +1,42 @@
+{
+  "name": "tincan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tin Can: self-hosted voice, video and text chat",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:contract": "vitest run --project contract",
+    "test:matrix": "vitest run --project matrix",
+    "build": "pnpm -r run build",
+    "check:headers": "node scripts/check-headers.mjs",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:secrets": "node scripts/secret-scan.mjs",
+    "check:dco": "node scripts/check-dco.mjs",
+    "ci": "pnpm typecheck && pnpm lint && pnpm check:headers && pnpm test && pnpm build && pnpm check:licenses && pnpm check:secrets",
+    "dev": "pnpm --filter @tincan/server run dev",
+    "tincan": "node apps/server/dist/cli.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "6.0.3",
+    "vite": "^8.3.5",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}

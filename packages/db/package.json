@@ -1,0 +1,32 @@
+{
+  "name": "@tincan/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tin Can database port: Kysely on better-sqlite3, migrations runner, contract suite",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": {
+      "tincan-src": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contract": {
+      "tincan-src": "./src/contract.ts",
+      "types": "./dist/contract.d.ts",
+      "default": "./dist/contract.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@tincan/shared": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "kysely": "^0.29.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "vitest": "^5.0.5"
+  }
+}

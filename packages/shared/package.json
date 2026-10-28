@@ -1,0 +1,22 @@
+{
+  "name": "@tincan/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tin Can shared types, protocol and zod schemas",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": {
+      "tincan-src": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "ulidx": "^2.4.1",
+    "zod": "^4.6.7"
+  }
+}

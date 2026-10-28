@@ -1,0 +1,26 @@
+{
+  "name": "@tincan/pubsub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tin Can pub/sub and ephemeral key-value port, memory adapter",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": {
+      "tincan-src": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./contract": {
+      "tincan-src": "./src/contract.ts",
+      "types": "./dist/contract.d.ts",
+      "default": "./dist/contract.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.5"
+  }
+}
