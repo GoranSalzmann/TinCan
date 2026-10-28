@@ -57,10 +57,15 @@ tester.run("module-boundary", rule, {
       filename: file,
       errors: [{ messageId: "crossModule" }],
     },
-    {
-      code: 'import x from "../accounts/index.js";',
-      filename: String.raw`apps\server\src\modules\voice\routes.ts`,
-      errors: [{ messageId: "crossModule" }],
-    },
+    // Windows-style paths only resolve on Windows: elsewhere a backslash is part of the file name.
+    ...(process.platform === "win32"
+      ? [
+          {
+            code: 'import x from "../accounts/index.js";',
+            filename: String.raw`apps\server\src\modules\voice\routes.ts`,
+            errors: [{ messageId: "crossModule" as const }],
+          },
+        ]
+      : []),
   ],
 });
