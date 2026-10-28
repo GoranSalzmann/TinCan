@@ -78,6 +78,8 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | GET `/auth/oidc/start` · GET `/auth/oidc/callback` | OIDC flow (if enabled) |
 | GET `/invites/:code` | Public invite preview (instance name, member count) |
 
+> **As built in M1.** Paths are under `/api/v1`. Added: `POST /auth/setup/verify` (checks the setup token, 204), `POST /auth/gateway-ticket` (`{ticket, expiresInMs}`), `GET/PATCH /admin/instance` (owner). `IDENTIFY` and `RESUME` take `ticket` instead of `token` for cookie sessions. `READY` is sent with `s: 0`; sequence numbers of later events start at 1. `/capabilities` also carries `server.sourceUrl` and `auth.setupRequired`. Probes `/healthz` and `/readyz` are at the root, not under `/api/v1`, and Caddy does not proxy them. Not built yet: `register`, `reset`, `PATCH /users/@me`, settings, avatars, OIDC.
+
 ### 3.3 Users & members
 | Method & path | Purpose |
 |---|---|

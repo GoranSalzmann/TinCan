@@ -1,0 +1,81 @@
+# PR pipeline (16 §12): typecheck, lint, unit, contract, module matrix, build, licence and secret scan.
+# `pnpm check` runs the same steps locally. Actions are pinned by major version; pin by SHA before the first release.
+name: PR checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint and format
+        run: pnpm lint
+      - name: SPDX headers
+        run: pnpm check:headers
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Web tests
+        run: pnpm vitest run --project web
+      - name: Contract tests (DB, storage, pubsub, auth)
+        run: pnpm test:contract
+      - name: Module boot matrix
+        run: pnpm test:matrix
+      - name: Build
+        run: pnpm build
+      - name: Licence scan
+        run: pnpm check:licenses
+      - name: Secret scan
+        run: pnpm check:secrets
+
+  dco:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/check-dco.mjs "${{ github.event.pull_request.base.sha }}"
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: server
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: web
+          push: false
+          cache-from: type=gha

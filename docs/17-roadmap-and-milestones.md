@@ -62,6 +62,7 @@ heartbeat/resume), web shell (auth gate, layout, theme, i18n scaffold), Docker
 compose with Caddy + app (+ LiveKit placeholder), `tincan init/doctor` v0.
 **Exit:** you can deploy to a VPS, create the owner, log in on web, see an
 empty layout; CI green; module boot matrix test exists.
+**Status (2026-10-28): built; review pending.** Demo checklist in [qa/m1.md](qa/m1.md); cuts and deferrals in 18 §H. Not yet done: a run on a real VPS with a domain (needs you).
 
 ### M2. Text chat
 Channels/categories, roles + permission engine + overwrites, invites + register,

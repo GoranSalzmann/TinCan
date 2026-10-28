@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  better-sqlite3: true
+  argon2: true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - lucide-react@1.63.0
+  - react-router-dom@7.18.5
+  - react-router@7.18.5

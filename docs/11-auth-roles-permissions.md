@@ -20,6 +20,7 @@ connections (gateway and LiveKit).
   - **Desktop:** token encrypted with the OS keychain via Electron `safeStorage`, stored in the user-data directory; never in renderer-accessible storage (13).
   - **Web:** HttpOnly + Secure + SameSite=Strict cookie by default (CSRF header required for mutating calls) or bearer token in memory with refresh via cookie. Not `localStorage` for the long-lived secret.
 - WebSocket uses the same token in `IDENTIFY` (07).
+- **As built in M1.** Login sets the HttpOnly, SameSite=Strict cookie `tincan_session` (Secure when `publicUrl` is https) and also returns the token in the body for desktop and CLI clients. A request authenticated by cookie must carry the header `X-Tincan-CSRF` (any value) on every non-GET call, which a cross-site page cannot add. Scripts cannot read the cookie, so the web client calls `POST /auth/gateway-ticket` and sends the 30-second single-use `ticket` in `IDENTIFY`/`RESUME` instead of a token. Rate limits: 10 logins per 15 min per IP, 5 per username (reset on success).
 - Session list shows client name, last-used time, coarse location (IP hashed; optional display of last IP octets off by default), "this device" marker, revoke buttons.
 
 ### 1.3 Login throttling & abuse
@@ -34,6 +35,7 @@ visitor claim ownership.
 - `POST /auth/setup` requires that token; creates the owner user (`is_instance_owner`), the default space, `@everyone`, Moderator and Admin roles, and a first text channel (`general`) and voice channel (`Lounge`); deletes the token.
 - Until setup completes, all other endpoints return `SETUP_REQUIRED` (clients show the setup screen).
 - Alternatively `tincan setup --username … ` via CLI.
+- **As built in M1.** The token is `XXXX-XXXX-XXXX-XXXX` (16 characters from an alphabet without 0/O/1/I/L/U, about 78 bits), compared case-, space- and dash-insensitively in constant time. `tincan init` writes it to `data/setup-token` (mode 0600) and prints it, so the Host has it before the first boot; the server creates one only if the file is missing. `POST /auth/setup/verify` checks a token without creating anything (the wizard's first step), and both calls share a limit of 10 tries per 15 minutes per IP. Setup creates the owner, the one space and the owner's membership in one `BEGIN IMMEDIATE` transaction (a partial unique index allows only one `is_instance_owner`, so two racing setups cannot both win); `@everyone`, Moderator and Admin, `#general` and `Lounge` arrive with `roles` and `channels` in M2.
 
 ### 1.5 Registration and invites
 - Default signup policy: `invite-only`. Config values: `invite-only | open | closed` (closed = admin creates accounts).

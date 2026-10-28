@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-types
+coverage
+pnpm-lock.yaml
+spikes
+docs
+LICENSE
+*.generated.*
+.claude

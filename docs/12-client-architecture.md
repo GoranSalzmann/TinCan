@@ -48,6 +48,8 @@ apps/web/src/
 A module exports `ClientModule` (04 §10). The shell loads
 `modules/index.ts`, filters by capabilities, and calls `register`.
 
+> **As built in M1.** The shell has the auth gate, the setup wizard, login and the empty layout; slots, the client module registry and the stores of §5 arrive with the first feature module (M2). Colour tokens are in `apps/web/src/theme/tokens.ts` (not `packages/ui`, which waits until a second consumer exists); `theme.test.ts` checks them against the style guide table and every contrast pairing, and the generated CSS is checked for staleness. The web session is a cookie plus gateway ticket (11 §1.2). The main bundle is about 515 kB because the shared zod schemas ship to the browser; split it when the voice chunk is added.
+
 ### 3.1 Slots (extension points the shell renders)
 `sidebarSection`, `channelView(type)`, `channelHeaderAction`, `toolbarButton`,
 `userPanelWidget`, `settingsPane`, `messageDecorator`, `messageActions`,

@@ -72,6 +72,15 @@ A module's `register` is the only place it touches the framework. It receives on
 the ports it declared, so an accidental dependency (e.g. `reactions` grabbing
 `livekit`) is a type error.
 
+> **As built in M1 (2026-10-28).** `ModuleContext` differs from the sketch above in four ways:
+> `permissions` is absent until `roles` exists (M2); `api` is a small registry (`provide(id, obj)` / `get(id)`) for the
+> `ModuleApi` of §5; `security` lets `accounts` register the authenticator (`fromToken`, `fromTicket`) and request gates
+> (the setup gate returns `SETUP_REQUIRED`); `capabilities.instance(fn)` lets `accounts` supply the instance name, signup
+> policy and setup state. `ctx.http` is a Fastify scope under `/api/v1`, created per module, so a disabled module has no
+> routes. Env overrides: `TINCAN_` prefix, `__` nests, `SNAKE_CASE` becomes camelCase, and under `modules` the module id is
+> kebab-case (`TINCAN_MODULES__TEXT_CHAT__ENABLED`); a variable ending in `_FILE` reads its value from that file.
+> The boot matrix runs over the shipped modules plus stand-ins for the rest of §2 (`modules.matrix.test.ts`).
+
 ## 4. Boot sequence
 
 1. **Load config** (YAML/TOML + env overrides). Validate against the composed zod schema (core + each *enabled* module's `configSchema`).
@@ -136,7 +145,7 @@ fails, the next voice reconciler pass removes the person anyway.
 
 ## 7. Capability discovery
 
-`GET /api/capabilities` (unauthenticated minimal subset; full set after auth):
+`GET /api/v1/capabilities` (unauthenticated minimal subset; full set after auth):
 
 ```json
 {
@@ -174,7 +183,7 @@ Listening: http://0.0.0.0:3000   LiveKit: wss://chat.example.com/livekit
 
 ## 9. Configuration
 
-Single `config.yaml`, env var overrides (`SHC_MODULES__VOICE__ENABLED=false`),
+Single `config.yaml`, env var overrides (`TINCAN_MODULES__VOICE__ENABLED=false`; the `SHC_` prefix of the first draft is gone),
 secrets via env or `*_FILE` indirection (Docker secrets). Validated by zod at
 boot; unknown keys are an error (catches typos).
 

@@ -83,6 +83,8 @@ The schema behind these bounds is in 06 §3.9.
 - Eight random kills under write load all ended consistent.
 - `search reindex` repaired a damaged index while writes continued. Online on 3.4M messages it takes about 9 minutes, ≤ 250 ms per batch.
 
+> **As built in M1.** `Db` adds `as<T>()` (narrow to a module's tables), `pendingMigrations()`, `snapshot(path)` (`VACUUM INTO` on a worker thread, fsync, rename; the boot code snapshots before pending migrations on an existing database) and `close()`; `search` and the outbox drain job arrive with the `search` module in M2 (the `outbox` table exists). PubSub `kv` adds `ttl()` and `set(key, value, {ttlMs, nx})`; `incr(key, {ttlMs})` applies the ttl only when it creates the key; `acquireLease`/`releaseLease` build on `set nx`. Storage `get` takes an optional byte range. The auth port hands `accounts` a factory (`ports.auth.local({lookup})`) because the local adapter needs a credential lookup that only `accounts` can provide.
+
 ### 3.2 Storage port
 ```ts
 interface Storage {

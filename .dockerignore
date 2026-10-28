@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/dist-types
+**/coverage
+.git
+.claude
+spikes
+docs
+data
+*.log
+.env
+**/*.tsbuildinfo
