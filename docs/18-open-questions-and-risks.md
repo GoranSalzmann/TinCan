@@ -129,9 +129,9 @@ Referenced elsewhere as D1 to D6.
 
 - [x] Q1–Q10 answered
 - [x] All docs 00–17 written (drafts complete)
-- [ ] All docs 00–17 reviewed by you (batch 1 and 2 partially; batch 3 pending)
-- [ ] Spikes D1–D6 scheduled (not necessarily done)
-- [ ] Roadmap (17) accepted
+- [x] All docs 00–17 reviewed by you (signed off 2026-10-28, after the design review in §G)
+- [ ] Spikes D1–D6 scheduled (not necessarily done). D5 started 2026-10-28; the others need dates (T24) and your VPS and test machines
+- [x] Roadmap (17) accepted (2026-10-28, with the cut lines as amended by T32)
 - [x] Licence and name chosen (AGPL-3.0, Tin Can)
 
 ## F. Sign-off triage outcome (2026-10-27)
@@ -202,8 +202,7 @@ Still open: T33 (waits for spike D4).
 | U1–U16 | **All approved as drafted** (docs/design/README.md): mute and deafen in the user panel; joining voice keeps your text channel; no chat-beside-stream split in v1 (backlog); focus ring separate from the accent; no instance rail on the web; accent from checked presets; role colours never colour names; member list docks at ≥ 1280 px; settings as a full-screen layer; Lucide icons; system fonts only; `role.hoist`; join voice at once; no badges for unconnected servers; one-time watching notice; own-attachments list and delete for Storage. The screens (W-01 to W-55) and the style guide were approved the same day with no changes (T23) | 06, 07, 12, 17, design/ |
 
 ### Remaining sign-off blockers
-- You review docs 12–17 (batch 3) and any corrections to 07–11.
-- Roadmap and cut lines (17 §6) accepted.
+None. You signed off on 2026-10-28: docs 00–18 reviewed, roadmap and cut lines accepted. Spike dates (T24) are still to be set; they don't block starting M0.
 
 ## G. Design review findings (2026-10-27)
 

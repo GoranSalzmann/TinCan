@@ -2,7 +2,7 @@
 
 > Product name: **Tin Can**. Licence: **AGPL-3.0**.
 > (The folder is still called `SelfHostedChat`; rename it whenever convenient, nothing depends on it.)
-> Status: **DRAFT for sign-off.** Nothing is built yet.
+> Status: **Signed off 2026-10-28.** M0 (spikes and wireframes) in progress; no product code yet.
 
 ## How to read this
 

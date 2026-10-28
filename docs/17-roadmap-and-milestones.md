@@ -207,11 +207,11 @@ basics, docs.
 
 ## 11. Sign-off checklist for starting M0
 
-- [ ] Docs 00–18 reviewed; open questions in 18 §A resolved (done) and technical open items triaged
-- [ ] Roadmap and cut lines accepted
+- [x] Docs 00–18 reviewed; open questions in 18 §A resolved (done) and technical open items triaged (2026-10-28; decisions in 18 §F)
+- [x] Roadmap and cut lines accepted (2026-10-28)
 - [x] Decided who is building: you plus Claude doing most coding (§5); dates depend on your review cadence, to be set when M0 starts
 - [ ] Name/trademark check done (F4)
-- [ ] Repo location & hosting chosen (GitHub assumed), licence headers decided (F3)
+- [x] Repo location & hosting chosen (GitHub: `GoranSalzmann/TinCan`), licence headers decided (F3: `AGPL-3.0-or-later` + DCO)
 
 ## Open items
 - Calendar dates (need your availability).
