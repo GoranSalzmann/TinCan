@@ -209,7 +209,7 @@ basics, docs.
 - [x] Roadmap and cut lines accepted (2026-10-28)
 - [x] Decided who is building: you plus Claude doing most coding (§5); dates depend on your review cadence, to be set when M0 starts
 - [ ] Name/trademark check done (F4)
-- [ ] Repo location & hosting chosen (GitHub assumed; no remote yet), licence headers decided (F3 done: `AGPL-3.0-or-later` + DCO)
+- [x] Repo location & hosting chosen (GitHub: `GoranSalzmann/TinCan`), licence headers decided (F3: `AGPL-3.0-or-later` + DCO)
 
 ## Open items
 - Calendar dates (need your availability).
