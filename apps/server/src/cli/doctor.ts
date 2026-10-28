@@ -2,7 +2,7 @@
 import { accessSync, constants, existsSync, statfsSync } from "node:fs";
 import { lookup } from "node:dns/promises";
 import { freemem, totalmem } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import WebSocket from "ws";
 import { CapabilitiesSchema, GATEWAY_PATH, GATEWAY_VERSION, Op } from "@tincan/shared";
 import { availablePorts } from "../boot.js";
@@ -72,10 +72,33 @@ async function check(name: string, fn: () => Promise<Omit<CheckResult, "name">>)
  * (DNS, HTTPS/proxy, capabilities, WebSocket). Network checks talk only to this instance's own URL.
  * Voice checks (UDP, TURN, LiveKit API, webhook round trip) arrive with the voice milestone.
  */
-export async function runDoctor(config: CoreConfig, opts: { url?: string } = {}): Promise<CheckResult[]> {
+/**
+ * A config made by `tincan init` holds container paths (`dataDir: /data`). On the host that folder is the
+ * `data/` next to the config file, when it exists; otherwise the check cannot be run from here.
+ */
+export function resolveDataDir(
+  raw: string,
+  configDir: string | undefined,
+  exists: (p: string) => boolean = existsSync,
+): { dir: string | null; note?: string } {
+  const direct = resolve(raw);
+  if (exists(direct)) return { dir: direct };
+  if (raw.startsWith("/")) {
+    const mapped = configDir ? join(configDir, "data") : null;
+    if (mapped && exists(mapped)) return { dir: mapped, note: `container path ${raw} mapped to ${mapped}` };
+    return { dir: null };
+  }
+  return { dir: direct };
+}
+
+export async function runDoctor(
+  config: CoreConfig,
+  opts: { url?: string; configDir?: string } = {},
+): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const url = opts.url ?? config.instance.publicUrl;
-  const dataDir = resolve(config.dataDir);
+  const data = resolveDataDir(config.dataDir, opts.configDir);
+  const dataDir = data.dir ?? resolve(".");
 
   results.push(
     await check("Configuration", async () => {
@@ -90,6 +113,13 @@ export async function runDoctor(config: CoreConfig, opts: { url?: string } = {})
 
   results.push(
     await check("Data directory writable", async () => {
+      if (data.dir === null) {
+        return {
+          status: "skip",
+          detail: `container path ${config.dataDir}: check it inside Docker`,
+          fix: "run `docker compose exec tincan node dist/cli.js doctor`",
+        };
+      }
       if (!existsSync(dataDir))
         return {
           status: "fail",
@@ -97,7 +127,7 @@ export async function runDoctor(config: CoreConfig, opts: { url?: string } = {})
           fix: "create it, or run `tincan init`",
         };
       accessSync(dataDir, constants.W_OK);
-      return { status: "ok", detail: dataDir };
+      return { status: "ok", detail: data.note ?? dataDir };
     }),
   );
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import { ConfigError } from "./errors.js";
-import { applyEnv, parseCoreConfig } from "./load.js";
+import { applyEnv, parseCoreConfig, withDotEnv } from "./load.js";
 
 const SECRET = "x".repeat(40);
 const minimal = { security: { instanceSecret: SECRET } };
@@ -31,7 +31,7 @@ describe("core config", () => {
 
   it("requires a long enough instance secret", () => {
     expect(() => parseCoreConfig({ security: { instanceSecret: "short" } })).toThrow(/instanceSecret/);
-    expect(() => parseCoreConfig({})).toThrow(/security/);
+    expect(() => parseCoreConfig({})).toThrow(/TINCAN_SECURITY__INSTANCE_SECRET/);
   });
 });
 
@@ -83,5 +83,40 @@ describe("environment overrides", () => {
         throw new Error("ENOENT");
       }),
     ).toThrow(/cannot be read/);
+  });
+});
+
+describe("missing instance secret", () => {
+  it("names the variable and says where `tincan init` put it", () => {
+    for (const raw of [{}, { instance: { name: "x" } }]) {
+      let message = "";
+      try {
+        parseCoreConfig(raw);
+      } catch (e) {
+        message = (e as Error).message;
+      }
+      expect(message).toContain("TINCAN_SECURITY__INSTANCE_SECRET");
+      expect(message).toContain(".env");
+      expect(message).not.toMatch(/expected object, received undefined/);
+    }
+  });
+
+  it("still reports a too-short secret as such", () => {
+    expect(() => parseCoreConfig({ security: { instanceSecret: "short" } })).toThrow(/instanceSecret/);
+  });
+});
+
+describe("withDotEnv", () => {
+  const read = () =>
+    `# comment\nTINCAN_SECURITY__INSTANCE_SECRET="${SECRET}"\nTINCAN_SERVER__PORT=9000\nTINCAN_CONFIG=/x\nHOST_UID=1000\n`;
+
+  it("fills TINCAN_ variables that are unset, strips quotes, and ignores the rest", () => {
+    const env = withDotEnv("/cfg", {}, read);
+    expect(env).toEqual({ TINCAN_SECURITY__INSTANCE_SECRET: SECRET, TINCAN_SERVER__PORT: "9000" });
+  });
+
+  it("never overrides a real environment variable, and tolerates a missing file", () => {
+    expect(withDotEnv("/cfg", { TINCAN_SERVER__PORT: "1" }, read).TINCAN_SERVER__PORT).toBe("1");
+    expect(withDotEnv("/cfg", { A: "b" }, () => null)).toEqual({ A: "b" });
   });
 });

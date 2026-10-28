@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { z } from "zod";
 import { ConfigError, type ConfigIssue } from "./errors.js";
@@ -93,9 +94,30 @@ export function formatZodIssues(error: z.ZodError, prefix = ""): ConfigIssue[] {
   });
 }
 
+export const SECRET_VAR = "TINCAN_SECURITY__INSTANCE_SECRET";
+
+const MISSING_SECRET: ConfigIssue = {
+  message: `the instance secret is not set. Set ${SECRET_VAR} (or ${SECRET_VAR}_FILE).`,
+  hint:
+    "`tincan init` writes it to .env next to config.yaml. Docker loads that file for the app; " +
+    "on the host the CLI reads a .env next to the config file when the variable is unset, " +
+    "so pass --config <dir>/config.yaml or export the variable yourself",
+};
+
 export function parseCoreConfig(raw: unknown): CoreConfig {
   const result = CoreConfigSchema.safeParse(raw ?? {});
-  if (!result.success) throw new ConfigError(formatZodIssues(result.error));
+  if (!result.success) {
+    const issues = result.error.issues.some(
+      (i) =>
+        i.path[0] === "security" &&
+        i.path.length <= 2 &&
+        (i.code === "invalid_type" || i.path.length === 2) &&
+        /received undefined|expected object/i.test(i.message),
+    )
+      ? [MISSING_SECRET, ...formatZodIssues(result.error).filter((i) => !i.message.startsWith("security"))]
+      : formatZodIssues(result.error);
+    throw new ConfigError(issues);
+  }
   return result.data;
 }
 
@@ -129,5 +151,26 @@ export function loadConfig(
   env: Record<string, string | undefined> = process.env,
 ): CoreConfig {
   const file = path ? readConfigFile(path) : {};
-  return parseCoreConfig(applyEnv(file, env));
+  return parseCoreConfig(applyEnv(file, path ? withDotEnv(dirname(path), env) : env));
+}
+
+/**
+ * `tincan init` keeps secrets in `.env` next to `config.yaml`. Docker loads it for the app; on the host the
+ * CLI does the same for `TINCAN_*` variables that are not already set, so `doctor --config <dir>/config.yaml`
+ * works without exporting anything. Real environment variables always win.
+ */
+export function withDotEnv(
+  dir: string,
+  env: Record<string, string | undefined>,
+  read: (path: string) => string | null = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null),
+): Record<string, string | undefined> {
+  const text = read(join(dir, ".env"));
+  if (text === null) return env;
+  const merged = { ...env };
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^\s*(TINCAN_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m || m[1] === "TINCAN_CONFIG" || merged[m[1]!] !== undefined) continue;
+    merged[m[1]!] = m[2]!.replace(/^(["'])(.*)\1$/, "$2");
+  }
+  return merged;
 }
