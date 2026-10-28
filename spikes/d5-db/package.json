@@ -1,0 +1,29 @@
+{
+  "name": "@tincan-spike/d5-db",
+  "private": true,
+  "description": "Spike D5 (throwaway): Kysely vs Drizzle on better-sqlite3 + FTS5, outbox, event-loop blocking",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "tx": "tsx src/tx/run-all.ts",
+    "migrate": "tsx src/migrate/run.ts",
+    "outbox": "tsx src/outbox/crash-test.ts",
+    "overhead": "tsx src/bench/overhead.ts",
+    "fixture": "tsx src/fixture/generate.ts",
+    "blocking": "tsx src/bench/blocking.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4",
+    "kysely": "^0.29.7",
+    "ulidx": "^2.4.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.5",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

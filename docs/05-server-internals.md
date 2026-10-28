@@ -38,10 +38,10 @@ Rules:
 Deliberately small. Each has a contract test suite that all adapters must pass.
 
 ### 3.1 Database port
-Exposes a typed query builder (Kysely/Drizzle instance) plus:
+Exposes a typed query builder (Kysely, recommended by spike D5; 18 T2) plus:
 ```ts
 interface Db {
-  query: QueryBuilder;                 // typed builder
+  query: Kysely<DB>;                   // typed builder; each module gets a handle narrowed to its own tables
   transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>;
   dialect: "sqlite" | "postgres";
   search: SearchIndex;                 // the only engine-specific helper
@@ -54,9 +54,34 @@ interface SearchIndex {
   query(q: string, filter: {channelIds: string[]}, page: Cursor): Promise<Hit[]>;
 }
 ```
-SQLite specifics: WAL, `synchronous=NORMAL`, `busy_timeout=5000`, one write connection (serialised), `foreign_keys=ON`. better-sqlite3 runs every statement on the calling thread, so in v1 the database shares the event loop with HTTP, the gateway and jobs. Rules: no full `VACUUM` and no `VACUUM INTO` on the live process; backups use the incremental `.backup()` API; search queries are bounded (`LIMIT` plus a cost cap). If spike D5 measures unacceptable blocking, the database moves to a worker thread (18 T28). Postgres (post-v1 adapter): pooled connections, `statement_timeout`.
+**Transactions.** There is one write connection. Kysely's connection mutex serialises every statement on it, and `transaction(fn)` holds the connection from `BEGIN IMMEDIATE` to `COMMIT`. A concurrent request therefore cannot write into, or read from, another request's open transaction (D5: 300 concurrent requests with 25 % rollbacks, no interleaving). Rules:
+- Inside `fn`, use only `tx`. The root handle throws there (AsyncLocalStorage guard); without the guard, using it deadlocks every later query.
+- No non-DB `await` inside `fn`: every other query waits for it (a 50 ms await delayed 50 concurrent reads by 49–51 ms).
+- Awaiting a query on better-sqlite3 resolves in microtasks and never yields to I/O. Jobs that loop over queries yield with `setImmediate` between batches (a 200-row outbox batch held the loop for 170 ms).
 
-**Outbox.** A use case that feeds derived data appends a row to the core-owned `outbox` table (06 §3.14) inside its own transaction. The core `outbox.drain` job delivers rows in ID order to the subscribed module and deletes each row only after its handler succeeds; handlers are idempotent, so redelivery after a crash is safe. In v1 the only consumer is the search index (06 §3.9, 18 T29).
+**Threads (18 T28, measured in D5 on a 4 GB database).** Writes and ordinary reads stay on the main thread: a prepared point query costs 5 µs there and 78 µs as a round trip to a worker. One DB worker thread with its own read-only connection runs search queries and scheduled snapshots:
+- `VACUUM INTO` on the worker took 39.8 s while main-thread writes kept a p99 of 4.1 ms.
+- The incremental `.backup()` stalled the main thread for 0.4–2.8 s per run whatever the step size. From any connection other than the writer's it never finished while the app wrote 100 rows/s, because every write restarts it.
+- The worker writes a snapshot to a temporary name, fsyncs it (SQLite does not fsync `VACUUM INTO` output) and renames it.
+- Never on the main thread: `VACUUM` or `VACUUM INTO` (45 s), `ANALYZE` or a first `PRAGMA optimize` on a large database (19–34 s; `analysis_limit` does not bound it), FTS5 `'optimize'` (9 s), unbounded `ORDER BY rank` (up to 4.5 s).
+- Fine on the main thread in small steps: `incremental_vacuum(1000)` (46 ms), FTS5 `'merge', 100` (9 ms), retention deletes of ≤ 500 messages (64 ms), outbox delivery, `search reindex` batches.
+- The pre-migration backup (06 §8) runs at boot before the server listens, so blocking does not matter there.
+
+**SQLite specifics.** WAL, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=ON`, and `auto_vacuum=INCREMENTAL` set before the first table (changing it later needs a full `VACUUM`). `PRAGMA optimize=0x10002` once when the database is created (1 ms while empty), never on the live event loop. Postgres (post-v1 adapter): pooled connections, `statement_timeout`.
+
+**Search bounds.** better-sqlite3 cannot interrupt a running statement (no `interrupt()`, no progress handler), so search is bounded by query shape, not a timer. Measured on 3.4M messages:
+- Newest-first is the default order: ≤ 25 ms cold even for a term in 3M messages. Short prefixes are expensive ('ka*' 350 ms, 'kalo*' 25 ms), so a minimum prefix length applies.
+- Relevance ranks only the newest 1,000 matches (subquery, then `ORDER BY bm25()`): 70–230 ms, against up to 4.5 s for ranking every hit.
+- Channel visibility is filtered through an indexed channel column in the FTS5 table (1 ms). Filtering on an UNINDEXED `channel_id` scans every hit: 43 s for a channel with none.
+- FTS rows are found through a `message_id → rowid` map owned by `search`. A lookup on the UNINDEXED `message_id` took 0.5 s per edit or delete.
+
+06 §3.9 still shows the schema from before the spike (18 §D D5).
+
+**Outbox.** A use case that feeds derived data appends a row to the core-owned `outbox` table (06 §3.14) inside its own transaction. The core `outbox.drain` job delivers rows in ID order to the subscribed module and deletes each row only after its handler succeeds; handlers are idempotent, so redelivery after a crash is safe. In SQLite the handler's writes and the row's deletion share one transaction. In v1 the only consumer is the search index (06 §3.9, 18 T29). D5 prototyped this:
+- After a kill between commit and indexing, the drain caught up on restart.
+- After a kill between a handler's commit and the row's deletion, redelivery left no duplicates.
+- Eight random kills under write load all ended consistent.
+- `search reindex` repaired a damaged index while writes continued. Online on 3.4M messages it takes about 9 minutes, ≤ 250 ms per batch.
 
 ### 3.2 Storage port
 ```ts
