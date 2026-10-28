@@ -92,7 +92,7 @@ Ephemeral login state that is **not** stored in the DB: OIDC `state`/PKCE verifi
 
 **member** : (space_id, user_id) PK, joined_at, nickname?, timeout_until?, invited_by?.
 
-**role** : id, space_id, name, color?, position int (higher = more authority), permissions (bitset stored as decimal text or two ints to avoid 53-bit JS limit; see 11), is_default bool (`@everyone`), is_managed bool.
+**role** : id, space_id, name, color?, position int (higher = more authority), permissions (bitset stored as decimal text or two ints to avoid 53-bit JS limit; see 11), is_default bool (`@everyone`), is_managed bool, hoist bool (default false; members with this role get their own group in the member list, design U12).
 
 **member_role** : (space_id, user_id, role_id) PK.
 

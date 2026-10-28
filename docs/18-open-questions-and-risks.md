@@ -54,7 +54,7 @@ added there as later batches surface them.
 | T20 | Separate origin for user-uploaded content by default vs optional | 15 |
 | T21 | LiveKit `network_mode: host` vs published ports as compose default | 14 |
 | T22 | Gateway resume ring-buffer placement when running multiple app nodes | 14 §10 |
-| T23 | Missing deliverable: UI/UX design (wireframes, design tokens, brand, icon) | 12, 17 |
+| T23 | UI/UX design (wireframes, design tokens, brand, icon). **Wireframes and style guide approved 2026-10-28:** screens W-01 to W-55, the style guide and design calls U1–U16 in `docs/design/` (§F); the calls are applied to 06, 07, 12 and 17. **Still open:** brand basics and the app icon (17 §3 M0) | 12, 17, design/ |
 | T24 | Calendar dates and weekly time budget to turn sizes in 17 into a schedule | 17 |
 | T25 | **Decided (§F): accepted.** Review blocker (K-29). Make the presence reconciler also reconcile permissions: each pass, recompute CONNECT/SPEAK/VIDEO/SCREEN_SHARE for every LiveKit participant from the DB; `removeParticipant`/`updateParticipant` on mismatch; rotate the E2EE key if anyone was removed. Failure-path enforcement becomes ≤ 30 s (the 2 s SLO still holds on the happy path) | 05 §6.3, 10 §4.3, 11 §2.6 |
 | T26 | **Decided (§F): accepted.** Review blocker (K-30). Rework default compose routing for LiveKit host networking: publish the app on `127.0.0.1:3000` and point the webhook there; reach LiveKit via `host-gateway`; bind LiveKit's HTTP port 7880 to loopback; restate T5's reasoning. Narrow the Caddy route `/livekit/*` to the signalling path (`/livekit/rtc*`) so LiveKit's Twirp RoomService API is not proxied publicly | 05, 14 §2.1–2.2, 15 §4.7 |
@@ -99,7 +99,7 @@ Likelihood (L) and impact (I): H/M/L.
 | K-24 | GPU/driver bugs cause black video or crashes in Electron | M | M | Hardware-accel toggle, auto safe-mode after repeated GPU crashes (13 §7) |
 | K-25 | Electron/Chromium security patches require fast desktop releases | H | M | Automated dependency PRs, release checklist, auto-updater (13 §11, 15 §9) |
 | K-26 | Bundled renderer can fall out of sync with newer servers | M | M | `apiVersion` negotiation, update prompts, additive-change policy (07 §6, 13 §2) |
-| K-27 | No UI/UX design exists yet; risk of an unpolished product | H | M | Design pass in M0/M2, restrained design system (17 §5, T23) |
+| K-27 | Unpolished product: the approved low-fi design still has to be built well | M | M | Wireframes and style guide approved 2026-10-28 (`docs/design/`, T23); restrained design system (17 §5); tokens and the contrast check become code and tests in M1; visual regression on key screens (16) |
 | K-28 | Test infrastructure (media, multi-OS) is costly to build and may flake | M | M | Layered strategy, manual matrix as backstop, quarantine policy (16) |
 | K-29 | A ban, kick or permission loss fails to remove the user from a live voice call: enforcement is a single fire-and-forget bus handler calling LiveKit (04 §6), nothing retries, and the reconciler checks presence, not permission. The user keeps the current E2EE key | M | H | T25 (reconcile permissions every pass); D1 checks whether token refresh is a backstop at all |
 | K-30 | Default compose topology doesn't route: with LiveKit on host networking (T21) it cannot resolve `tincan`, and Caddy/app cannot resolve `livekit`. Webhook failure is masked by the 30 s reconciler, so it looks like presence lag | H | H | T26; T34 (count reconciler repairs) |
@@ -195,6 +195,11 @@ Pending your call: the product-feature candidates found in the audit (stream pre
 | T34 | **Accepted.** `reconcile_repairs_total` with an alert; request IDs carried through the bus | 04, 05, 14 |
 
 Still open: T33 (waits for spike D4).
+
+### UI design calls (2026-10-28)
+| Ref | Decision | Docs touched |
+|---|---|---|
+| U1–U16 | **All approved as drafted** (docs/design/README.md): mute and deafen in the user panel; joining voice keeps your text channel; no chat-beside-stream split in v1 (backlog); focus ring separate from the accent; no instance rail on the web; accent from checked presets; role colours never colour names; member list docks at ≥ 1280 px; settings as a full-screen layer; Lucide icons; system fonts only; `role.hoist`; join voice at once; no badges for unconnected servers; one-time watching notice; own-attachments list and delete for Storage. The screens (W-01 to W-55) and the style guide were approved the same day with no changes (T23) | 06, 07, 12, 17, design/ |
 
 ### Remaining sign-off blockers
 None. You signed off on 2026-10-28: docs 00–18 reviewed, roadmap and cut lines accepted. Spike dates (T24) are still to be set; they don't block starting M0.

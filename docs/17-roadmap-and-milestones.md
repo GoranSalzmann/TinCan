@@ -48,7 +48,8 @@ usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
 | D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded |
 | D6 | TURN/TLS cert sharing with deferred LiveKit reload (T30); single-port UDP; host-network routing and the narrowed Caddy route (T26) | Final network docs (T3) |
 Also: Fastify vs Hono (T1), electron-builder vs Forge, **low-fi wireframes and a
-token/style guide for the main screens (drafted by Claude, approved by you)**,
+token/style guide for the main screens (drafted by Claude, approved by you; done 2026-10-28,
+`docs/design/`)**,
 app icon/brand basics, repo creation and licence headers (`AGPL-3.0-or-later`
 SPDX tags, DCO check in CI; F3 resolved).
 **Deliverable:** updated docs 03/08/09/10/13/14, spike code kept in `spikes/`.
@@ -160,6 +161,7 @@ basics, docs.
 | Native denoiser via utility process, auto-level | 09 |
 | Native global hold-to-talk hook (opt-in) | 13 §4.2.3 |
 | Stream preview thumbnails in the sidebar | 08, 12 |
+| Chat beside a stream (split view) | design U3; v1 uses pop-out / picture-in-picture |
 | Camera background blur / virtual backgrounds | 08, 09 |
 | Welcome message, rules screen, announcements | 11, 12 |
 | Custom emoji, GIF picker (needs opt-in provider), soundboard | 12 |
