@@ -34,7 +34,7 @@ Each record: context, options, decision, consequences. Status is one of
 **Consequences:** Each port requires a shared contract test suite that every adapter passes (16). v1 ships one adapter per port, except auth (local + OIDC); Postgres, S3 and Redis adapters are post-v1 (18 T32).
 
 ## ADR-005: Language and server framework
-**Status:** Proposed. HTTP framework **recommended: Fastify** after spike T1 (2026-10-28); the pick is yours (18 T1).
+**Status:** Proposed (TypeScript). HTTP framework **Settled: Fastify** (you, 2026-10-28, after spike T1; 18 T1).
 **Options:** TypeScript (Node), Go, Rust.
 **Decision:** TypeScript end to end; Fastify as the HTTP framework (mature plugin ecosystem, schema validation, good WS support via `@fastify/websocket`).
 **Alternatives considered:** Hono (lighter, portable across runtimes; fewer batteries), Go (matches LiveKit, but splits the language between server and client and prevents shared types/zod schemas).
@@ -56,9 +56,9 @@ Each record: context, options, decision, consequences. Status is one of
 **Consequences:** We own reconnect/resume logic (well understood; specified in 07).
 
 ## ADR-007: Database access layer and engines
-**Status:** Engines settled (18 T32). Query builder **recommended: Kysely** after spike D5 (2026-10-28); the pick is yours (18 T2).
+**Status:** Engines settled (18 T32). Query builder **Settled: Kysely** (you, 2026-10-28, after spike D5; 18 T2).
 **Options:** Drizzle, Kysely, Prisma, raw SQL.
-**Decision:** SQLite only in v1; Postgres is a post-v1 adapter behind the same port (18 T32). Kysely (recommended by spike D5) on better-sqlite3; criteria: typed queries, async transactions that work on better-sqlite3, no code generation step in the dev loop.
+**Decision:** SQLite only in v1; Postgres is a post-v1 adapter behind the same port (18 T32). Kysely on better-sqlite3, chosen against these criteria: typed queries, async transactions that work on better-sqlite3, no code generation step in the dev loop.
 **Spike D5 (2026-10-28).** Kysely 0.29.7 and drizzle-orm 0.45.4 (plus 1.0.0-rc.5) on better-sqlite3 13 with FTS5. Raw output: `spikes/d5-db/RESULTS.md`.
 - Async transactions: Kysely serialises every query on the single connection through a mutex, and a transaction holds it from `begin` to `commit`. In 300 concurrent requests with awaits inside transactions and 25 % rollbacks, nothing interleaved, no write was lost and no read saw uncommitted rows. The control (BEGIN, await, COMMIT without a mutex) failed all of these.
 - Drizzle's better-sqlite3 transactions are synchronous only, and an async callback type-checks. 0.45.4 throws at the first `await` and runs the rest in autocommit. 1.0.0-rc.5 commits before the first `await` and still hands the caller the callback's error, so a "failed" transaction keeps its rows. Drizzle is only safe through its async `sqlite-proxy` driver plus our own mutex (71 µs per point query).
@@ -133,7 +133,7 @@ Each record: context, options, decision, consequences. Status is one of
 **Status:** Settled. The project is **AGPL-3.0**; the product name is **Tin Can** (D11).
 **Context:** You want protection against closed-source forks and hosted clones.
 **Consequences:**
-- Dependencies are compatible: LiveKit (Apache-2.0), DeepFilterNet (MIT/Apache-2.0), Electron (MIT), React, Fastify, Kysely/Drizzle (MIT/Apache) can all be combined into an AGPL work. Every new dependency must be checked in CI with a licence scanner (GPL-incompatible or proprietary licences rejected).
+- Dependencies are compatible: LiveKit (Apache-2.0), DeepFilterNet (MIT/Apache-2.0), Electron (MIT), React, Fastify, Kysely (MIT) can all be combined into an AGPL work. Every new dependency must be checked in CI with a licence scanner (GPL-incompatible or proprietary licences rejected).
 - **AGPL section 13:** anyone who runs a *modified* Tin Can as a network service must offer their users the corresponding source. Build in a "Source code" link (About dialog and `/capabilities`, configurable URL) so Hosts can comply easily.
 - Contributions: decide whether to require a CLA/DCO. Recommendation: DCO sign-off only. If you later want to offer a commercial licence, you would need a CLA, so choose before accepting outside contributions.
 - Copyright headers/SPDX tags (`AGPL-3.0-or-later` vs `-only`) to be chosen at scaffold; recommendation `AGPL-3.0-or-later`.
@@ -141,7 +141,7 @@ Each record: context, options, decision, consequences. Status is one of
 - The Electron installers and Docker images carry the licence text and a source offer.
 
 ## Open items
-- ADR-005 Fastify vs Hono: spike T1 recommends Fastify; your call (18 T1).
-- ADR-007 Kysely vs Drizzle: spike D5 recommends Kysely; your call (18 T2).
+- ~~ADR-005 Fastify vs Hono~~ Resolved: Fastify (18 T1).
+- ~~ADR-007 Kysely vs Drizzle~~ Resolved: Kysely (18 T2).
 - ~~ADR-014 cert sharing between Caddy and LiveKit~~ Resolved: shared certificate, deferred reload (18 T30; confirm in D6).
 - ADR-018 resolved: SPDX `AGPL-3.0-or-later` with DCO sign-off, no CLA (triage, 18 §F).

@@ -137,7 +137,16 @@ Index: `(channel_id, id)`; partial/secondary on `(author_id)` for moderation vie
 Unread = channel's latest message id > `last_read_message_id`. Acks only move forward: `last_read_message_id = max(existing, acked)`, so a stale device cannot un-read a channel. The mention count is computed, not stored: the number of `message_mention` rows in that channel targeting the user, one of their roles, or `everyone`, with `message_id > last_read_message_id` (indexed, §5). Nothing to keep in sync, so nothing can drift (18 T29).
 
 ### 3.9 Search (module `search`)
-- SQLite: FTS5 virtual table `message_fts(content, channel_id UNINDEXED, message_id UNINDEXED)`. When `search` is enabled, `text-chat` appends a `search.message` row to the core outbox (§3.14) in the same transaction as each create, edit or delete; the `search` module consumes it. The index therefore catches up after a crash, and `search` stays decoupled from `text-chat` tables. `tincan search reindex` rebuilds the index from `message` (18 T29).
+- SQLite, both tables owned by `search`:
+  - **message_fts**: FTS5 virtual table `message_fts(content, chan, author, message_id UNINDEXED)`. `chan` and `author` each hold one ID as a single indexed token, so channel visibility and the author filter (07 §3.6) are part of the `MATCH` expression. In spike D5, an indexed channel filter took 1 ms, while filtering on an UNINDEXED `channel_id` scanned every hit (43 s for a channel with none, on 3.4M messages). The author column uses the same mechanism and was not measured separately.
+  - **search_doc**: `(fts_rowid INTEGER PRIMARY KEY, message_id TEXT UNIQUE)` maps a message to its FTS row, so an upsert or delete is a point operation. A lookup on an UNINDEXED `message_id` took 0.5 s per edit or delete in D5; through `search_doc` it took 0.9 ms. Edits keep their `fts_rowid`.
+- Feeding: when `search` is enabled, `text-chat` appends a `search.message` row to the core outbox (§3.14) in the same transaction as each create, edit or delete. The payload carries the message's ID, channel, author and text (or a remove marker), and the `search` module consumes it. The index therefore catches up after a crash, and `search` stays decoupled from `text-chat` tables.
+- `tincan search reindex` rebuilds the index from `message` online, in short transactions, through a document source that `text-chat` provides. It clears old rows by `rowid = ?`, because FTS5 range deletes scan the whole table (49 rows/s in D5), then re-reads each live message inside the transaction that writes it. D5: about 9 minutes for 3.4M messages, ≤ 250 ms per batch of 500 (18 T29).
+- Query bounds, because a running statement cannot be cancelled (05 §3.1):
+  - Newest first by `rowid` is the default order.
+  - Relevance ranks only the newest 1,000 matches.
+  - Prefix terms need a minimum length.
+  - Queries run on the DB worker thread.
 - Postgres (post-v1 adapter): generated `tsvector` column or separate `message_search` table with GIN index.
 - Search results are filtered by the *current* channel visibility of the caller before return (never index-time permission).
 
@@ -191,7 +200,10 @@ Written by a use case inside its own transaction; drained in ID order by the cor
 
 ## 7. Backup and restore
 
-- SQLite: online backup through better-sqlite3's incremental `.backup()` API, which copies pages in steps and produces a consistent snapshot without stalling the event loop (`VACUUM INTO` would block it for the whole copy, 05 §3.1); scheduled by the `backup.hook` job.
+- SQLite: snapshot with `VACUUM INTO` on a connection of its own. That is the DB worker thread for the scheduled `backup.hook` job, or the CLI's own process for `tincan backup` (14 §6).
+  - It reads one consistent WAL snapshot while the server keeps writing and produces a compacted copy. D5: 40 s for 4 GB, with main-thread writes at p99 4.1 ms.
+  - SQLite does not fsync `VACUUM INTO` output, so the copy is written under a temporary name, fsynced, then renamed.
+  - Not better-sqlite3's incremental `.backup()`. On the main thread it stalled the event loop for up to 2.8 s. From any other connection, every write restarts it, and it never finished while the app wrote 100 rows/s (05 §3.1, 18 T28).
 - Postgres (post-v1 adapter): standard `pg_dump` / PITR; documented, not reinvented.
 - Storage: directory copy (local); bucket versioning once the post-v1 S3 adapter exists.
 - Config file + LiveKit config included in backup docs.
@@ -202,11 +214,11 @@ Written by a use case inside its own transaction; drained in ID order by the cor
 - Forward-only, versioned per module, idempotent when re-run.
 - Destructive migrations (drop column/table) require two releases: stop using → remove.
 - Boot refuses if the DB schema is *newer* than the server understands (downgrade protection).
-- Automatic backup before applying pending migrations (configurable), using the same `.backup()` API. Never a plain file copy: after an unclean stop, committed transactions can still be in the WAL file, and a copy of `app.db` alone would miss them (18 T28).
+- Automatic backup before applying pending migrations (configurable), using the same `VACUUM INTO` snapshot (§7). It runs at boot before the server listens, so blocking does not matter there. Never a plain file copy: after an unclean stop, committed transactions can still be in the WAL file, and a copy of `app.db` alone would miss them (18 T28).
 
 ## 9. Sizing estimates (sanity check)
 
-100 users, 200 messages/user/day, ~300 bytes average: ~6 MB/day of message data, ~2 GB/year. SQLite handles this comfortably. FTS roughly doubles message storage. Attachments dominate; plan storage by upload limits.
+100 users, 200 messages/user/day, ~300 bytes average: ~6 MB/day of message data, ~2 GB/year. SQLite handles this comfortably. FTS roughly doubles message storage. Spike D5 measured the whole database: 3.38M messages of ~280 characters came to 4.0 GB, about 1.2 KB per message. That splits into the `message` table and its indexes (2.0 GB), FTS5 (1.75 GB, of which 1.26 GB is FTS5's own copy of the text) and `search_doc` (0.26 GB). At this estimate's 7.3M messages a year, that is about 8.5 GB/year, twice the 4 GB the first sentence implies, because IDs, indexes and the FTS copy cost more than the text itself. Attachments dominate; plan storage by upload limits.
 
 ## Open items
 - Bitset width: permissions may exceed 53 bits? Use BigInt strings (11).
@@ -214,3 +226,4 @@ Written by a use case inside its own transaction; drained in ID order by the cor
 - DMs/group DMs: not modelled. If wanted, they become a `channel` type `dm` with a `channel_participant` table; would affect 11 and 07 (flag in 18).
 - ~~E2EE key epoch persistence~~ Resolved: not persisted (10 §4).
 - Whether threads are wanted (would add `thread` rows or `parent_message_id`); deferred.
+- FTS5 stores its own copy of message text (1.26 GB of the 4 GB D5 fixture, §9). An external-content or contentless FTS5 table would avoid that copy but couples `search` more tightly to `text-chat`'s rows; not evaluated (18 §D D5).

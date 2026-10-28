@@ -45,9 +45,9 @@ usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
 | D2 | Denoiser worklet CPU/latency/quality; AEC vs Web Audio playback; model licence | Tier choice made (T16); numbers in 09 |
 | D3 | Electron screenshare + audio on Windows/Linux/macOS/Wayland; `globalShortcut` behaviour per OS/Wayland (native PTT hook feasibility only as v1.1 input) | Support matrix written (13 §5) |
 | D4 | E2EE + simulcast/SVC + speaker detection; LiveKit room SID and metadata as the E2EE session (T27); audio-level header under E2EE (T33) | Decision on defaults (T12, T17); T27 confirmed; T33 closed |
-| D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded |
+| D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded. **Done (2026-10-28):** Kysely; numbers in 18 §D D5 |
 | D6 | TURN/TLS cert sharing with deferred LiveKit reload (T30); single-port UDP; host-network routing and the narrowed Caddy route (T26) | Final network docs (T3) |
-Also: Fastify vs Hono (T1), electron-builder vs Forge, **low-fi wireframes and a
+Also: Fastify vs Hono (T1, **done**: Fastify), electron-builder vs Forge, **low-fi wireframes and a
 token/style guide for the main screens (drafted by Claude, approved by you)**,
 app icon/brand basics, repo creation and licence headers (`AGPL-3.0-or-later`
 SPDX tags, DCO check in CI; F3 resolved).
@@ -55,7 +55,7 @@ SPDX tags, DCO check in CI; F3 resolved).
 
 ### M1. Skeleton
 Monorepo (pnpm), TS configs, lint/format, CI PR pipeline, module loader + config
-validation + `/capabilities`, DB port (SQLite first) + migrations framework,
+validation + `/capabilities`, DB port (Kysely on SQLite, with the D5 transaction guard and DB worker thread, 05 §3.1) + migrations framework,
 accounts + sessions + setup flow, gateway skeleton (HELLO/IDENTIFY/READY/
 heartbeat/resume), web shell (auth gate, layout, theme, i18n scaffold), Docker
 compose with Caddy + app (+ LiveKit placeholder), `tincan init/doctor` v0.

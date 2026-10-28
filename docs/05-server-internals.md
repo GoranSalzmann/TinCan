@@ -38,7 +38,7 @@ Rules:
 Deliberately small. Each has a contract test suite that all adapters must pass.
 
 ### 3.1 Database port
-Exposes a typed query builder (Kysely, recommended by spike D5; 18 T2) plus:
+Exposes a typed query builder (Kysely, 03 ADR-007) plus:
 ```ts
 interface Db {
   query: Kysely<DB>;                   // typed builder; each module gets a handle narrowed to its own tables
@@ -75,7 +75,7 @@ interface SearchIndex {
 - Channel visibility is filtered through an indexed channel column in the FTS5 table (1 ms). Filtering on an UNINDEXED `channel_id` scans every hit: 43 s for a channel with none.
 - FTS rows are found through a `message_id → rowid` map owned by `search`. A lookup on the UNINDEXED `message_id` took 0.5 s per edit or delete.
 
-06 §3.9 still shows the schema from before the spike (18 §D D5).
+The schema behind these bounds is in 06 §3.9.
 
 **Outbox.** A use case that feeds derived data appends a row to the core-owned `outbox` table (06 §3.14) inside its own transaction. The core `outbox.drain` job delivers rows in ID order to the subscribed module and deletes each row only after its handler succeeds; handlers are idempotent, so redelivery after a crash is safe. In SQLite the handler's writes and the row's deletion share one transaction. In v1 the only consumer is the search index (06 §3.9, 18 T29). D5 prototyped this:
 - After a kill between commit and indexing, the drain caught up on restart.
@@ -177,8 +177,8 @@ Tiny internal scheduler (no external queue): interval and cron-ish jobs with jit
 | `invites.purge` | hourly | Delete expired/used-up invites |
 | `uploads.gc` | daily | Remove orphaned files (no referencing message, > 24 h) |
 | `messages.retention` | daily | Optional message retention policy |
-| `db.maintenance` | weekly | SQLite `PRAGMA optimize` and `incremental_vacuum`; never a full `VACUUM` (§3.1) |
-| `backup.hook` | configurable | Optional scheduled DB snapshot via the incremental backup API (§3.1) |
+| `db.maintenance` | weekly | SQLite `incremental_vacuum(1000)` and FTS5 `'merge', 100` in steps, yielding between them; never a full `VACUUM`, `ANALYZE` or `PRAGMA optimize` on the live loop (§3.1) |
+| `backup.hook` | configurable | Optional scheduled DB snapshot via `VACUUM INTO` on the DB worker thread, fsynced and renamed (§3.1, 06 §7) |
 
 ## 8. Errors, logging, metrics
 

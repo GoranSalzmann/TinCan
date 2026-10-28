@@ -164,9 +164,9 @@ a rewrite.
 | Concern | Choice |
 |---|---|
 | Language | TypeScript (server, shared, client) |
-| Server framework | Fastify (or Hono; see ADR-005) |
+| Server framework | Fastify (ADR-005) |
 | Realtime | WebSocket gateway, JSON messages, sequence + resume |
-| ORM/query | Drizzle or Kysely (ADR-007) |
+| ORM/query | Kysely on better-sqlite3 (ADR-007) |
 | Media | LiveKit (server + `livekit-client`) |
 | Client UI | React, Vite, Zustand, Tailwind |
 | Desktop | Electron |
@@ -197,6 +197,6 @@ D:\SelfHostedChat
 ```
 
 ## Open items
-- Confirm Fastify vs Hono (ADR-005).
+- ~~Confirm Fastify vs Hono~~ Resolved: Fastify (ADR-005, 18 T1).
 - Confirm whether the web client is served by Caddy as static files or by the app server (leaning Caddy).
 - ~~UDP strategy~~ Resolved: single mux port 7882 plus TCP 7881 (08 §3.2; confirm in spike D6).
