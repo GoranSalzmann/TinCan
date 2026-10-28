@@ -6,14 +6,24 @@ import tseslint from "typescript-eslint";
 import tincan from "./tools/eslint/index.js";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "spikes/**", "docs/**", ".claude/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/dist-types/**",
+      "**/node_modules/**",
+      "**/coverage/**",
+      "spikes/**",
+      "docs/**",
+      ".claude/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       globals: { ...globals.node },
       parserOptions: {
-        project: ["./tsconfig.test.json"],
+        project: ["./tsconfig.test.json", "./apps/web/tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -47,6 +57,21 @@ export default tseslint.config(
     files: ["apps/server/src/modules/**/*.ts"],
     plugins: { tincan },
     rules: { "tincan/module-boundary": "error" },
+  },
+  {
+    // Components use semantic tokens only (style guide §3); raw palette classes such as bg-gray-800 are banned.
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...["Literal", "TemplateElement"].map((type) => ({
+          selector: `${type}[${type === "Literal" ? "value" : "value.raw"}=/\b(?:bg|text|border|ring|fill|stroke|from|to|via|outline|divide|decoration|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-[0-9]{2,3})?\b/]`,
+          message:
+            "Use a semantic colour token (bg-bg, text-text-muted, border-border …), not a raw palette class (style guide §3).",
+        })),
+      ],
+    },
   },
   {
     // Tests read arbitrary JSON responses; typing every body would only restate the assertions.

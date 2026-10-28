@@ -29,6 +29,7 @@ export default defineConfig({
         ...common,
         test: { name: "matrix", include: ["apps/**/*.matrix.test.ts"], exclude: ignore, testTimeout: 30_000 },
       },
+      "apps/web",
     ],
   },
 });

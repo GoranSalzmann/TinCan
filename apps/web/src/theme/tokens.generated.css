@@ -1,0 +1,458 @@
+/* Generated from src/theme/tokens.ts by `pnpm --filter @tincan/web gen:tokens`. Do not edit. */
+
+@theme {
+  --color-*: initial;
+  --color-bg-rail: #E2E5EA;
+  --color-bg-sidebar: #F1F3F6;
+  --color-bg: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-input: #F3F4F7;
+  --color-bg-hover: #E7EAEF;
+  --color-bg-selected: #DADFE6;
+  --color-bg-mention: #FDF3DC;
+  --color-bg-video: #0A0B0D;
+  --color-bg-video-label: #000000B8;
+  --color-overlay: #0A0B0D99;
+  --color-text: #11161C;
+  --color-text-muted: #4B5462;
+  --color-text-disabled: #8C95A2;
+  --color-text-link: #0B6A62;
+  --color-text-on-video: #FFFFFF;
+  --color-accent: #0F766E;
+  --color-accent-hover: #0B5F58;
+  --color-accent-text: #0B6A62;
+  --color-text-on-accent: #FFFFFF;
+  --color-border: #DADFE6;
+  --color-border-control: #7B8595;
+  --color-focus: #1F5FD1;
+  --color-danger: #C4261C;
+  --color-text-on-danger: #FFFFFF;
+  --color-danger-text: #B42318;
+  --color-danger-bg-subtle: #FDECEA;
+  --color-warning: #B54708;
+  --color-warning-text: #8F3A06;
+  --color-warning-bg-subtle: #FEF2DF;
+  --color-success-text: #067647;
+  --color-success-bg-subtle: #E5F5EC;
+  --color-speaking: #0C8A4C;
+  --color-live: #C4261C;
+  --color-text-on-live: #FFFFFF;
+  --color-presence-online: #12854C;
+  --color-presence-idle: #A65A06;
+  --color-presence-dnd: #C4261C;
+  --color-presence-offline: #737D8C;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", "DejaVu Sans Mono", Menlo, monospace;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-xs--font-weight: 500;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-sm--font-weight: 400;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.375rem;
+  --text-base--font-weight: 400;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-lg--font-weight: 600;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--font-weight: 600;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--font-weight: 700;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+}
+
+/* Plain tokens */
+:root {
+  --size-rail: 4.5rem;
+  --size-sidebar: 15rem;
+  --size-members: 15rem;
+  --size-header: 3rem;
+  --size-user-panel: 3.25rem;
+  --size-target: 1.5rem;
+  --size-dialog-sm: 27.5rem;
+  --size-dialog-md: 36rem;
+  --size-content-max: 46rem;
+  --z-sticky: 10;
+  --z-banner: 20;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;
+  --duration-fast: 100ms;
+  --duration-base: 160ms;
+  --duration-slow: 240ms;
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* One block per theme (style guide §2). `data-theme` is set by the Appearance setting. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg-rail: #E2E5EA;
+  --color-bg-sidebar: #F1F3F6;
+  --color-bg: #FFFFFF;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-input: #F3F4F7;
+  --color-bg-hover: #E7EAEF;
+  --color-bg-selected: #DADFE6;
+  --color-bg-mention: #FDF3DC;
+  --color-bg-video: #0A0B0D;
+  --color-bg-video-label: #000000B8;
+  --color-overlay: #0A0B0D99;
+  --color-text: #11161C;
+  --color-text-muted: #4B5462;
+  --color-text-disabled: #8C95A2;
+  --color-text-link: #0B6A62;
+  --color-text-on-video: #FFFFFF;
+  --color-accent: #0F766E;
+  --color-accent-hover: #0B5F58;
+  --color-accent-text: #0B6A62;
+  --color-text-on-accent: #FFFFFF;
+  --color-border: #DADFE6;
+  --color-border-control: #7B8595;
+  --color-focus: #1F5FD1;
+  --color-danger: #C4261C;
+  --color-text-on-danger: #FFFFFF;
+  --color-danger-text: #B42318;
+  --color-danger-bg-subtle: #FDECEA;
+  --color-warning: #B54708;
+  --color-warning-text: #8F3A06;
+  --color-warning-bg-subtle: #FEF2DF;
+  --color-success-text: #067647;
+  --color-success-bg-subtle: #E5F5EC;
+  --color-speaking: #0C8A4C;
+  --color-live: #C4261C;
+  --color-text-on-live: #FFFFFF;
+  --color-presence-online: #12854C;
+  --color-presence-idle: #A65A06;
+  --color-presence-dnd: #C4261C;
+  --color-presence-offline: #737D8C;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg-rail: #0E1014;
+  --color-bg-sidebar: #16191E;
+  --color-bg: #1D2026;
+  --color-bg-elevated: #262A31;
+  --color-bg-input: #2A2E36;
+  --color-bg-hover: #2C3038;
+  --color-bg-selected: #353A44;
+  --color-bg-mention: #3A3222;
+  --color-bg-video: #000000;
+  --color-bg-video-label: #000000B8;
+  --color-overlay: #000000B3;
+  --color-text: #ECEFF3;
+  --color-text-muted: #A9B1BE;
+  --color-text-disabled: #6C7482;
+  --color-text-link: #63DCCB;
+  --color-text-on-video: #FFFFFF;
+  --color-accent: #34C3B0;
+  --color-accent-hover: #5ED6C5;
+  --color-accent-text: #63DCCB;
+  --color-text-on-accent: #04211D;
+  --color-border: #30353E;
+  --color-border-control: #7C8595;
+  --color-focus: #7EB0FF;
+  --color-danger: #D02F25;
+  --color-text-on-danger: #FFFFFF;
+  --color-danger-text: #FF8F85;
+  --color-danger-bg-subtle: #3D1F1E;
+  --color-warning: #F6BE5C;
+  --color-warning-text: #F6BE5C;
+  --color-warning-bg-subtle: #3A2D15;
+  --color-success-text: #52E0A0;
+  --color-success-bg-subtle: #15301F;
+  --color-speaking: #3DDC84;
+  --color-live: #D02F25;
+  --color-text-on-live: #FFFFFF;
+  --color-presence-online: #3DDC84;
+  --color-presence-idle: #F6BE5C;
+  --color-presence-dnd: #F2555A;
+  --color-presence-offline: #808999;
+}
+[data-theme="hc"] {
+  color-scheme: dark;
+  --color-bg-rail: #000000;
+  --color-bg-sidebar: #000000;
+  --color-bg: #000000;
+  --color-bg-elevated: #000000;
+  --color-bg-input: #000000;
+  --color-bg-hover: #1F1F1F;
+  --color-bg-selected: #2E2E2E;
+  --color-bg-mention: #2B2300;
+  --color-bg-video: #000000;
+  --color-bg-video-label: #000000E0;
+  --color-overlay: #000000D9;
+  --color-text: #FFFFFF;
+  --color-text-muted: #D9D9D9;
+  --color-text-disabled: #9E9E9E;
+  --color-text-link: #8CD3FF;
+  --color-text-on-video: #FFFFFF;
+  --color-accent: #5CC8FF;
+  --color-accent-hover: #9ADEFF;
+  --color-accent-text: #5CC8FF;
+  --color-text-on-accent: #000000;
+  --color-border: #8A8A8A;
+  --color-border-control: #FFFFFF;
+  --color-focus: #FFD60A;
+  --color-danger: #FF6B6B;
+  --color-text-on-danger: #000000;
+  --color-danger-text: #FF8F8F;
+  --color-danger-bg-subtle: #330000;
+  --color-warning: #FFD60A;
+  --color-warning-text: #FFD60A;
+  --color-warning-bg-subtle: #332B00;
+  --color-success-text: #5CFF9D;
+  --color-success-bg-subtle: #00331A;
+  --color-speaking: #5CFF9D;
+  --color-live: #FF6B6B;
+  --color-text-on-live: #000000;
+  --color-presence-online: #5CFF9D;
+  --color-presence-idle: #FFD60A;
+  --color-presence-dnd: #FF6B6B;
+  --color-presence-offline: #BDBDBD;
+}
+
+/* System preference before any setting is loaded (the CSP forbids an inline script to set data-theme). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg-rail: #0E1014;
+    --color-bg-sidebar: #16191E;
+    --color-bg: #1D2026;
+    --color-bg-elevated: #262A31;
+    --color-bg-input: #2A2E36;
+    --color-bg-hover: #2C3038;
+    --color-bg-selected: #353A44;
+    --color-bg-mention: #3A3222;
+    --color-bg-video: #000000;
+    --color-bg-video-label: #000000B8;
+    --color-overlay: #000000B3;
+    --color-text: #ECEFF3;
+    --color-text-muted: #A9B1BE;
+    --color-text-disabled: #6C7482;
+    --color-text-link: #63DCCB;
+    --color-text-on-video: #FFFFFF;
+    --color-accent: #34C3B0;
+    --color-accent-hover: #5ED6C5;
+    --color-accent-text: #63DCCB;
+    --color-text-on-accent: #04211D;
+    --color-border: #30353E;
+    --color-border-control: #7C8595;
+    --color-focus: #7EB0FF;
+    --color-danger: #D02F25;
+    --color-text-on-danger: #FFFFFF;
+    --color-danger-text: #FF8F85;
+    --color-danger-bg-subtle: #3D1F1E;
+    --color-warning: #F6BE5C;
+    --color-warning-text: #F6BE5C;
+    --color-warning-bg-subtle: #3A2D15;
+    --color-success-text: #52E0A0;
+    --color-success-bg-subtle: #15301F;
+    --color-speaking: #3DDC84;
+    --color-live: #D02F25;
+    --color-text-on-live: #FFFFFF;
+    --color-presence-online: #3DDC84;
+    --color-presence-idle: #F6BE5C;
+    --color-presence-dnd: #F2555A;
+    --color-presence-offline: #808999;
+  }
+}
+@media (prefers-contrast: more) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg-rail: #000000;
+    --color-bg-sidebar: #000000;
+    --color-bg: #000000;
+    --color-bg-elevated: #000000;
+    --color-bg-input: #000000;
+    --color-bg-hover: #1F1F1F;
+    --color-bg-selected: #2E2E2E;
+    --color-bg-mention: #2B2300;
+    --color-bg-video: #000000;
+    --color-bg-video-label: #000000E0;
+    --color-overlay: #000000D9;
+    --color-text: #FFFFFF;
+    --color-text-muted: #D9D9D9;
+    --color-text-disabled: #9E9E9E;
+    --color-text-link: #8CD3FF;
+    --color-text-on-video: #FFFFFF;
+    --color-accent: #5CC8FF;
+    --color-accent-hover: #9ADEFF;
+    --color-accent-text: #5CC8FF;
+    --color-text-on-accent: #000000;
+    --color-border: #8A8A8A;
+    --color-border-control: #FFFFFF;
+    --color-focus: #FFD60A;
+    --color-danger: #FF6B6B;
+    --color-text-on-danger: #000000;
+    --color-danger-text: #FF8F8F;
+    --color-danger-bg-subtle: #330000;
+    --color-warning: #FFD60A;
+    --color-warning-text: #FFD60A;
+    --color-warning-bg-subtle: #332B00;
+    --color-success-text: #5CFF9D;
+    --color-success-bg-subtle: #00331A;
+    --color-speaking: #5CFF9D;
+    --color-live: #FF6B6B;
+    --color-text-on-live: #000000;
+    --color-presence-online: #5CFF9D;
+    --color-presence-idle: #FFD60A;
+    --color-presence-dnd: #FF6B6B;
+    --color-presence-offline: #BDBDBD;
+  }
+}
+
+/* Accent presets (style guide §3.2). High contrast keeps its own accent. */
+[data-accent="blue"]:is(:root, [data-theme="light"]) {
+  --color-accent: #2557D6;
+  --color-accent-hover: #1C45AD;
+  --color-accent-text: #1F4FC4;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="blue"][data-theme="dark"] {
+  --color-accent: #6C9BFF;
+  --color-accent-hover: #93B5FF;
+  --color-accent-text: #8DB1FF;
+  --color-text-on-accent: #06142E;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="blue"]:root:not([data-theme]) {
+    --color-accent: #6C9BFF;
+    --color-accent-hover: #93B5FF;
+    --color-accent-text: #8DB1FF;
+    --color-text-on-accent: #06142E;
+  }
+}
+[data-accent="violet"]:is(:root, [data-theme="light"]) {
+  --color-accent: #6D3FD1;
+  --color-accent-hover: #5730A8;
+  --color-accent-text: #6236C2;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="violet"][data-theme="dark"] {
+  --color-accent: #A58BFF;
+  --color-accent-hover: #BDA9FF;
+  --color-accent-text: #B9A5FF;
+  --color-text-on-accent: #160B33;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="violet"]:root:not([data-theme]) {
+    --color-accent: #A58BFF;
+    --color-accent-hover: #BDA9FF;
+    --color-accent-text: #B9A5FF;
+    --color-text-on-accent: #160B33;
+  }
+}
+[data-accent="rose"]:is(:root, [data-theme="light"]) {
+  --color-accent: #C0245C;
+  --color-accent-hover: #9C1C4A;
+  --color-accent-text: #AE1F53;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="rose"][data-theme="dark"] {
+  --color-accent: #FF7AA8;
+  --color-accent-hover: #FF9DBE;
+  --color-accent-text: #FF94B9;
+  --color-text-on-accent: #33081A;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="rose"]:root:not([data-theme]) {
+    --color-accent: #FF7AA8;
+    --color-accent-hover: #FF9DBE;
+    --color-accent-text: #FF94B9;
+    --color-text-on-accent: #33081A;
+  }
+}
+[data-accent="amber"]:is(:root, [data-theme="light"]) {
+  --color-accent: #A34F00;
+  --color-accent-hover: #853F00;
+  --color-accent-text: #8F4500;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="amber"][data-theme="dark"] {
+  --color-accent: #F2B13D;
+  --color-accent-hover: #F6C467;
+  --color-accent-text: #F6BE5C;
+  --color-text-on-accent: #2B1A00;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="amber"]:root:not([data-theme]) {
+    --color-accent: #F2B13D;
+    --color-accent-hover: #F6C467;
+    --color-accent-text: #F6BE5C;
+    --color-text-on-accent: #2B1A00;
+  }
+}
+[data-accent="green"]:is(:root, [data-theme="light"]) {
+  --color-accent: #13773F;
+  --color-accent-hover: #0E5F32;
+  --color-accent-text: #0F6D39;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="green"][data-theme="dark"] {
+  --color-accent: #45C97A;
+  --color-accent-hover: #6CD898;
+  --color-accent-text: #62D690;
+  --color-text-on-accent: #052211;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="green"]:root:not([data-theme]) {
+    --color-accent: #45C97A;
+    --color-accent-hover: #6CD898;
+    --color-accent-text: #62D690;
+    --color-text-on-accent: #052211;
+  }
+}
+[data-accent="graphite"]:is(:root, [data-theme="light"]) {
+  --color-accent: #39414D;
+  --color-accent-hover: #262C35;
+  --color-accent-text: #39414D;
+  --color-text-on-accent: #FFFFFF;
+}
+[data-accent="graphite"][data-theme="dark"] {
+  --color-accent: #B8C0CC;
+  --color-accent-hover: #D0D6DE;
+  --color-accent-text: #C3CAD4;
+  --color-text-on-accent: #11161C;
+}
+@media (prefers-color-scheme: dark) {
+  [data-accent="graphite"]:root:not([data-theme]) {
+    --color-accent: #B8C0CC;
+    --color-accent-hover: #D0D6DE;
+    --color-accent-text: #C3CAD4;
+    --color-text-on-accent: #11161C;
+  }
+}
+
+/* Windows contrast themes: tokens give way to system colours (style guide §2). */
+@media (forced-colors: active) {
+  :root {
+    --color-bg-rail: Canvas;
+    --color-bg-sidebar: Canvas;
+    --color-bg: Canvas;
+    --color-bg-elevated: Canvas;
+    --color-bg-input: Canvas;
+    --color-text: CanvasText;
+    --color-text-muted: CanvasText;
+    --color-text-link: LinkText;
+    --color-accent: Highlight;
+    --color-accent-hover: Highlight;
+    --color-accent-text: LinkText;
+    --color-text-on-accent: HighlightText;
+    --color-border: CanvasText;
+    --color-border-control: ButtonText;
+    --color-focus: Highlight;
+    --color-bg-selected: Highlight;
+  }
+}

@@ -1,0 +1,72 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+@import "tailwindcss";
+@import "./theme/tokens.generated.css";
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  body {
+    margin: 0;
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  /* Focus is never removed (style guide §11): 2 px ring, 2 px offset, its own colour so it never looks like selection. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  [data-theme="hc"] :focus-visible {
+    outline-width: 3px;
+  }
+  /* Links in text are always underlined (style guide §4). */
+  a {
+    color: var(--color-text-link);
+    text-decoration: underline;
+  }
+}
+
+/* Reduced motion (style guide §9): no movement, fades stay under 100 ms. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Elevation (style guide §8): dark uses a border, high contrast uses a 2 px border and no shadow. */
+@utility elev-2 {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 4px 12px #1018281f,
+    0 1px 3px #10182814;
+}
+[data-theme="dark"] .elev-2 {
+  box-shadow: 0 4px 16px #00000073;
+}
+[data-theme="hc"] .elev-2 {
+  box-shadow: none;
+  border: 2px solid var(--color-text);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .elev-2 {
+    box-shadow: 0 4px 16px #00000073;
+  }
+}

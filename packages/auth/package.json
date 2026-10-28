@@ -25,5 +25,8 @@
   },
   "devDependencies": {
     "vitest": "^5.0.5"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
