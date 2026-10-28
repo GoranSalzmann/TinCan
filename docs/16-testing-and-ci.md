@@ -126,6 +126,8 @@ Executed by the maintainer plus friends (dogfooding group) using a checklist:
 | Scenarios | Join/leave, PTT global, screenshare with/without audio (each OS), camera, 3+ people, E2EE channel, long call (1 h+), sleep/wake, device unplug, update install, first-run setup, upgrade from previous version |
 Results are recorded per release in `docs/qa/<version>.md`.
 
+> **As built in M1.** Vitest projects: `unit`, `contract` (`*.contract.test.ts` in `packages/`), `matrix` (`*.matrix.test.ts`), `web`. `pnpm check` runs the PR pipeline locally; `.github/workflows/pr.yml` runs it plus the DCO check and the two Docker builds, `codeql.yml` adds SAST. The licence scan is `scripts/check-licenses.mjs` (allow-list), the secret scan `scripts/secret-scan.mjs` (patterns; gitleaks is not wired up).
+
 ## 12. CI/CD pipeline
 
 | Stage | Trigger | Jobs |

@@ -9,3 +9,4 @@ docs
 data
 *.log
 .env
+**/*.tsbuildinfo

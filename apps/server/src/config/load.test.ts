@@ -58,6 +58,10 @@ describe("environment overrides", () => {
     expect(out).toEqual({ modules: { "text-chat": { enabled: false }, accounts: { sessionIdleDays: 7 } } });
   });
 
+  it("ignores TINCAN_CONFIG, which names the file rather than a setting", () => {
+    expect(applyEnv({}, { TINCAN_CONFIG: "/config/config.yaml" })).toEqual({});
+  });
+
   it("overrides the file and does not touch the input", () => {
     const base = { server: { port: 1 } };
     expect(applyEnv(base, { TINCAN_SERVER__PORT: "2" })).toEqual({ server: { port: 2 } });

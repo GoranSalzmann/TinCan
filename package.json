@@ -22,7 +22,7 @@
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:secrets": "node scripts/secret-scan.mjs",
     "check:dco": "node scripts/check-dco.mjs",
-    "ci": "pnpm typecheck && pnpm lint && pnpm check:headers && pnpm test && pnpm build && pnpm check:licenses && pnpm check:secrets",
+    "check": "pnpm typecheck && pnpm lint && pnpm check:headers && pnpm test && pnpm build && pnpm check:licenses && pnpm check:secrets",
     "dev": "pnpm --filter @tincan/server run dev",
     "tincan": "node apps/server/dist/cli.js"
   },

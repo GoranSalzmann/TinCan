@@ -7,6 +7,9 @@ import { CoreConfigSchema, type CoreConfig } from "./schema.js";
 
 export const ENV_PREFIX = "TINCAN_";
 
+/** Control variables that share the prefix but are not settings. */
+const NOT_SETTINGS = new Set(["TINCAN_CONFIG"]);
+
 function camel(seg: string): string {
   return seg.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
 }
@@ -54,7 +57,7 @@ function setPath(tree: Tree, path: string[], value: unknown): void {
 export function applyEnv(raw: Tree, env: Record<string, string | undefined>, readFile = readFileSync): Tree {
   const out = structuredClone(raw);
   for (const [name, value] of Object.entries(env)) {
-    if (!name.startsWith(ENV_PREFIX) || value === undefined) continue;
+    if (!name.startsWith(ENV_PREFIX) || NOT_SETTINGS.has(name) || value === undefined) continue;
     let key = name.slice(ENV_PREFIX.length);
     let val: unknown;
     if (key.endsWith("_FILE")) {

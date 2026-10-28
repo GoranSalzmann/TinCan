@@ -159,7 +159,7 @@ export function caddyfile(v: InitValues): string {
 	}`;
   const scheme = v.insecureHttp ? "ws" : "wss";
   // Scripts and styles only from self; Radix positions popovers with inline style attributes, hence style-src-attr.
-  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ${scheme}://{host}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ${scheme}://{hostport}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
   const headers = `	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer

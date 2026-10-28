@@ -90,7 +90,7 @@ memory (10 §4.1).
 ### 4.1 Sign-in and connect
 1. Client POSTs credentials to `/api/auth/login`; receives a session token
    (opaque, stored server-side hashed).
-2. Client calls `GET /api/capabilities` to learn enabled features and server version.
+2. Client calls `GET /api/v1/capabilities` to learn enabled features and server version.
 3. Client opens WebSocket `/gateway`, authenticates with the session token,
    receives `READY` (user, spaces/channels visible, presence snapshot, unread state).
 4. Gateway keeps the socket live; client resumes after drops via sequence number.

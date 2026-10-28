@@ -254,3 +254,20 @@ testability.
 Decisions on these findings are recorded in §F, and docs 00–08, 10, 11 and 13–17
 now reflect them (the M0 spike table in 17 §3 carries the §D additions). T33
 stays open until spike D4.
+
+## H. M1 build notes (2026-10-28)
+
+Facts learned while building the skeleton, and what was cut. Detail sits in the docs named.
+
+| Ref | Note | Doc |
+|---|---|---|
+| M1-1 | `TINCAN_CONFIG` shares the env prefix with settings. First compose run failed with `unknown setting "config"`. It is now ignored by the override logic, and the host uid/gid use `HOST_UID`/`HOST_GID` for the same reason. Lesson: control variables must not start with `TINCAN_` | 04 §9, 14 |
+| M1-2 | A stale `*.tsbuildinfo` copied into a Docker build makes `tsc -b` skip emit, so the web build could not find `@tincan/shared`. `.dockerignore` excludes them | 14 |
+| M1-3 | Web session = HttpOnly cookie + `X-Tincan-CSRF` header + single-use gateway ticket (a script cannot read the cookie to put a token in `IDENTIFY`) | 07, 11 §1.2 |
+| M1-4 | `ws` can answer 1009 to an oversize frame while the client sees the connection reset (1006) first; tests accept both | 07 §4.7 |
+| M1-5 | Kysely does not close a `better-sqlite3` handle it never opened a connection on; `Db.close()` closes the raw handle too (a leak showed as EPERM on Windows temp-dir cleanup) | 05 §3.1 |
+| M1-6 | TypeScript is pinned to 6.0.x because typescript-eslint supports `<6.1`; revisit when it supports 7 (the spikes used 7.0) | 16 |
+| M1-7 | LiveKit image is unpinned in the generated compose (profile `voice`); pin in D1 before M3 (K-03) | 14 §2 |
+| M1-8 | Web bundle is ~515 kB: the shared zod schemas ship to the browser | 12 |
+
+**Cut or deferred from M1 (by design, to the milestone named):** roles, channels, default `#general`/`Lounge` and `@everyone` (M2); invites, `/auth/register`, password reset codes, user settings sync, avatars (M2); OIDC (cut line 4); `search` helper and outbox drain job (M2, with `search`); OpenAPI output (M2, 17 §10); voice checks in `doctor` and the setup checklist (M3); Playwright e2e (nightly pipeline, 16 §12); `packages/ui` (tokens stay in `apps/web`); mobile drawer is minimal and the member list overlay below 1280 px is basic; the Electron shell (out of scope).
