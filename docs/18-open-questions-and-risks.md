@@ -129,9 +129,9 @@ Referenced elsewhere as D1 to D6.
 
 - [x] Q1–Q10 answered
 - [x] All docs 00–17 written (drafts complete)
-- [ ] All docs 00–17 reviewed by you (batch 1 and 2 partially; batch 3 pending)
-- [ ] Spikes D1–D6 scheduled (not necessarily done)
-- [ ] Roadmap (17) accepted
+- [x] All docs 00–17 reviewed by you (signed off 2026-10-28, after the design review in §G)
+- [ ] Spikes D1–D6 scheduled (not necessarily done). D5 started 2026-10-28; the others need dates (T24) and your VPS and test machines
+- [x] Roadmap (17) accepted (2026-10-28, with the cut lines as amended by T32)
 - [x] Licence and name chosen (AGPL-3.0, Tin Can)
 
 ## F. Sign-off triage outcome (2026-10-27)
@@ -197,8 +197,7 @@ Pending your call: the product-feature candidates found in the audit (stream pre
 Still open: T33 (waits for spike D4).
 
 ### Remaining sign-off blockers
-- You review docs 12–17 (batch 3) and any corrections to 07–11.
-- Roadmap and cut lines (17 §6) accepted.
+None. You signed off on 2026-10-28: docs 00–18 reviewed, roadmap and cut lines accepted. Spike dates (T24) are still to be set; they don't block starting M0.
 
 ## G. Design review findings (2026-10-27)
 
