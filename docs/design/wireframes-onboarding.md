@@ -1,6 +1,6 @@
 # Wireframes: setup, joining and saved servers
 
-> Status: **DRAFT, awaiting approval** (18 T23). Review table, legend and the calls
+> Status: **Approved 2026-10-28** (18 T23). Review table, legend and the calls
 > marked **U1–U16** are in [README.md](README.md).
 
 Screens W-30 to W-34: first-run setup for the Host, the desktop first launch, the invite
@@ -10,7 +10,7 @@ every breakpoint.
 
 ## W-30 First-run setup
 
-Status: Draft · Trace: R-054, 11 §1.4, 14 §4, K-21
+Status: Approved · Trace: R-054, 11 §1.4, 14 §4, K-21
 
 ```text
 ┌─ Set up Tin Can · Step 1 of 4: Setup token ──────────────────┐
@@ -83,7 +83,7 @@ Status: Draft · Trace: R-054, 11 §1.4, 14 §4, K-21
 
 ## W-31 Desktop first launch and add server
 
-Status: Draft · Trace: 13 §6, 13 §4.5
+Status: Approved · Trace: 13 §6, 13 §4.5
 
 ```text
 ┌─ Tin Can (first launch) ─────────────────────────────────────┐
@@ -128,7 +128,7 @@ Status: Draft · Trace: 13 §6, 13 §4.5
 
 ## W-32 Invite page (web)
 
-Status: Draft · Trace: R-002, R-003, 11 §1.5, 13 §4.5
+Status: Approved · Trace: R-002, R-003, 11 §1.5, 13 §4.5
 
 ```text
 ┌─ chat.example.com/invite/k3J9xQ2mPa ─────────────────────────┐
@@ -162,7 +162,7 @@ Status: Draft · Trace: R-002, R-003, 11 §1.5, 13 §4.5
 
 ## W-33 Join, log in and reset code
 
-Status: Draft · Trace: R-001, R-004, 11 §1.1, §1.3, §1.6, §1.7
+Status: Approved · Trace: R-001, R-004, 11 §1.1, §1.3, §1.6, §1.7
 
 ```text
 ┌─ Join Friends of Tin ────────────────────────┐   ┌─ Log in to Friends of Tin ───────────────────┐
@@ -194,7 +194,7 @@ Status: Draft · Trace: R-001, R-004, 11 §1.1, §1.3, §1.6, §1.7
 
 ## W-34 Saved servers switcher
 
-Status: Draft · Trace: 13 §6, 18 §F (saved-servers switcher in v1) · Calls: U5, U14
+Status: Approved · Trace: 13 §6, 18 §F (saved-servers switcher in v1) · Calls: U5, U14
 
 ```text
 ┌──────┐

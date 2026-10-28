@@ -1,6 +1,6 @@
 # Wireframes: main layout
 
-> Status: **DRAFT, awaiting approval** (18 T23). Review table, legend and the calls
+> Status: **Approved 2026-10-28** (18 T23). Review table, legend and the calls
 > marked **U1–U16** are in [README.md](README.md). Tokens and components: [style-guide.md](style-guide.md).
 
 Screens W-01 to W-07: the window you live in. Drawn at the **wide** breakpoint
@@ -8,7 +8,7 @@ Screens W-01 to W-07: the window you live in. Drawn at the **wide** breakpoint
 
 ## W-01 Main layout
 
-Status: Draft · Trace: 12 §4, R-018, R-031, R-033 · Calls: U1, U2, U5, U8
+Status: Approved · Trace: 12 §4, R-018, R-031, R-033 · Calls: U1, U2, U5, U8
 
 ```text
 ┌──────┬───────────────────────┬────────────────────────────────────────────────┬──────────────────┐
@@ -69,7 +69,7 @@ Right-to-left: the whole layout mirrors. Schematic:
 
 ## W-02 Channel list
 
-Status: Draft · Trace: R-018, R-031, R-033, R-051, 10 §5 · Calls: U13
+Status: Approved · Trace: R-018, R-031, R-033, R-051, 10 §5 · Calls: U13
 
 ```text
 ┌────────────────────────────────┐
@@ -121,7 +121,7 @@ Keyboard: the list is a tree (one tab stop). ↑/↓ move, → expands a categor
 
 ## W-03 Message list
 
-Status: Draft · Trace: R-010–R-020, 12 §5.3–5.6
+Status: Approved · Trace: R-010–R-020, 12 §5.3–5.6
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -193,7 +193,7 @@ Keyboard: the list is a feed. ↑/↓ or PageUp/PageDown move between messages o
 
 ## W-04 Composer
 
-Status: Draft · Trace: 12 §5.5, R-014, R-015, R-021
+Status: Approved · Trace: 12 §5.5, R-014, R-015, R-021
 
 ```text
 ┌─ 1. Default ───────────────────────────────────────────────────┐
@@ -264,7 +264,7 @@ Status: Draft · Trace: 12 §5.5, R-014, R-015, R-021
 
 ## W-05 Member list and user card
 
-Status: Draft · Trace: R-006, R-031, 11 §2.4 · Calls: U7, U12
+Status: Approved · Trace: R-006, R-031, 11 §2.4 · Calls: U7, U12
 
 ```text
 ┌─ Members ────────────┐   ┌─ User card (popover) ────────────────────┐   ┌─ More ─────────────────────┐
@@ -290,7 +290,7 @@ Status: Draft · Trace: R-006, R-031, 11 §2.4 · Calls: U7, U12
 
 ## W-06 Voice panel and user panel
 
-Status: Draft · Trace: R-032–R-037, 08 §4.4–4.5, 10 §5 · Calls: U1
+Status: Approved · Trace: R-032–R-037, 08 §4.4–4.5, 10 §5 · Calls: U1
 
 Voice panel states:
 
@@ -362,7 +362,7 @@ Connection details (click the quality bars) and the participant menu (right-clic
 
 ## W-07 Banners, toasts and blocking screens
 
-Status: Draft · Trace: 12 §5.2, §11, 13 §8, 08 §11
+Status: Approved · Trace: 12 §5.2, §11, 13 §8, 08 §11
 
 Banners (one at a time; offline beats reconnecting beats update):
 

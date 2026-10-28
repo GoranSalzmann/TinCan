@@ -1,6 +1,6 @@
 # Wireframes: admin tooling
 
-> Status: **DRAFT, awaiting approval** (18 T23). Review table, legend and the calls
+> Status: **Approved 2026-10-28** (18 T23). Review table, legend and the calls
 > marked **U1–U16** are in [README.md](README.md).
 
 Screens W-40 to W-43, all inside Server settings ([W-20](wireframes-settings.md#w-20-settings-shell)).
@@ -11,7 +11,7 @@ not security.
 
 ## W-40 Role editor
 
-Status: Draft · Trace: R-050, 11 §2.2, §2.4, §4
+Status: Approved · Trace: R-050, 11 §2.2, §2.4, §4
 
 ```text
 ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────┐
@@ -63,7 +63,7 @@ When the role is above your own:
 
 ## W-41 Channel permissions
 
-Status: Draft · Trace: R-051, 11 §2.3, §4
+Status: Approved · Trace: R-051, 11 §2.3, §4
 
 ```text
 ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────┐
@@ -125,7 +125,7 @@ The effective result for a chosen member, with the deciding step:
 
 ## W-42 Preview as member
 
-Status: Draft · Trace: 11 §4
+Status: Approved · Trace: 11 §4
 
 ```text
 ┌─ Preview banner (top of the app, above everything) ──────────────────────────────────────────────┐
@@ -140,7 +140,7 @@ Status: Draft · Trace: 11 §4
 
 ## W-43 Invites
 
-Status: Draft · Trace: R-003, 11 §1.5, §5
+Status: Approved · Trace: R-003, 11 §1.5, §5
 
 ```text
 ┌─ Invite people to Friends of Tin ──────────────────────── [×] ─┐

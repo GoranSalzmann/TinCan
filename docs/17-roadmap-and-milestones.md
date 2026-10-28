@@ -48,7 +48,8 @@ usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
 | D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded |
 | D6 | TURN/TLS cert sharing with deferred LiveKit reload (T30); single-port UDP; host-network routing and the narrowed Caddy route (T26) | Final network docs (T3) |
 Also: Fastify vs Hono (T1), electron-builder vs Forge, **low-fi wireframes and a
-token/style guide for the main screens (drafted by Claude, approved by you)**,
+token/style guide for the main screens (drafted by Claude, approved by you; done 2026-10-28,
+`docs/design/`)**,
 app icon/brand basics, repo creation and licence headers (`AGPL-3.0-or-later`
 SPDX tags, DCO check in CI; F3 resolved).
 **Deliverable:** updated docs 03/08/09/10/13/14, spike code kept in `spikes/`.

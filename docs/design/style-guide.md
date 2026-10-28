@@ -1,7 +1,7 @@
 # Style guide and design tokens
 
-> Status: **DRAFT, awaiting approval** (18 T23, K-27). Approve or mark up per section; the
-> review table is in [README.md](README.md). Wireframes that use these tokens are listed there too.
+> Status: **Approved 2026-10-28** (18 T23, K-27). The review table and the wireframes that use these
+> tokens are in [README.md](README.md).
 
 This guide fixes the visual language before UI code starts: colour tokens for three themes,
 type, spacing, radius, elevation, motion, icons, keyboard and focus rules, writing and

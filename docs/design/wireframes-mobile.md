@@ -1,6 +1,6 @@
 # Wireframes: narrow windows and mobile web
 
-> Status: **DRAFT, awaiting approval** (18 T23). Review table, legend and the calls
+> Status: **Approved 2026-10-28** (18 T23). Review table, legend and the calls
 > marked **U1–U16** are in [README.md](README.md).
 
 Screens W-50 to W-55: how the layout collapses (12 §14). There is no native mobile app
@@ -18,7 +18,7 @@ background audio guarantees, 12 §14).
 
 ## W-50 Compact: channel
 
-Status: Draft · Trace: 12 §14
+Status: Approved · Trace: 12 §14
 
 ```text
 ┌──────────────────────────────────────┐
@@ -67,7 +67,7 @@ With the on-screen keyboard open:
 
 ## W-51 Compact: channel drawer
 
-Status: Draft · Trace: 12 §14
+Status: Approved · Trace: 12 §14
 
 ```text
 ┌───────────────────────────┬──────────┐
@@ -96,7 +96,7 @@ Status: Draft · Trace: 12 §14
 
 ## W-52 Compact: member sheet
 
-Status: Draft · Trace: 12 §14
+Status: Approved · Trace: 12 §14
 
 ```text
 ┌──────────────────────────────────────┐
@@ -125,7 +125,7 @@ Status: Draft · Trace: 12 §14
 
 ## W-53 Compact: voice sheet
 
-Status: Draft · Trace: 12 §14, R-032
+Status: Approved · Trace: 12 §14, R-032
 
 ```text
 ┌──────────────────────────────────────┐
@@ -155,7 +155,7 @@ Status: Draft · Trace: 12 §14, R-032
 
 ## W-54 Compact: stream view
 
-Status: Draft · Trace: R-041, R-047
+Status: Approved · Trace: R-041, R-047
 
 ```text
 ┌─ Portrait ───────────────────────────┐   ┌─ Landscape, fullscreen ────────────────────────────────┐
@@ -180,7 +180,7 @@ Status: Draft · Trace: R-041, R-047
 
 ## W-55 Medium: member overlay
 
-Status: Draft · Trace: 12 §14 · Calls: U8
+Status: Approved · Trace: 12 §14 · Calls: U8
 
 ```text
 ┌──────┬───────────────────────┬──────────────────────────────────────────────────────────┐

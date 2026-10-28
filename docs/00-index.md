@@ -41,7 +41,7 @@ The docs go top-down. Each level assumes the one above it.
 | 16 | Testing & CI | Written |
 | 17 | Roadmap & milestones | Written |
 | 18 | Open questions & risks (living) | Written; updated each batch |
-| design/ | UI design: wireframes and style guide ([README](design/README.md)) | Drafted; design calls approved, screens awaiting approval (18 T23) |
+| design/ | UI design: wireframes and style guide ([README](design/README.md)) | Approved 2026-10-28 (18 T23) |
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:
 facts marked "(verify)" are checked in the M0 spikes (17), and open items in each doc

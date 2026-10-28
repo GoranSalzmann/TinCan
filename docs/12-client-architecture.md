@@ -77,7 +77,7 @@ A module exports `ClientModule` (04 §10). The shell loads
 - One server in the left rail in v1 (single community), but the rail exists for the desktop app's saved-instances switcher (13 §6).
 
 Low-fi wireframes for these screens and the token and style guide are in
-[design/](design/README.md) (design calls U1–U16 approved; screens awaiting approval, 18 T23).
+[design/](design/README.md) (approved 2026-10-28, 18 T23).
 
 ## 5. State & data flow
 
@@ -247,5 +247,4 @@ option (Q10); keep audio and E2EE code free of desktop-only assumptions.
 - TanStack Query vs bespoke REST cache: decide at scaffold.
 - Persistent local message cache (IndexedDB) in v1 or later.
 - Command palette (`Ctrl/Cmd+K`): v1 nice-to-have for channel switching.
-- Message context menu set and keyboard shortcuts: proposed in design/ (W-03, style guide §11); final on approval.
-- Visual design: low-fi wireframes and a token/style guide are in [design/](design/README.md). The design calls U1–U16 were approved on 2026-10-28 and are applied here; the screens still await approval (18 T23).
+- Brand basics and the app icon (17 §3 M0); the rest of the visual design is approved in [design/](design/README.md).

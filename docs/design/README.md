@@ -1,8 +1,8 @@
 # Tin Can UI design (M0)
 
-> Status: **DRAFT.** Design calls U1–U16 approved on 2026-10-28; screens and style guide awaiting
-> approval (18 T23, K-27). Drafted by Claude in M0; UI code starts only after you approve
-> (17 §3 M0, §5).
+> Status: **Approved 2026-10-28**: all screens (W-01 to W-55), the style guide and design calls
+> U1–U16 (18 T23, K-27). Drafted by Claude in M0 and reviewed screen by screen; M1 builds the
+> UI from these (17 §3 M0, §5).
 
 Low-fi wireframes for the main screens and a token and style guide. Everything is Markdown
 with ASCII frames so it diffs in git (00 conventions).
@@ -19,6 +19,11 @@ with ASCII frames so it diffs in git (00 conventions).
 | [tools/check_contrast.py](tools/check_contrast.py) | Recomputes every contrast pairing in the style guide; run after changing a colour |
 
 ## How to review
+
+Everything below is approved. To change an approved screen later, edit its frame, set its
+row in the review table back to Draft with a note, and get it re-approved before the UI
+code changes.
+
 
 - **Low-fi means:** the frames settle layout, hierarchy, content, states and behaviour. Colours, sizes and icons come from the style guide, not from the frames.
 - **Per screen:** set the Status column in the [review table](#review-table) to Approved or Changes, with a note; or comment on lines in the commit or PR. Every screen also lists what it traces to (R-xxx, doc sections) so you can check coverage.
@@ -87,44 +92,44 @@ with ASCII frames so it diffs in git (00 conventions).
 
 | ID | Screen | File | Status | Notes |
 |---|---|---|---|---|
-| — | Style guide (tokens, type, motion, components) | [style-guide.md](style-guide.md) | Draft | |
-| W-01 | Main layout | [main](wireframes-main.md#w-01-main-layout) | Draft | |
-| W-02 | Channel list | [main](wireframes-main.md#w-02-channel-list) | Draft | |
-| W-03 | Message list | [main](wireframes-main.md#w-03-message-list) | Draft | |
-| W-04 | Composer | [main](wireframes-main.md#w-04-composer) | Draft | |
-| W-05 | Member list and user card | [main](wireframes-main.md#w-05-member-list-and-user-card) | Draft | |
-| W-06 | Voice panel and user panel | [main](wireframes-main.md#w-06-voice-panel-and-user-panel) | Draft | |
-| W-07 | Banners, toasts and blocking screens | [main](wireframes-main.md#w-07-banners-toasts-and-blocking-screens) | Draft | |
-| W-10 | Call view | [voice-video](wireframes-voice-video.md#w-10-call-view) | Draft | |
-| W-11 | Stream view: focus | [voice-video](wireframes-voice-video.md#w-11-stream-view-focus) | Draft | |
-| W-12 | Stream view: grid | [voice-video](wireframes-voice-video.md#w-12-stream-view-grid) | Draft | |
-| W-13 | Sharing bar and viewer list | [voice-video](wireframes-voice-video.md#w-13-sharing-bar-and-viewer-list) | Draft | |
-| W-14 | Watch opt-in | [voice-video](wireframes-voice-video.md#w-14-watch-opt-in) | Draft | |
-| W-15 | Desktop source picker | [voice-video](wireframes-voice-video.md#w-15-desktop-source-picker) | Draft | |
-| W-16 | Web screen share | [voice-video](wireframes-voice-video.md#w-16-web-screen-share) | Draft | |
-| W-17 | Pop-out and picture-in-picture | [voice-video](wireframes-voice-video.md#w-17-pop-out-and-picture-in-picture) | Draft | |
-| W-20 | Settings shell | [settings](wireframes-settings.md#w-20-settings-shell) | Draft | |
-| W-21 | Voice & audio | [settings](wireframes-settings.md#w-21-voice--audio) | Draft | |
-| W-22 | Keybinds | [settings](wireframes-settings.md#w-22-keybinds) | Draft | |
-| W-23 | Storage | [settings](wireframes-settings.md#w-23-storage) | Draft | |
-| W-24 | Devices & sessions | [settings](wireframes-settings.md#w-24-devices--sessions) | Draft | |
-| W-25 | Connection test | [settings](wireframes-settings.md#w-25-connection-test) | Draft | |
-| W-26 | Appearance | [settings](wireframes-settings.md#w-26-appearance) | Draft | |
-| W-30 | First-run setup | [onboarding](wireframes-onboarding.md#w-30-first-run-setup) | Draft | |
-| W-31 | Desktop first launch and add server | [onboarding](wireframes-onboarding.md#w-31-desktop-first-launch-and-add-server) | Draft | |
-| W-32 | Invite page (web) | [onboarding](wireframes-onboarding.md#w-32-invite-page-web) | Draft | |
-| W-33 | Join, log in and reset code | [onboarding](wireframes-onboarding.md#w-33-join-log-in-and-reset-code) | Draft | |
-| W-34 | Saved servers switcher | [onboarding](wireframes-onboarding.md#w-34-saved-servers-switcher) | Draft | |
-| W-40 | Role editor | [admin](wireframes-admin.md#w-40-role-editor) | Draft | |
-| W-41 | Channel permissions | [admin](wireframes-admin.md#w-41-channel-permissions) | Draft | |
-| W-42 | Preview as member | [admin](wireframes-admin.md#w-42-preview-as-member) | Draft | |
-| W-43 | Invites | [admin](wireframes-admin.md#w-43-invites) | Draft | |
-| W-50 | Compact: channel | [mobile](wireframes-mobile.md#w-50-compact-channel) | Draft | |
-| W-51 | Compact: channel drawer | [mobile](wireframes-mobile.md#w-51-compact-channel-drawer) | Draft | |
-| W-52 | Compact: member sheet | [mobile](wireframes-mobile.md#w-52-compact-member-sheet) | Draft | |
-| W-53 | Compact: voice sheet | [mobile](wireframes-mobile.md#w-53-compact-voice-sheet) | Draft | |
-| W-54 | Compact: stream view | [mobile](wireframes-mobile.md#w-54-compact-stream-view) | Draft | |
-| W-55 | Medium: member overlay | [mobile](wireframes-mobile.md#w-55-medium-member-overlay) | Draft | |
+| — | Style guide (tokens, type, motion, components) | [style-guide.md](style-guide.md) | Approved | |
+| W-01 | Main layout | [main](wireframes-main.md#w-01-main-layout) | Approved | |
+| W-02 | Channel list | [main](wireframes-main.md#w-02-channel-list) | Approved | |
+| W-03 | Message list | [main](wireframes-main.md#w-03-message-list) | Approved | |
+| W-04 | Composer | [main](wireframes-main.md#w-04-composer) | Approved | |
+| W-05 | Member list and user card | [main](wireframes-main.md#w-05-member-list-and-user-card) | Approved | |
+| W-06 | Voice panel and user panel | [main](wireframes-main.md#w-06-voice-panel-and-user-panel) | Approved | |
+| W-07 | Banners, toasts and blocking screens | [main](wireframes-main.md#w-07-banners-toasts-and-blocking-screens) | Approved | |
+| W-10 | Call view | [voice-video](wireframes-voice-video.md#w-10-call-view) | Approved | |
+| W-11 | Stream view: focus | [voice-video](wireframes-voice-video.md#w-11-stream-view-focus) | Approved | |
+| W-12 | Stream view: grid | [voice-video](wireframes-voice-video.md#w-12-stream-view-grid) | Approved | |
+| W-13 | Sharing bar and viewer list | [voice-video](wireframes-voice-video.md#w-13-sharing-bar-and-viewer-list) | Approved | |
+| W-14 | Watch opt-in | [voice-video](wireframes-voice-video.md#w-14-watch-opt-in) | Approved | |
+| W-15 | Desktop source picker | [voice-video](wireframes-voice-video.md#w-15-desktop-source-picker) | Approved | |
+| W-16 | Web screen share | [voice-video](wireframes-voice-video.md#w-16-web-screen-share) | Approved | |
+| W-17 | Pop-out and picture-in-picture | [voice-video](wireframes-voice-video.md#w-17-pop-out-and-picture-in-picture) | Approved | |
+| W-20 | Settings shell | [settings](wireframes-settings.md#w-20-settings-shell) | Approved | |
+| W-21 | Voice & audio | [settings](wireframes-settings.md#w-21-voice--audio) | Approved | |
+| W-22 | Keybinds | [settings](wireframes-settings.md#w-22-keybinds) | Approved | |
+| W-23 | Storage | [settings](wireframes-settings.md#w-23-storage) | Approved | |
+| W-24 | Devices & sessions | [settings](wireframes-settings.md#w-24-devices--sessions) | Approved | |
+| W-25 | Connection test | [settings](wireframes-settings.md#w-25-connection-test) | Approved | |
+| W-26 | Appearance | [settings](wireframes-settings.md#w-26-appearance) | Approved | |
+| W-30 | First-run setup | [onboarding](wireframes-onboarding.md#w-30-first-run-setup) | Approved | |
+| W-31 | Desktop first launch and add server | [onboarding](wireframes-onboarding.md#w-31-desktop-first-launch-and-add-server) | Approved | |
+| W-32 | Invite page (web) | [onboarding](wireframes-onboarding.md#w-32-invite-page-web) | Approved | |
+| W-33 | Join, log in and reset code | [onboarding](wireframes-onboarding.md#w-33-join-log-in-and-reset-code) | Approved | |
+| W-34 | Saved servers switcher | [onboarding](wireframes-onboarding.md#w-34-saved-servers-switcher) | Approved | |
+| W-40 | Role editor | [admin](wireframes-admin.md#w-40-role-editor) | Approved | |
+| W-41 | Channel permissions | [admin](wireframes-admin.md#w-41-channel-permissions) | Approved | |
+| W-42 | Preview as member | [admin](wireframes-admin.md#w-42-preview-as-member) | Approved | |
+| W-43 | Invites | [admin](wireframes-admin.md#w-43-invites) | Approved | |
+| W-50 | Compact: channel | [mobile](wireframes-mobile.md#w-50-compact-channel) | Approved | |
+| W-51 | Compact: channel drawer | [mobile](wireframes-mobile.md#w-51-compact-channel-drawer) | Approved | |
+| W-52 | Compact: member sheet | [mobile](wireframes-mobile.md#w-52-compact-member-sheet) | Approved | |
+| W-53 | Compact: voice sheet | [mobile](wireframes-mobile.md#w-53-compact-voice-sheet) | Approved | |
+| W-54 | Compact: stream view | [mobile](wireframes-mobile.md#w-54-compact-stream-view) | Approved | |
+| W-55 | Medium: member overlay | [mobile](wireframes-mobile.md#w-55-medium-member-overlay) | Approved | |
 
 ## Not drawn yet
 
@@ -136,12 +141,12 @@ dialogs (kick, ban, timeout). App icon, logo and brand basics are a separate M0 
 
 ## After approval
 
-1. Mark approved screens here; fold requested changes back into the frames.
+1. Done 2026-10-28: every screen and the style guide approved with no changes.
 2. Done 2026-10-28: the doc changes the approved calls need, in 12 §2, §4, §13 and §14 (U1, U6, U8, U10, U11), 06 `role.hoist` (U12), 07 §3.7 own attachments (U16) and the 17 §7 backlog (U3).
 3. M1 turns the token tables into `packages/ui` tokens, generated CSS and Tailwind theme, and ports `tools/check_contrast.py` to a test (16).
-4. Close 18 T23 and lower K-27.
+4. Done 2026-10-28: 18 T23 records the approval (brand and app icon stay open there) and K-27 is lowered.
 
 ## Open items
 
-- Screen-by-screen approval in the review table.
+- Screens listed under "Not drawn yet", when you want them.
 - Each wireframe file and the style guide end with their own open items.

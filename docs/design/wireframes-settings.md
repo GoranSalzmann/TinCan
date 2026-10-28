@@ -1,6 +1,6 @@
 # Wireframes: settings
 
-> Status: **DRAFT, awaiting approval** (18 T23). Review table, legend and the calls
+> Status: **Approved 2026-10-28** (18 T23). Review table, legend and the calls
 > marked **U1–U16** are in [README.md](README.md).
 
 Screens W-20 to W-26: the settings shell and the pages the M0 brief asked for (Voice & audio,
@@ -10,7 +10,7 @@ Language, Advanced, About) reuse these patterns and are listed in the README as 
 
 ## W-20 Settings shell
 
-Status: Draft · Trace: 12 §8, 11 §4 · Calls: U9
+Status: Approved · Trace: 12 §8, 11 §4 · Calls: U9
 
 ```text
 ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────┐
@@ -52,7 +52,7 @@ Status: Draft · Trace: 12 §8, 11 §4 · Calls: U9
 
 ## W-21 Voice & audio
 
-Status: Draft · Trace: R-034, R-035, 09 §6, §9, §10
+Status: Approved · Trace: R-034, R-035, 09 §6, §9, §10
 
 ```text
 ┌─ Voice & audio ──────────────────────────────────────────────────────────────────┐
@@ -124,7 +124,7 @@ States and variants:
 
 ## W-22 Keybinds
 
-Status: Draft · Trace: R-035, 13 §4.2, K-20
+Status: Approved · Trace: R-035, 13 §4.2, K-20
 
 ```text
 ┌─ Keybinds ───────────────────────────────────────────────────────────────────────┐
@@ -179,7 +179,7 @@ States and platform variants:
 
 ## W-23 Storage
 
-Status: Draft · Trace: R-021, 07 §3.7 · Calls: U16
+Status: Approved · Trace: R-021, 07 §3.7 · Calls: U16
 
 ```text
 ┌─ Storage ────────────────────────────────────────────────────────────────────────┐
@@ -214,7 +214,7 @@ Status: Draft · Trace: R-021, 07 §3.7 · Calls: U16
 
 ## W-24 Devices & sessions
 
-Status: Draft · Trace: R-005, 11 §1.2
+Status: Approved · Trace: R-005, 11 §1.2
 
 ```text
 ┌─ Devices & sessions ─────────────────────────────────────────────────────────────┐
@@ -256,7 +256,7 @@ Status: Draft · Trace: R-005, 11 §1.2
 
 ## W-25 Connection test
 
-Status: Draft · Trace: 08 §10, K-01, 14 §4
+Status: Approved · Trace: 08 §10, K-01, 14 §4
 
 ```text
 ┌─ Test connection ────────────────────────────────────────────────────────────────┐
@@ -304,7 +304,7 @@ Status: Draft · Trace: 08 §10, K-01, 14 §4
 
 ## W-26 Appearance
 
-Status: Draft · Trace: 12 §8, §13, N-011 · Calls: U6
+Status: Approved · Trace: 12 §8, §13, N-011 · Calls: U6
 
 ```text
 ┌─ Appearance ─────────────────────────────────────────────────────────────────────┐
