@@ -160,6 +160,7 @@ basics, docs.
 | Native denoiser via utility process, auto-level | 09 |
 | Native global hold-to-talk hook (opt-in) | 13 §4.2.3 |
 | Stream preview thumbnails in the sidebar | 08, 12 |
+| Chat beside a stream (split view) | design U3; v1 uses pop-out / picture-in-picture |
 | Camera background blur / virtual backgrounds | 08, 09 |
 | Welcome message, rules screen, announcements | 11, 12 |
 | Custom emoji, GIF picker (needs opt-in provider), soundboard | 12 |

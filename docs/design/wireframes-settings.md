@@ -208,7 +208,7 @@ Status: Draft · Trace: R-021, 07 §3.7 · Calls: U16
 ```
 
 - The bar shows `usedBytes` of `quotaBytes` from `GET /users/@me/storage` (07 §3.7), formatted with `Intl.NumberFormat` units.
-- The "Largest uploads" list needs an endpoint that 07 doesn't have yet (U16). Without it, v1 shows the bar and the explanation only.
+- The "Largest uploads" list comes from `GET /users/@me/attachments?sort=size`; Delete calls `DELETE /uploads/:id` (07 §3.7, added for U16). Jump appears only for channels you can still see.
 - Delete removes the attachment from its message after a confirm; Jump opens the message.
 - The instance disk warning (R-021, `diskWarnPercent`) is for admins and lives in Server settings, Overview, not here.
 
@@ -338,4 +338,3 @@ Status: Draft · Trace: 12 §8, §13, N-011 · Calls: U6
 
 - Settings search (useful once all panes exist).
 - Whether Video settings get a camera preview with the same test pattern as the mic test.
-- The own-attachments endpoint for Storage (U16).

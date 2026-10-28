@@ -274,6 +274,5 @@ Status: Draft · Trace: R-045, 13 §4.6, T14
 
 ## Open items
 
-- Split view (chat beside a stream) for v1.1? (U3 keeps v1 simpler.)
 - "Auto-watch cameras" default (off proposed).
 - Whether the call view should show a text-channel shortcut for paired channels (admins pair them by name today, 18 Q5).

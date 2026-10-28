@@ -121,6 +121,8 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | Method & path | Purpose |
 |---|---|
 | POST `/uploads` | `multipart/form-data` single file → `{id, filename, contentType, size, width?, height?}`; attached later by ID in message create |
+| GET `/users/@me/attachments` | Own non-deleted attachments for Settings → Storage: `sort=size` or `sort=date`, cursor-paginated → `[{id, filename, contentType, size, channelId?, messageId?, createdAt}]`. Channel and message IDs are included only where the user can still view the channel (design U16) |
+| DELETE `/uploads/:id` | Delete an own attachment: sets `deleted_at`, frees quota at once, and the message shows "File removed" (design U16) |
 | GET `/files/:id/:filename` | Download/serve. Auth required: cookie on web; on desktop the Electron main process adds the `Authorization` header, so `<img>` and other subresources work (13 §3). Signed URLs only with the post-v1 S3 adapter |
 Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads.userQuotaBytes`, otherwise `QUOTA_EXCEEDED`; `GET /users/@me/storage` returns `{usedBytes, quotaBytes}` and the UI shows it in settings. Rules: size limit from config, extension and content-sniff checks, images get dimensions + generated thumbnail. Files served with `nosniff`; non-image types served as attachment. See 05 §9.
 

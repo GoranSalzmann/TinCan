@@ -25,7 +25,7 @@ renderer (ADR-012). Desktop-only capabilities are reached through a
 | Lists | Virtualised (TanStack Virtual or equivalent) | Message list must handle tens of thousands of messages with stable scroll |
 | Markdown | `remark/rehype` pipeline with strict allow-list, or a small safe parser | Never `dangerouslySetInnerHTML` of untrusted HTML; sanitised AST only |
 | i18n | `i18next`-style message catalogs (ICU plural support) | English only at launch; all strings externalised |
-| Icons/emoji | Local icon set; native emoji picker data bundled | No third-party CDNs at runtime (privacy, offline-friendly) |
+| Icons/emoji | Lucide icons, bundled (design U10); native emoji picker data bundled | No third-party CDNs at runtime (privacy, offline-friendly) |
 | Validation | zod schemas from `packages/shared` | Same schemas validate server payloads and incoming gateway events in dev builds |
 
 ## 3. Application structure
@@ -71,12 +71,13 @@ A module exports `ClientModule` (04 §10). The shell loads
 └───┴──────────────┴───────────────────────────────┴──────────────┘
 ```
 - Voice channels show participants and "live" badges (screenshare/camera icons) inline without joining (R-031).
-- **Voice panel** (bottom of channel list): current channel, connection quality, mute/deafen, camera, share screen, disconnect. Visible in every view.
+- **Voice panel** (bottom of channel list, while connected): current channel, connection quality, E2EE state, camera, share screen, disconnect. Visible in every view.
+- **User panel** (under the voice panel, always visible): avatar, status, mute, deafen, settings. Mute and deafen live here so they work before joining (design U1).
 - **Stream view:** clicking a live badge or "Watch" opens the stream in the main area (focus mode) with a filmstrip of other participants; grid mode when several streams are watched. Desktop: pop-out window (R-045).
 - One server in the left rail in v1 (single community), but the rail exists for the desktop app's saved-instances switcher (13 §6).
 
 Low-fi wireframes for these screens and the token and style guide are in
-[design/](design/README.md) (draft, awaiting approval; 18 T23).
+[design/](design/README.md) (design calls U1–U16 approved; screens awaiting approval, 18 T23).
 
 ## 5. State & data flow
 
@@ -216,15 +217,16 @@ limits ("Push-to-talk only works while Tin Can is focused in the browser").
 ## 13. Theming
 
 Design tokens as CSS variables (`--color-bg`, `--color-accent`, …); light, dark,
-and a high-contrast theme at launch; accent colour customisable per user. The
+and a high-contrast theme at launch; accent colour customisable per user from checked presets (design U6). The
 instance name/icon is Host-customisable. No third-party fonts loaded from
-CDNs; ship a system font stack plus one bundled font if desired. Token values,
+CDNs; the system font stack only, no bundled font in v1 (design U11). Token values,
 contrast checks and the component inventory: [design/style-guide.md](design/style-guide.md).
 
 ## 14. Mobile web (responsive)
 
 Breakpoints collapse the layout: channel list as a drawer, member list as a
-sheet, voice panel as a bottom bar. Mobile browsers limit background audio and
+sheet, voice panel as a bottom bar. The member list docks only at ≥ 1280 px and is
+an overlay below that (design U8). Mobile browsers limit background audio and
 screenshare publishing (not supported on most mobile browsers); the UI hides
 unsupported controls using capability detection. Native mobile remains a future
 option (Q10); keep audio and E2EE code free of desktop-only assumptions.
@@ -246,4 +248,4 @@ option (Q10); keep audio and E2EE code free of desktop-only assumptions.
 - Persistent local message cache (IndexedDB) in v1 or later.
 - Command palette (`Ctrl/Cmd+K`): v1 nice-to-have for channel switching.
 - Message context menu set and keyboard shortcuts: proposed in design/ (W-03, style guide §11); final on approval.
-- Visual design: low-fi wireframes and a token/style guide are drafted in [design/](design/README.md), awaiting approval (18 T23). Approved calls feed back here (U1 moves mute/deafen from the voice panel in §4 to the user panel).
+- Visual design: low-fi wireframes and a token/style guide are in [design/](design/README.md). The design calls U1–U16 were approved on 2026-10-28 and are applied here; the screens still await approval (18 T23).

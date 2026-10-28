@@ -1,7 +1,8 @@
 # Tin Can UI design (M0)
 
-> Status: **DRAFT, awaiting approval** (18 T23, K-27). Drafted by Claude in M0; UI code
-> starts only after you approve (17 §3 M0, §5).
+> Status: **DRAFT.** Design calls U1–U16 approved on 2026-10-28; screens and style guide awaiting
+> approval (18 T23, K-27). Drafted by Claude in M0; UI code starts only after you approve
+> (17 §3 M0, §5).
 
 Low-fi wireframes for the main screens and a token and style guide. Everything is Markdown
 with ASCII frames so it diffs in git (00 conventions).
@@ -21,7 +22,7 @@ with ASCII frames so it diffs in git (00 conventions).
 
 - **Low-fi means:** the frames settle layout, hierarchy, content, states and behaviour. Colours, sizes and icons come from the style guide, not from the frames.
 - **Per screen:** set the Status column in the [review table](#review-table) to Approved or Changes, with a note; or comment on lines in the commit or PR. Every screen also lists what it traces to (R-xxx, doc sections) so you can check coverage.
-- **Calls to approve:** where I had to choose, or where a frame changes or interprets another doc, the call is listed as U1–U16 [below](#calls-to-approve). Each needs a yes or no; a "no" changes the frames named there.
+- **Design calls:** where I had to choose, or where a frame changes or interprets another doc, the call is listed as U1–U16 [below](#calls-to-approve). All sixteen were approved as drafted on 2026-10-28; changing one later changes the frames named there.
 - **Copy:** text in frames is draft English. Strings get keys and ICU messages at implementation (style guide §12).
 - **Direction:** frames are left-to-right at desktop width unless stated; RTL mirrors as in [W-01](wireframes-main.md#w-01-main-layout).
 
@@ -63,24 +64,24 @@ with ASCII frames so it diffs in git (00 conventions).
 
 ## Calls to approve
 
-| ID | Call | Why | Affects |
-|---|---|---|---|
-| U1 | Mute and deafen live in the **user panel** (always visible), not the voice panel | They must work before you join; 12 §4 lists them in the voice panel | 12 §4; W-01, W-06 |
-| U2 | Joining a voice channel **doesn't replace** the text channel you're reading; the call view opens on demand | People drop into voice mid-conversation | W-01, W-10 |
-| U3 | The stream view takes the main column, and **leaving it stops the download** unless popped out; no chat-beside-stream split in v1 | Matches "unsubscribe when not displayed" (12 §6.1, 08 §4.2); split view is extra layout work | W-11, W-17 |
-| U4 | The focus ring has its own colour, not the accent | Focus must never look like selection | Style guide §3, §11 |
-| U5 | The **web client has no instance rail**; the desktop app shows it with saved servers and "+" | One instance on the web; the rail exists for the switcher (12 §4, 13 §6) | W-01, W-34, W-50 |
-| U6 | The accent comes from **7 checked presets**, not a free colour picker, in v1 | Every option is AA in light and dark | 12 §13; W-26 |
-| U7 | Role colours never colour text; they show as a dot and pill border | User-chosen colours can't be guaranteed readable | Style guide §3; W-05, W-40 |
-| U8 | The member list docks only at ≥ 1280 px; narrower, it is an overlay | Messages keep a readable width | 12 §14; W-55 |
-| U9 | Settings is a full-screen layer with mute, deafen and leave in its navigation | Voice keeps running (12 §6.3) and settings covers the voice panel | W-20 |
-| U10 | Icons: Lucide, bundled | ISC licence, broad set, tree-shakable, no CDN | Style guide §10 |
-| U11 | No bundled text font in v1 | `system-ui` covers every script with nothing to download (12 §13 allows one) | Style guide §5 |
-| U12 | Member list groups: roles marked "show separately", then Online, then Offline. **Needs a `role.hoist` boolean in 06** | Useful groups without colouring names | 06 `role`; W-05, W-40 |
-| U13 | Selecting a voice channel joins at once, with no confirm; joining another leaves the current one | Common chat-app convention; 12 §6.3 | W-02 |
-| U14 | Saved servers you aren't connected to show **no unread badges** | One connection at a time (13 §6); stale counts would mislead | W-34 |
-| U15 | The "can see you watching" notice is a one-time popover, not a blocking dialog | 08 §5.6 asks for a one-time notice; a dialog interrupts the stream | W-14 |
-| U16 | Storage lists your largest uploads with delete. **Needs a new endpoint** (own attachments sorted by size); 07 only returns used and quota | People need a way to free space when they hit the quota | 07 §3.7; W-23 |
+| ID | Call | Why | Affects | Decision |
+|---|---|---|---|---|
+| U1 | Mute and deafen live in the **user panel** (always visible), not the voice panel | They must work before you join; 12 §4 lists them in the voice panel | 12 §4; W-01, W-06 | Approved |
+| U2 | Joining a voice channel **doesn't replace** the text channel you're reading; the call view opens on demand | People drop into voice mid-conversation | W-01, W-10 | Approved |
+| U3 | The stream view takes the main column, and **leaving it stops the download** unless popped out; no chat-beside-stream split in v1 | Matches "unsubscribe when not displayed" (12 §6.1, 08 §4.2); split view is extra layout work | W-11, W-17 | Approved |
+| U4 | The focus ring has its own colour, not the accent | Focus must never look like selection | Style guide §3, §11 | Approved |
+| U5 | The **web client has no instance rail**; the desktop app shows it with saved servers and "+" | One instance on the web; the rail exists for the switcher (12 §4, 13 §6) | W-01, W-34, W-50 | Approved |
+| U6 | The accent comes from **7 checked presets**, not a free colour picker, in v1 | Every option is AA in light and dark | 12 §13; W-26 | Approved |
+| U7 | Role colours never colour text; they show as a dot and pill border | User-chosen colours can't be guaranteed readable | Style guide §3; W-05, W-40 | Approved |
+| U8 | The member list docks only at ≥ 1280 px; narrower, it is an overlay | Messages keep a readable width | 12 §14; W-55 | Approved |
+| U9 | Settings is a full-screen layer with mute, deafen and leave in its navigation | Voice keeps running (12 §6.3) and settings covers the voice panel | W-20 | Approved |
+| U10 | Icons: Lucide, bundled | ISC licence, broad set, tree-shakable, no CDN | Style guide §10 | Approved |
+| U11 | No bundled text font in v1 | `system-ui` covers every script with nothing to download (12 §13 allows one) | Style guide §5 | Approved |
+| U12 | Member list groups: roles marked "show separately", then Online, then Offline. Adds a `role.hoist` boolean to 06 | Useful groups without colouring names | 06 `role` (added); W-05, W-40 | Approved |
+| U13 | Selecting a voice channel joins at once, with no confirm; joining another leaves the current one | Common chat-app convention; 12 §6.3 | W-02 | Approved |
+| U14 | Saved servers you aren't connected to show **no unread badges** | One connection at a time (13 §6); stale counts would mislead | W-34 | Approved |
+| U15 | The "can see you watching" notice is a one-time popover, not a blocking dialog | 08 §5.6 asks for a one-time notice; a dialog interrupts the stream | W-14 | Approved |
+| U16 | Storage lists your largest uploads with delete. Adds an own-attachments list and delete to 07 | People need a way to free space when they hit the quota | 07 §3.7 (added); W-23 | Approved |
 
 ## Review table
 
@@ -135,12 +136,12 @@ dialogs (kick, ban, timeout). App icon, logo and brand basics are a separate M0 
 
 ## After approval
 
-1. Mark approved screens and U-calls here; fold "no" answers back into the frames.
-2. Apply the doc changes the approved calls need: 12 §4 (U1), 06 `role.hoist` (U12), 07 own-attachments endpoint (U16).
+1. Mark approved screens here; fold requested changes back into the frames.
+2. Done 2026-10-28: the doc changes the approved calls need, in 12 §2, §4, §13 and §14 (U1, U6, U8, U10, U11), 06 `role.hoist` (U12), 07 §3.7 own attachments (U16) and the 17 §7 backlog (U3).
 3. M1 turns the token tables into `packages/ui` tokens, generated CSS and Tailwind theme, and ports `tools/check_contrast.py` to a test (16).
 4. Close 18 T23 and lower K-27.
 
 ## Open items
 
-- The U1–U16 calls above.
+- Screen-by-screen approval in the review table.
 - Each wireframe file and the style guide end with their own open items.

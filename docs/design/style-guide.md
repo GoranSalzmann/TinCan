@@ -246,7 +246,7 @@ edit by hand). High contrast is checked against the same minimums but is designe
 ### 3.2 Accent presets
 
 The accent is customisable per user (12 §13) from a **curated set** rather than a free colour
-picker, so every option is checked in advance. The high-contrast theme keeps its own accent.
+picker (U6, approved), so every option is checked in advance. The high-contrast theme keeps its own accent.
 Teal is the default and matches the token table above.
 
 | Accent preset | Theme | `--color-accent` | `--color-accent-hover` | `--color-accent-text` | `--color-text-on-accent` |
@@ -319,7 +319,7 @@ Each preset is checked against every accent pairing in §3.1 for its theme:
 
 - `system-ui` picks the right face per script and locale (CJK, Arabic, Hebrew, Cyrillic), which a single bundled Latin font cannot.
 - Emoji render with the OS emoji font. Emoji picker data is bundled (12 §2); no emoji images are fetched.
-- No bundled text font in v1 (12 §13 allows one). Open item: whether to bundle one for cross-platform consistency.
+- No bundled text font in v1 (U11, approved).
 
 ### 5.2 Type scale
 
@@ -437,7 +437,7 @@ Rules:
 
 ## 10. Icons
 
-- **Recommendation: Lucide** (ISC licence, compatible with AGPL distribution, F2 licence scan), bundled as tree-shaken React components. No icon fonts, no CDN.
+- **Lucide** (U10, approved; ISC licence, compatible with AGPL distribution, F2 licence scan), bundled as tree-shaken React components. No icon fonts, no CDN.
 - Sizes: 16 px (inline, badges), 20 px (default: toolbars, rows), 24 px (call controls, mobile). Stroke 1.75 px; colour `currentColor`.
 - Icon-only buttons always have an accessible name and a tooltip that also shows the shortcut.
 - Mute, deafen, camera and share icons change **shape** between states (mic ↔ mic-off), not only colour.
@@ -574,7 +574,6 @@ until then.
 
 ## Open items
 
-- Bundle a text font for cross-platform consistency, or stay system-only (recommended: system-only for v1).
 - Composer: plain `textarea` (recommended for v1) vs a rich editor (Lexical, Slate) for inline mention chips.
 - Quick switcher library (cmdk vs custom combobox) once 12's "command palette in v1" is decided.
 - Free custom accent colour (with automatic contrast correction) in addition to presets: later.
