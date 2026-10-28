@@ -39,6 +39,8 @@ IPv4 (or IPv6 with working inbound). The doctor command detects CGNAT symptoms
 
 > **As built in M1.** `tincan init` writes `.env`, `config.yaml`, `docker-compose.yml`, `Caddyfile`, `livekit.yaml` and `data/setup-token`. The web client is not a volume: the `web` target of `deploy/Dockerfile` is Caddy with the built client in `/srv/web`, and the `server` target is the app (non-root, read-only root, `cap_drop: ALL`). `--domain localhost` selects a plain-HTTP trial on `--http-port` (default 8080). The app is published on `127.0.0.1:3000`. LiveKit is in the compose file under the profile `voice` with an unpinned image, because nothing uses it before M3 (pin it in D1). The host user's uid and gid are passed as `HOST_UID`/`HOST_GID` (not `TINCAN_*`, which would be read as settings) so `./data` stays writable.
 
+> **CLI on the host.** The generated `config.yaml` holds container paths (`dataDir: /data`) and no secrets. On the host the CLI reads `TINCAN_*` lines from a `.env` next to the config file when those variables are not already set (real environment variables win), so `tincan doctor --config <dir>/config.yaml` needs nothing exported. A missing instance secret now names `TINCAN_SECURITY__INSTANCE_SECRET` and says where `tincan init` put it. `doctor` maps a container `dataDir` that does not exist on the host to the `data/` folder next to the config file; if there is none it skips that check and points to `docker compose exec tincan node dist/cli.js doctor`.
+
 ### 2.1 Reverse proxy routes (Caddy)
 | Path | Target |
 |---|---|

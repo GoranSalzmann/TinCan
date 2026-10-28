@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { AppError } from "@tincan/shared";
 import { boot, createLogger } from "./boot.js";
@@ -114,7 +115,11 @@ async function main(argv: string[]): Promise<number> {
 
     case "doctor": {
       const config = loadConfig(configPath(values.config));
-      const results = await runDoctor(config, values.url ? { url: values.url } : {});
+      const path = configPath(values.config);
+      const results = await runDoctor(config, {
+        ...(values.url ? { url: values.url } : {}),
+        ...(path ? { configDir: dirname(resolve(path)) } : {}),
+      });
       console.log(formatReport(results));
       return results.some((r) => r.status === "fail") ? 1 : 0;
     }
