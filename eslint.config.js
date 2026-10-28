@@ -3,6 +3,7 @@ import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import tincan from "./tools/eslint/index.js";
 
 export default tseslint.config(
   { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "spikes/**", "docs/**", ".claude/**"] },
@@ -39,6 +40,23 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // 04 §11: feature modules reach each other only through events, ports and type-only ModuleApi imports.
+    files: ["apps/server/src/modules/**/*.ts"],
+    plugins: { tincan },
+    rules: { "tincan/module-boundary": "error" },
+  },
+  {
+    // Tests read arbitrary JSON responses; typing every body would only restate the assertions.
+    files: ["**/*.test.ts", "**/testing/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-base-to-string": "off",
     },
   },
   { files: ["**/*.js", "**/*.mjs"], ...tseslint.configs.disableTypeChecked },

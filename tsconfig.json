@@ -5,6 +5,7 @@
     { "path": "packages/db" },
     { "path": "packages/storage" },
     { "path": "packages/pubsub" },
-    { "path": "packages/auth" }
+    { "path": "packages/auth" },
+    { "path": "apps/server" }
   ]
 }

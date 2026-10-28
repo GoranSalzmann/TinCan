@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { defaultServerConditions, defineConfig } from "vite";
+import { defaultServerConditions } from "vite";
+import { defineConfig } from "vitest/config";
 
 // Workspace packages export their TypeScript source under the "tincan-src" condition, so tests and
 // `tsx --conditions=tincan-src` run without building first. Production resolves the compiled dist.

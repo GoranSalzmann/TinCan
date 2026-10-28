@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { describe, expect, it } from "vitest";
+import { ConfigError } from "./errors.js";
+import { applyEnv, parseCoreConfig } from "./load.js";
+
+const SECRET = "x".repeat(40);
+const minimal = { security: { instanceSecret: SECRET } };
+
+describe("core config", () => {
+  it("fills defaults from a minimal file", () => {
+    const c = parseCoreConfig(minimal);
+    expect(c.adapters.database).toEqual({ kind: "sqlite", path: "./data/app.db" });
+    expect(c.adapters.pubsub).toEqual({ kind: "memory" });
+    expect(c.server.port).toBe(3000);
+    expect(c.server.trustProxy).toBe(false);
+    expect(c.modules).toEqual({});
+  });
+
+  it("refuses unknown keys and says where", () => {
+    expect(() =>
+      parseCoreConfig({ ...minimal, adapters: { database: { kind: "sqlite", path: "x", pth: 1 } } }),
+    ).toThrow(/unknown setting "adapters\.database\.pth"/);
+    expect(() => parseCoreConfig({ ...minimal, typo: 1 })).toThrow(/unknown setting "typo"/);
+  });
+
+  it("refuses engines v1 does not ship", () => {
+    expect(() =>
+      parseCoreConfig({ ...minimal, adapters: { database: { kind: "postgres", path: "x" } } }),
+    ).toThrow(ConfigError);
+  });
+
+  it("requires a long enough instance secret", () => {
+    expect(() => parseCoreConfig({ security: { instanceSecret: "short" } })).toThrow(/instanceSecret/);
+    expect(() => parseCoreConfig({})).toThrow(/security/);
+  });
+});
+
+describe("environment overrides", () => {
+  it("maps TINCAN_A__B_C to a.bC and coerces values", () => {
+    const out = applyEnv(minimal, {
+      TINCAN_SERVER__PORT: "8080",
+      TINCAN_SERVER__TRUST_PROXY: "true",
+      TINCAN_INSTANCE__PUBLIC_URL: "https://chat.example.com",
+      TINCAN_SERVER__ALLOWED_ORIGINS: '["http://localhost:5173"]',
+      OTHER: "ignored",
+    });
+    expect(out).toMatchObject({
+      server: { port: 8080, trustProxy: true, allowedOrigins: ["http://localhost:5173"] },
+      instance: { publicUrl: "https://chat.example.com" },
+    });
+  });
+
+  it("writes module ids in kebab-case (04 §9)", () => {
+    const out = applyEnv(
+      {},
+      { TINCAN_MODULES__TEXT_CHAT__ENABLED: "false", TINCAN_MODULES__ACCOUNTS__SESSION_IDLE_DAYS: "7" },
+    );
+    expect(out).toEqual({ modules: { "text-chat": { enabled: false }, accounts: { sessionIdleDays: 7 } } });
+  });
+
+  it("overrides the file and does not touch the input", () => {
+    const base = { server: { port: 1 } };
+    expect(applyEnv(base, { TINCAN_SERVER__PORT: "2" })).toEqual({ server: { port: 2 } });
+    expect(base).toEqual({ server: { port: 1 } });
+  });
+
+  it("reads *_FILE secrets and strips the trailing newline", () => {
+    const out = applyEnv(
+      {},
+      { TINCAN_SECURITY__INSTANCE_SECRET_FILE: "/run/secrets/s" },
+      (() => `${SECRET}\n`) as never,
+    );
+    expect(out).toEqual({ security: { instanceSecret: SECRET } });
+  });
+
+  it("explains an unreadable secret file", () => {
+    expect(() =>
+      applyEnv({}, { TINCAN_SECURITY__INSTANCE_SECRET_FILE: "/nope" }, () => {
+        throw new Error("ENOENT");
+      }),
+    ).toThrow(/cannot be read/);
+  });
+});
