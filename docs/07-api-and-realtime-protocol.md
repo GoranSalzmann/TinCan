@@ -139,6 +139,8 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads.userQuotaBytes`, otherwise `QUOTA_EXCEEDED`; `GET /users/@me/storage` returns `{usedBytes, quotaBytes}` and the UI shows it in settings. Rules: size limit from config, extension and content-sniff checks, images get dimensions + generated thumbnail. Files served with `nosniff`; non-image types served as attachment. See 05 §9.
 
 ### 3.8 Voice (modules `voice`, `video`, `screenshare`, `voice-e2ee`)
+
+> **As built in M3.** `POST /voice/channels/:id/join` returns `{url, token, expiresAt, roomName, publishDefaults:{audioBitrateKbps, dtx, red, sources}, userLimit}` (no `e2ee` yet, M5); a hidden or missing channel answers 404, a full one 409 with `details.reason = channel_full`. `POST /voice/leave`, `GET /voice/state` and `GET /voice/status` (needs MANAGE_INSTANCE; webhook and reconciler counters) exist. Added: `POST /voice/diagnostics` hands out a 60 s listen-only token for a private room `diag_<userId>` that never shows as presence (the connection test, 08 §10). Not built: `/voice/channels/:id/token` (LiveKit refreshes tokens, D1), `e2ee-key`, `members/:userId/mute|move|disconnect` (M5). `VOICE_STATE_UPDATE` carries `{channelId, userId, joined, participant?}`; `VOICE_SERVER_DISCONNECT` reasons used: `moved`, `permission_lost`, `channel_deleted`.
 | Method & path | Purpose |
 |---|---|
 | GET `/voice/state` | Snapshot: for each visible voice channel, participants and their published sources |

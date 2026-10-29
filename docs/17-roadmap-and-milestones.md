@@ -86,6 +86,7 @@ minimal (window, secure bridge, keychain, instance entry, installers unsigned),
 **Exit:** friends can talk in voice channels from web/desktop with good audio;
 reconnect works; the 3-person media test passes in CI.
 **This is the dogfooding start.**
+**Status (2026-10-29): built; not yet confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: not built, moved out pending your decision (recommended: M4).** Needs from you: open the voice ports, walk [qa/m3.md](qa/m3.md) on the VPS with another person, listen to the mic test. Ports 7881/tcp and 7882/udp are still closed on mkarl.io.
 
 ### M4. Video, screenshare, desktop polish
 Camera + screenshare with presets, simulcast/dynacast, viewer opt-in/stream view,

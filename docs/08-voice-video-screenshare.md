@@ -28,6 +28,8 @@ spike phase (18 §D) before being treated as fact.
 
 ## 3. Server stack
 
+> **Measured in M3 (18 §J, LiveKit v1.13.10).** `rtc.udp_port: 7882` is a single-port mux (every client used it); `bind_addresses` binds only the HTTP port (7881 and TURN stay public); TURN certificates are read at start only. Defaults confirmed: `room.empty_timeout` and `departure_timeout` are set per room by the app at creation (60 s and 20 s); `prometheus.port` replaces the deprecated `prometheus_port`; TURN relay range defaults to 30000–40000/udp. Dynacast keeps publisher upload flat in the number of viewers (1.57 / 1.55 / 1.51 Mbps for 1 / 3 / 5 viewers of a 1080p30 simulcast source) and stops the top layer when viewers only need small tiles.
+
 ### 3.1 Processes
 `livekit-server` (SFU + built-in TURN) is configured via `livekit.yaml`. Redis is
 optional for a single node without egress/ingress (05, 14).
@@ -85,6 +87,8 @@ automatically, defeating "viewer opts in". So:
 - **Server mute:** `RoomService.mutePublishedTrack` plus a permission revoke so the user cannot simply unmute (permission `SPEAK` removed via `updateParticipant`); lifting restores it.
 
 ### 4.4 Reconnection
+
+> **Measured in M3.** LiveKit sends the connected client a new token after join and after every permission change, with the current permissions; the app's token endpoint is therefore only for joining, and revocation is the server's `updateParticipant`/`removeParticipant` plus the reconciler (T25). A network drop of 3 s reconnects by ICE restart without a rejoin; an app restart does not drop the call.
 - `livekit-client` performs ICE restarts and full reconnects automatically.
 - Client UI states: connected, reconnecting (spinner on avatar), disconnected (offer rejoin).
 - Token refresh: LiveKit may refresh tokens for connected participants itself (verify in D1). The app's `/voice/channels/:id/token` serves rejoins and re-checks CONNECT/permissions. Token expiry is not relied on for revocation (05 §6.2–6.3).

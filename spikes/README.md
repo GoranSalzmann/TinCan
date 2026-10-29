@@ -34,3 +34,8 @@ cd ../t1-http && npm ci
 npm run check                               # feature matrix
 npm run bench                               # HTTP and gateway fan-out numbers
 ```
+
+## M3 spikes
+
+`m3-voice/` holds D1 (LiveKit behaviour and load), D2 (denoiser candidates), D4 (E2EE with simulcast) and D6 (network and
+TURN). See its own README; results are in `docs/18-open-questions-and-risks.md` §D and §J.

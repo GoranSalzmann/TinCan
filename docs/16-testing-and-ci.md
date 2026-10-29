@@ -68,6 +68,8 @@ Server booted in-process with real adapters and a real LiveKit container
 
 ## 6. Media tests
 
+> **As built in M3.** `tools/media-test` (`pnpm media-test`, workflow `media.yml`, nightly and on voice changes) runs the real server, the web client and a real LiveKit with three headless Chromium clients on fake devices: join, Opus audio with under 5 % loss, presence, mute, deafen, app restart mid-call, a network drop, SPEAK revoked and restored, CONNECT revoked, leave, and no unexpected reconciler repairs. Not yet built: screenshare, upload independence in CI (measured once in D1), simulcast under throttling, E2EE, UDP-blocked TURN paths.
+
 Headless Chromium with fake media devices:
 `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream
 --use-file-for-fake-audio-capture=<wav> --use-file-for-fake-video-capture=<y4m>`.

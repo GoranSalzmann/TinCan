@@ -370,6 +370,33 @@ async function main(): Promise<number> {
       if (b.bytes - a.bytes < 2000) throw new Error("no audio after reconnecting");
     });
 
+    await step(
+      "taking SPEAK away silences the microphone, and giving it back restores it without rejoining",
+      async () => {
+        const micOf = async (userId: string) => {
+          const v = await api<{ voice: Record<string, { userId: string; sources: string[] }[]> }>(
+            "GET",
+            "/voice/state",
+            owner.token,
+          );
+          return (
+            (v.voice[lounge] ?? []).find((p) => p.userId === userId)?.sources.includes("microphone") ?? false
+          );
+        };
+        await api("PUT", `/channels/${lounge}/overwrites/member/${ids.cy}`, owner.token, {
+          allow: "0",
+          deny: permissionsToString(PERM.SPEAK),
+        });
+        await until("microphone revoked", async () => !(await micOf(ids.cy!)), 8000);
+        await api("DELETE", `/channels/${lounge}/overwrites/member/${ids.cy}`, owner.token);
+        await until("microphone published again", () => micOf(ids.cy!), 10_000);
+        const a = await inbound(bo.page);
+        await sleep(3000);
+        const b = await inbound(bo.page);
+        if (b.bytes - a.bytes < 2000) throw new Error("no audio after the right to speak came back");
+      },
+    );
+
     await step("taking CONNECT away removes the person from the call within seconds", async () => {
       const t0 = Date.now();
       await api("PUT", `/channels/${lounge}/overwrites/member/${ids.ann}`, owner.token, {

@@ -17,6 +17,8 @@ import { useVoice, type Quality, type VoiceNotice } from "./store.js";
 import { autoThreshold, PushToTalk, rms, VoiceActivity } from "./transmit.js";
 import type { VoiceJoinResponse } from "@tincan/shared";
 
+/** `TrackSource.MICROPHONE` in LiveKit's protocol enum, which livekit-client does not re-export. */
+const PROTOCOL_MICROPHONE = 2;
 const VOLUME_KEY = "tincan.voice.volumes.v1";
 
 function loadVolumes(): Record<string, number> {
@@ -46,6 +48,7 @@ class VoiceManager {
   #meter: ReturnType<typeof setInterval> | null = null;
   #unsubPrefs: (() => void) | null = null;
   #leaving = false;
+  #capKbps = 40;
   #volumes = loadVolumes();
   #cleanups: (() => void)[] = [];
 
@@ -105,20 +108,8 @@ class VoiceManager {
     for (const p of room.remoteParticipants.values())
       for (const pub of p.trackPublications.values()) this.#subscribeIfAudio(pub);
 
-    if (pipeline) {
-      const local = new LocalAudioTrack(pipeline.track, undefined, false);
-      this.#local = local;
-      const cap = Math.min(settings.bitrateKbps, grant.publishDefaults.audioBitrateKbps);
-      await room.localParticipant.publishTrack(local, {
-        source: Track.Source.Microphone,
-        name: "microphone",
-        dtx: settings.dtx,
-        red: settings.dtx,
-        audioPreset: { maxBitrate: cap * 1000 },
-        stopMicTrackOnMute: false,
-      });
-      this.#startTransmitGate(prefs);
-    }
+    this.#capKbps = grant.publishDefaults.audioBitrateKbps;
+    if (pipeline) await this.#publishMic(room, prefs);
     useVoice.getState().patch({ status: "connected", muted: !pipeline, deafened: false });
     this.#announceSelf();
     void this.#detectTransport(room);
@@ -136,6 +127,35 @@ class VoiceManager {
         this.#startTransmitGate(s.prefs);
       }
     });
+  }
+
+  /**
+   * Publishes the processed microphone. Also used when the server grants the right to speak mid-call: LiveKit unpublishes
+   * a source when its permission is revoked, and nothing republishes it when the permission comes back.
+   */
+  async #publishMic(room: Room, prefs: AudioPrefs): Promise<void> {
+    if (room.localParticipant.getTrackPublication(Track.Source.Microphone)) return;
+    if (!this.#pipeline) {
+      try {
+        this.#pipeline = await createPipeline(prefs);
+        this.#pipeline.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
+      } catch {
+        return;
+      }
+    }
+    const settings = effectiveSettings(prefs);
+    this.#local ??= new LocalAudioTrack(this.#pipeline.track, undefined, false);
+    const cap = Math.min(settings.bitrateKbps, this.#capKbps);
+    await room.localParticipant.publishTrack(this.#local, {
+      source: Track.Source.Microphone,
+      name: "microphone",
+      dtx: settings.dtx,
+      red: settings.dtx,
+      audioPreset: { maxBitrate: cap * 1000 },
+      stopMicTrackOnMute: false,
+    });
+    this.#startTransmitGate(prefs);
+    if (!this.#meter) this.#startMeter();
   }
 
   async leave(o: { keepNotice?: boolean; silent?: boolean } = {}): Promise<void> {
@@ -359,6 +379,14 @@ class VoiceManager {
       useVoice.getState().patch({
         quality: { ...useVoice.getState().quality, [participant.identity]: QUALITY[q] ?? "unknown" },
       });
+    });
+    room.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant) => {
+      if (participant !== room.localParticipant) return;
+      const perm = participant.permissions;
+      const mayPublishMic =
+        !!perm?.canPublish &&
+        (perm.canPublishSources.length === 0 || perm.canPublishSources.includes(PROTOCOL_MICROPHONE));
+      if (mayPublishMic) void this.#publishMic(room, useAudioPrefs.getState().prefs);
     });
     room.on(RoomEvent.Reconnecting, () => useVoice.getState().patch({ status: "reconnecting" }));
     room.on(RoomEvent.Reconnected, () => {
