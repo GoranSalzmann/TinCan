@@ -63,6 +63,7 @@ export function ServerPane() {
           </Button>
         </div>
       </form>
+      {owner ? <VideoLimitsCard /> : null}
       {owner ? <UploadLimitsCard /> : null}
       <p className="text-sm text-text-muted">
         {t("settings.server.source")}:{" "}
@@ -71,6 +72,81 @@ export function ServerPane() {
         </a>
       </p>
     </section>
+  );
+}
+
+/** The server-wide camera and screen share bitrate caps; a channel can lower the share cap further (18 §L). */
+function VideoLimitsCard() {
+  const t = useT();
+  const voiceOn = useSession((s) => Boolean(s.capabilities?.features.voice));
+  const [camera, setCamera] = useState("");
+  const [share, setShare] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!voiceOn) return;
+    void api
+      .videoLimits()
+      .then((l) => {
+        setCamera(String(+(l.cameraMaxKbps / 1000).toFixed(2)));
+        setShare(String(+(l.screenshareMaxKbps / 1000).toFixed(2)));
+        setLoaded(true);
+      })
+      .catch(toastError);
+  }, [voiceOn]);
+  if (!voiceOn) return null;
+
+  const cameraKbps = Math.round(Number(camera) * 1000);
+  const shareKbps = Math.round(Number(share) * 1000);
+  const cameraError =
+    camera === "" || !Number.isFinite(cameraKbps) || cameraKbps < 150 || cameraKbps > 8000
+      ? t("settings.video.range", { min: 0.15, max: 8 })
+      : null;
+  const shareError =
+    share === "" || !Number.isFinite(shareKbps) || shareKbps < 300 || shareKbps > 20_000
+      ? t("settings.video.range", { min: 0.3, max: 20 })
+      : null;
+
+  return (
+    <form
+      className={card}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void api
+          .setVideoLimits({ cameraMaxKbps: cameraKbps, screenshareMaxKbps: shareKbps })
+          .then(() => toast(t("settings.saved")))
+          .catch(toastError);
+      }}
+    >
+      <h3 className="m-0 text-lg">{t("settings.video")}</h3>
+      <Field
+        label={t("settings.video.screenshare")}
+        type="number"
+        min={0.3}
+        max={20}
+        step="any"
+        value={share}
+        onChange={(e) => setShare(e.target.value)}
+        error={shareError}
+        hint={t("settings.video.screenshare.hint")}
+      />
+      <Field
+        label={t("settings.video.camera")}
+        type="number"
+        min={0.15}
+        max={8}
+        step="any"
+        value={camera}
+        onChange={(e) => setCamera(e.target.value)}
+        error={cameraError}
+        hint={t("settings.video.camera.hint")}
+      />
+      <div>
+        <Button type="submit" disabled={!loaded || cameraError !== null || shareError !== null}>
+          {t("common.save")}
+        </Button>
+      </div>
+    </form>
   );
 }
 

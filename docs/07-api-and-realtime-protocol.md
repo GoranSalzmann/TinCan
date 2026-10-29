@@ -166,6 +166,7 @@ Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads
 | GET `/admin/modules` | Resolved module graph, adapters, warnings |
 | GET/PATCH `/admin/instance` | Name, icon, signup policy (non-module settings) |
 | GET/PATCH `/admin/uploads` | Largest file and per-person upload space, changeable at runtime (owner; 18 §L) |
+| GET/PATCH `/admin/voice` | Server-wide camera and screen share bitrate caps, changeable at runtime (owner; 18 §L) |
 | POST `/admin/users/:id/reset-token` | Generate a one-time password-reset code (11 §1.6) |
 | GET `/admin/stats` | User/message counts, storage use, voice usage |
 

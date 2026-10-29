@@ -9,6 +9,7 @@ import type { RolesApi } from "../roles/api.js";
 import type { VoiceApi } from "./api.js";
 import { sdkWebhookVerifier, SdkLiveKit, type LiveKitRooms, type WebhookVerifier } from "./livekit.js";
 import { registerVoiceRoutes } from "./routes.js";
+import { voiceMigrations, type VoiceTables } from "./schema.js";
 import { VoiceService } from "./service.js";
 
 const ConfigSchema = z.strictObject({
@@ -51,7 +52,8 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
     // On when a LiveKit server is configured; `modules.voice.enabled: false` turns it off.
     enabledByDefault: (ports) => ports.has("livekit"),
     configSchema: ConfigSchema,
-    register(ctx) {
+    migrations: voiceMigrations,
+    async register(ctx) {
       const roles = ctx.api.get<RolesApi>("roles");
       const channels = ctx.api.get<ChannelsApi>("channels");
       const accounts = ctx.api.get<AccountsApi>("accounts");
@@ -59,7 +61,9 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
       const lk = ctx.ports.livekit;
       const cfg = ctx.config;
       const svc = new VoiceService({
-        settings: cfg,
+        db: ctx.ports.db.as<VoiceTables>(),
+        // A copy: the owner's runtime changes must not write into the shared config object.
+        settings: { ...cfg, camera: { ...cfg.camera }, screenshare: { ...cfg.screenshare } },
         livekit: { url: lk.url, apiKey: lk.apiKey, apiSecret: lk.apiSecret },
         rooms: overrides.rooms ?? new SdkLiveKit(lk.apiUrl, lk.apiKey, lk.apiSecret),
         verify: overrides.verify ?? sdkWebhookVerifier(lk.apiKey, lk.apiSecret),
@@ -71,6 +75,7 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
         log: ctx.log,
       });
 
+      await svc.loadStoredLimits();
       registerVoiceRoutes(ctx.http, svc, roles);
 
       ctx.gateway.onCommand("voice.state", (args, { actor }) => {

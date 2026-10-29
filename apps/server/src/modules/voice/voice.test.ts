@@ -578,6 +578,30 @@ describe("camera and screen share (M4, 08 §5.2, §8)", () => {
     expect((await join()).screenshareMaxKbps).toBe(6000);
     const bad = await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 10 } });
     expect(bad.status).toBe(400);
+    // A null clears the channel's own cap, so the server's applies again.
+    await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 2500 } });
+    expect((await join()).screenshareMaxKbps).toBe(2500);
+    const cleared = await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: null } });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.settings.maxScreenshareKbps).toBeUndefined();
+    expect((await join()).screenshareMaxKbps).toBe(6000);
+  });
+
+  it("lets the owner change the server-wide video caps at runtime", async () => {
+    const ann = await s.register("ann");
+    const join = async () =>
+      (await api(ann.token).post(`/voice/channels/${lounge}/join`)).body.publishDefaults.video;
+    expect((await api(ann.token).get("/admin/voice")).status).toBe(403);
+    expect((await api(ann.token).patch("/admin/voice", { screenshareMaxKbps: 2000 })).status).toBe(403);
+    expect((await api(owner).get("/admin/voice")).body).toEqual({
+      cameraMaxKbps: 1700,
+      screenshareMaxKbps: 6000,
+    });
+    const r = await api(owner).patch("/admin/voice", { screenshareMaxKbps: 2000, cameraMaxKbps: 900 });
+    expect(r.status).toBe(200);
+    expect(await join()).toEqual({ cameraMaxKbps: 900, screenshareMaxKbps: 2000 });
+    expect((await api(owner).patch("/admin/voice", { screenshareMaxKbps: 100 })).status).toBe(400);
+    expect((await api(owner).patch("/admin/voice", {})).status).toBe(400);
   });
 
   it("the server-wide caps come from the module config", async () => {

@@ -2,7 +2,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { AppError, VoiceJoinResponseSchema, VoiceParticipantSchema } from "@tincan/shared";
+import {
+  AppError,
+  VideoLimitsPatchSchema,
+  VideoLimitsSchema,
+  VoiceJoinResponseSchema,
+  VoiceParticipantSchema,
+} from "@tincan/shared";
 import type { RolesApi } from "../roles/api.js";
 import type { VoiceService } from "./service.js";
 
@@ -22,6 +28,22 @@ export function registerVoiceRoutes(app: FastifyInstance, svc: VoiceService, rol
       schema: { params: z.object({ id: Id }), response: { 200: VoiceJoinResponseSchema } },
     },
     async (req) => svc.join(req.actor!.userId, req.params.id),
+  );
+
+  // The owner's server-wide video caps (18 §L): they apply to the next join, with no restart.
+  http.get(
+    "/admin/voice",
+    { preHandler: app.requireOwner, schema: { response: { 200: VideoLimitsSchema } } },
+    () => svc.videoLimits(),
+  );
+
+  http.patch(
+    "/admin/voice",
+    {
+      preHandler: app.requireOwner,
+      schema: { body: VideoLimitsPatchSchema, response: { 200: VideoLimitsSchema } },
+    },
+    async (req) => svc.updateVideoLimits(req.body),
   );
 
   http.post(

@@ -84,12 +84,12 @@ export const ChannelSettingsSchema = z.object({
   /** Seconds a member must wait between messages; 0 or absent is off. */
   slowmodeSecs: z.number().int().min(0).max(21_600).optional(),
   /** Voice channels (08 §9): maximum people at once (1–99) and the audio bitrate cap in kbit/s. */
-  userLimit: z.number().int().min(1).max(99).optional(),
-  bitrateKbps: z.number().int().min(8).max(128).optional(),
+  userLimit: z.number().int().min(1).max(99).nullish(),
+  bitrateKbps: z.number().int().min(8).max(128).nullish(),
   videoAllowed: z.boolean().optional(),
   screenshareAllowed: z.boolean().optional(),
   /** Screen share cap in kbit/s for this channel; never above the server's own cap (08 §5.2). */
-  maxScreenshareKbps: z.number().int().min(300).max(20_000).optional(),
+  maxScreenshareKbps: z.number().int().min(300).max(20_000).nullish(),
 });
 
 export type ChannelSettings = z.infer<typeof ChannelSettingsSchema>;

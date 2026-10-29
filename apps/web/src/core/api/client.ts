@@ -13,6 +13,7 @@ import {
   type InviteCreate,
   type LoginResponse,
   type UploadLimits,
+  type VideoLimits,
   type Member,
   type Message,
   type MessageCreate,
@@ -161,6 +162,8 @@ export const api = {
   }) => request<LoginResponse>("POST", "/auth/setup", { body }),
   renameInstance: (name: string) =>
     request<{ name: string; ownerId: string | null }>("PATCH", "/admin/instance", { body: { name } }),
+  videoLimits: () => request<VideoLimits>("GET", "/admin/voice"),
+  setVideoLimits: (body: Partial<VideoLimits>) => request<VideoLimits>("PATCH", "/admin/voice", { body }),
   uploadLimits: () => request<UploadLimits>("GET", "/admin/uploads"),
   setUploadLimits: (body: { maxBytes?: number; userQuotaBytes?: number }) =>
     request<UploadLimits>("PATCH", "/admin/uploads", { body }),

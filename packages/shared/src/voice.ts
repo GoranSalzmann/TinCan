@@ -52,6 +52,16 @@ export const VoiceJoinResponseSchema = z.object({
 });
 export type VoiceJoinResponse = z.infer<typeof VoiceJoinResponseSchema>;
 
+/** The owner's server-wide caps for the top video layer, in kbit/s (`GET/PATCH /admin/voice`). Advisory: see 08 §5.2. */
+export const VideoLimitsSchema = z.object({ cameraMaxKbps: z.number(), screenshareMaxKbps: z.number() });
+export const VideoLimitsPatchSchema = z
+  .strictObject({
+    cameraMaxKbps: z.number().int().min(150).max(8000).optional(),
+    screenshareMaxKbps: z.number().int().min(300).max(20_000).optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: "Nothing to change." });
+export type VideoLimits = z.infer<typeof VideoLimitsSchema>;
+
 export const VoiceLeaveBodySchema = z.object({ channelId: z.string().optional() });
 
 /** `voice.state` gateway command (07 §4.6): self mute/deafen, shown to others as icons. */

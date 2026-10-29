@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Db } from "@tincan/db";
 import type { Kv } from "@tincan/pubsub";
 import {
   AppError,
@@ -36,7 +37,15 @@ export interface VoiceSettings {
   joinRate: { max: number; windowSecs: number };
 }
 
+import type { VoiceTables } from "./schema.js";
+
+export interface VideoLimits {
+  cameraMaxKbps: number;
+  screenshareMaxKbps: number;
+}
+
 export interface VoiceDeps {
+  db: Db<VoiceTables>;
   settings: VoiceSettings;
   livekit: { url: string; apiKey: string; apiSecret: string };
   rooms: LiveKitRooms;
@@ -128,6 +137,41 @@ export class VoiceService {
 
   limitOf(ch: ChannelRecord): number {
     return ch.settings.userLimit ?? this.#d.settings.defaultUserLimit;
+  }
+
+  /** The server-wide caps in force now: the config values, or what the owner set at runtime. */
+  videoLimits(): VideoLimits {
+    const g = this.#d.settings;
+    return { cameraMaxKbps: g.camera.maxBitrateKbps, screenshareMaxKbps: g.screenshare.maxBitrateKbps };
+  }
+
+  /** Applies caps the owner saved earlier; call once at start-up. */
+  async loadStoredLimits(): Promise<void> {
+    const rows = await this.#d.db.query.selectFrom("voice_setting").select(["key", "value"]).execute();
+    for (const r of rows) {
+      if (r.key === "camera_max_kbps") this.#d.settings.camera.maxBitrateKbps = r.value;
+      if (r.key === "screenshare_max_kbps") this.#d.settings.screenshare.maxBitrateKbps = r.value;
+    }
+  }
+
+  /** Changes the caps for the next join, without a restart, and keeps them across restarts. */
+  async updateVideoLimits(patch: Partial<VideoLimits>): Promise<VideoLimits> {
+    const now = Date.now();
+    const entries: [string, number][] = [];
+    if (patch.cameraMaxKbps !== undefined) entries.push(["camera_max_kbps", patch.cameraMaxKbps]);
+    if (patch.screenshareMaxKbps !== undefined)
+      entries.push(["screenshare_max_kbps", patch.screenshareMaxKbps]);
+    for (const [key, value] of entries) {
+      await this.#d.db.query
+        .insertInto("voice_setting")
+        .values({ key, value, updated_at: now })
+        .onConflict((oc) => oc.column("key").doUpdateSet({ value, updated_at: now }))
+        .execute();
+    }
+    if (patch.cameraMaxKbps !== undefined) this.#d.settings.camera.maxBitrateKbps = patch.cameraMaxKbps;
+    if (patch.screenshareMaxKbps !== undefined)
+      this.#d.settings.screenshare.maxBitrateKbps = patch.screenshareMaxKbps;
+    return this.videoLimits();
   }
 
   /** Top-layer caps in kbit/s. Advisory: LiveKit cannot enforce a publisher's bitrate, so a modified client could exceed it. */

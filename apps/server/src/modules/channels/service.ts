@@ -224,7 +224,13 @@ export class ChannelsService {
       set.category_id = patch.categoryId;
     }
     if (patch.position !== undefined) set.position = patch.position;
-    if (patch.settings !== undefined) set.settings = JSON.stringify({ ...cur.settings, ...patch.settings });
+    if (patch.settings !== undefined) {
+      // A null clears a setting, so the server-wide default applies again.
+      const merged = Object.fromEntries(
+        Object.entries({ ...cur.settings, ...patch.settings }).filter(([, v]) => v !== null),
+      );
+      set.settings = JSON.stringify(merged);
+    }
     if (patch.archived !== undefined) set.archived_at = patch.archived ? Date.now() : null;
     if (Object.keys(set).length > 0)
       await this.#d.db.query.updateTable("channel").set(set).where("id", "=", id).execute();

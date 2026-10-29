@@ -28,6 +28,15 @@ export function CreateChannelDialog({
   const [topic, setTopic] = useState(edit?.topic ?? "");
   const [category, setCategory] = useState<string>(edit?.categoryId ?? categoryId ?? "");
   const [slow, setSlow] = useState(String(edit?.settings.slowmodeSecs ?? 0));
+  const [limit, setLimit] = useState(edit?.settings.userLimit ? String(edit.settings.userLimit) : "");
+  const [audioKbps, setAudioKbps] = useState(
+    edit?.settings.bitrateKbps ? String(edit.settings.bitrateKbps) : "",
+  );
+  const [cameraOn, setCameraOn] = useState(edit?.settings.videoAllowed !== false);
+  const [shareOn, setShareOn] = useState(edit?.settings.screenshareAllowed !== false);
+  const [shareMbps, setShareMbps] = useState(
+    edit?.settings.maxScreenshareKbps ? String(+(edit.settings.maxScreenshareKbps / 1000).toFixed(2)) : "",
+  );
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -36,7 +45,18 @@ export function CreateChannelDialog({
     if (!name.trim()) return;
     setBusy(true);
     try {
-      const settings = type === "text" ? { slowmodeSecs: Math.max(0, Number.parseInt(slow, 10) || 0) } : {};
+      // A blank number clears the setting (null), so the server-wide default applies.
+      const blankOr = (v: string, scale = 1) => (v.trim() === "" ? null : Math.round(Number(v) * scale));
+      const settings =
+        type === "text"
+          ? { slowmodeSecs: Math.max(0, Number.parseInt(slow, 10) || 0) }
+          : {
+              userLimit: blankOr(limit),
+              bitrateKbps: blankOr(audioKbps),
+              videoAllowed: cameraOn,
+              screenshareAllowed: shareOn,
+              maxScreenshareKbps: blankOr(shareMbps, 1000),
+            };
       if (edit) {
         await api.patchChannel(edit.id, {
           name,
@@ -107,6 +127,48 @@ export function CreateChannelDialog({
                 onChange={(e) => setSlow(e.target.value)}
               />
             </>
+          ) : null}
+          {type === "voice" ? (
+            <fieldset className="flex flex-col gap-3 border-0 p-0">
+              <legend className="mb-1 text-sm font-medium">{t("channel.voice.settings")}</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={cameraOn} onChange={(e) => setCameraOn(e.target.checked)} />
+                {t("channel.voice.camera")}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={shareOn} onChange={(e) => setShareOn(e.target.checked)} />
+                {t("channel.voice.screenshare")}
+              </label>
+              <Field
+                label={t("channel.voice.shareCap")}
+                hint={t("channel.voice.shareCap.hint")}
+                type="number"
+                min={0.3}
+                max={20}
+                step="any"
+                value={shareMbps}
+                onChange={(e) => setShareMbps(e.target.value)}
+                disabled={!shareOn}
+              />
+              <Field
+                label={t("channel.voice.limit")}
+                hint={t("channel.voice.default.hint")}
+                type="number"
+                min={1}
+                max={99}
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+              />
+              <Field
+                label={t("channel.voice.audio")}
+                hint={t("channel.voice.default.hint")}
+                type="number"
+                min={8}
+                max={128}
+                value={audioKbps}
+                onChange={(e) => setAudioKbps(e.target.value)}
+              />
+            </fieldset>
           ) : null}
           <label className="flex flex-col gap-1 text-sm font-medium">
             {t("channel.category")}
