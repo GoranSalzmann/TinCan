@@ -6,3 +6,5 @@ export * from "./capabilities.js";
 export * from "./accounts.js";
 export * from "./password-policy.js";
 export * from "./permissions.js";
+export * from "./community.js";
+export * from "./chat.js";

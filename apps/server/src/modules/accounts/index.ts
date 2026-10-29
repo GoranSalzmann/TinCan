@@ -4,9 +4,12 @@ import { AppError } from "@tincan/shared";
 import { defineModule } from "../../framework/types.js";
 import { VERSION } from "../../version.js";
 import type { AccountsApi } from "./api.js";
+import { getMember, listMembers, memberCount, spaceOf } from "./members.js";
+import { Presence } from "./presence.js";
 import { registerAccountRoutes } from "./routes.js";
 import { accountsMigrations, type AccountsTables } from "./schema.js";
 import { AccountsService } from "./service.js";
+import { UserSettings } from "./settings.js";
 
 const ConfigSchema = z.strictObject({
   signup: z.enum(["invite-only", "open", "closed"]).default("invite-only"),
@@ -52,9 +55,17 @@ export default defineModule({
       dataDir: ctx.core.dataDir,
       instanceSecret: ctx.core.security.instanceSecret,
       defaultInstanceName: ctx.core.instance.name,
+      broadcast: (t, d) => ctx.gateway.dispatchToAll(t, d),
     });
     svc.bindAuth(ctx.ports.auth.local({ lookup: (u) => svc.lookupCredential(u), params: ctx.config.argon2 }));
     await svc.init();
+
+    const settings = new UserSettings(db);
+    settings.register("appearance.theme", z.enum(["light", "dark", "system"]));
+    settings.register("appearance.accent", z.string().min(1).max(32));
+    settings.register("appearance.density", z.enum(["comfortable", "compact"]));
+    settings.register("locale", z.string().min(2).max(16));
+    const presence = new Presence(ctx.gateway);
 
     ctx.security.setAuthenticator({
       fromToken: (token) => svc.authenticateToken(token),
@@ -71,18 +82,29 @@ export default defineModule({
       setupRequired: svc.setupRequired,
     }));
 
-    registerAccountRoutes(ctx.http, svc, { secureCookie: ctx.core.instance.publicUrl.startsWith("https:") });
+    registerAccountRoutes(ctx.http, svc, {
+      secureCookie: ctx.core.instance.publicUrl.startsWith("https:"),
+      settings,
+      notifyUser: (userId, t, d) => ctx.gateway.dispatchToUser(userId, t, d),
+    });
 
     ctx.gateway.contributeReady(async (actor) => {
-      const [instance, user] = await Promise.all([svc.getInstance(), svc.getUser(actor.userId)]);
+      const [instance, user, prefs] = await Promise.all([
+        svc.getInstance(),
+        svc.getUser(actor.userId),
+        settings.get(actor.userId),
+      ]);
       return {
         user: user && {
           id: user.id,
           username: user.username,
           displayName: user.displayName,
+          avatarKey: user.avatarKey,
           isInstanceOwner: user.isInstanceOwner,
         },
         instance,
+        presence: presence.snapshot(),
+        settings: prefs,
       };
     });
 
@@ -99,9 +121,34 @@ export default defineModule({
           }
         );
       },
+      getUsers: (ids) => svc.getUsers(ids),
+      async spaceId() {
+        return (await spaceOf(db))?.id ?? null;
+      },
+      async ownerId() {
+        return (await spaceOf(db))?.ownerId ?? null;
+      },
+      listMembers: () => listMembers(db),
+      getMember: (id) => getMember(db, id),
+      memberCount: () => memberCount(db),
+      async setNickname(userId, nickname) {
+        await db.query.updateTable("member").set({ nickname }).where("user_id", "=", userId).execute();
+      },
+      setAvatarKey: (userId, key) => svc.setAvatarKey(userId, key),
+      onMemberJoin: (hook) => svc.addJoinHook(hook),
+      onMemberJoined: (hook) => svc.addJoinedHook(hook),
+      setInviteRedeemer: (r) => svc.setRedeemer(r),
+      setResetAuthorizer: (a) => svc.setResetAuthorizer(a),
+      registerSetting: (key, schema) => settings.register(key, schema),
     };
     ctx.api.provide("accounts", api);
 
     ctx.jobs.every("sessions.purge", 60 * 60_000, async () => void (await svc.purgeSessions()));
+    ctx.jobs.every("password-reset.purge", 60 * 60_000, async () => {
+      await db.query
+        .deleteFrom("password_reset")
+        .where("expires_at", "<", Date.now() - 86_400_000)
+        .execute();
+    });
   },
 });

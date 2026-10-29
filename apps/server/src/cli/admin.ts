@@ -9,7 +9,7 @@ import { resolveModules } from "../framework/loader.js";
 import { ALL_MODULES } from "../modules/index.js";
 import { accountsMigrations, type AccountsTables } from "../modules/accounts/schema.js";
 import { deleteSetupToken } from "../modules/accounts/setup-token.js";
-import { countUsers, createOwnerAndSpace, insertUser } from "../modules/accounts/users.js";
+import { countUsers, createOwnerAndSpace, insertMember, insertUser } from "../modules/accounts/users.js";
 import { askSecret, readStdin } from "./prompt.js";
 
 /** `config check` (04 §9): validates the file and prints the module graph without starting anything. */
@@ -81,9 +81,11 @@ export async function userCreate(config: CoreConfig, args: UserArgs): Promise<st
         "There is no owner yet. Run `tincan setup`, or finish setup in the browser first.",
       );
     }
-    await db.transaction((tx) =>
-      insertUser(tx, { username, displayName, passwordHash: hash }).then(() => undefined),
-    );
+    await db.transaction(async (tx) => {
+      const space = await tx.query.selectFrom("space").select("id").limit(1).executeTakeFirstOrThrow();
+      const user = await insertUser(tx, { username, displayName, passwordHash: hash });
+      await insertMember(tx, { spaceId: space.id, userId: user.id });
+    });
     return `Created user ${username}.`;
   });
 }

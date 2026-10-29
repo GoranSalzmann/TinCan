@@ -78,10 +78,7 @@ export function handleConnection(
     closed = true;
     clearTimeout(identifyTimer);
     clearInterval(heartbeatTimer);
-    if (session && session.conn === conn) {
-      session.conn = null;
-      session.detachedAt = now();
-    }
+    if (session) hub.detach(session, conn);
     try {
       socket.close(code, reason.slice(0, 100));
     } catch {
@@ -137,8 +134,10 @@ export function handleConnection(
 
     const contributions = await Promise.all(hub.readyContributors.map(async (c) => c(actor)));
     if (closed) return;
-    const created = hub.create(actor);
-    created.conn = conn;
+    const access = hub.channelAccess ? await hub.channelAccess(actor.userId) : new Set<string>();
+    if (closed) return;
+    const created = hub.create(actor, access);
+    hub.attach(created, conn);
     session = created;
     const ready = Object.assign({ sessionId: created.id }, ...contributions) as Record<string, unknown>;
     sendOp(Op.DISPATCH, ready, { t: "READY", s: 0 });
@@ -170,8 +169,7 @@ export function handleConnection(
     clearTimeout(identifyTimer);
     // From here to the end of the replay nothing awaits, so no new event can overtake the replayed ones.
     found.conn?.close(CloseCode.NORMAL, "resumed on another connection");
-    found.conn = conn;
-    found.detachedAt = null;
+    hub.attach(found, conn);
     session = found;
     for (const frame of replay) conn.send(frame);
     sendOp(Op.DISPATCH, { replayed: replay.length }, { t: "RESUMED", s: found.seq });
@@ -248,10 +246,7 @@ export function handleConnection(
     closed = true;
     clearTimeout(identifyTimer);
     clearInterval(heartbeatTimer);
-    if (session && session.conn === conn) {
-      session.conn = null;
-      session.detachedAt = now();
-    }
+    if (session) hub.detach(session, conn);
   });
   socket.on("error", (err) => deps.log.debug({ err }, "gateway socket error"));
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import type { LocalAuthAdapter } from "@tincan/auth";
 import {
   generateToken,
@@ -16,6 +16,7 @@ import {
   checkPassword,
   newId,
   type LoginRequest,
+  type RegisterRequest,
   type SessionInfo,
   type SetupRequest,
   type User,
@@ -23,14 +24,37 @@ import {
 import type { EventBus } from "../../framework/events.js";
 import type { Actor, Logger } from "../../framework/types.js";
 import { enforceRateLimit } from "../../http/rate-limit.js";
+import type { InviteRedeemer, JoinHook, JoinedHook, JoinInfo, PublicUser, ResetAuthorizer } from "./api.js";
 import type { AccountsTables } from "./schema.js";
 import { deleteSetupToken, ensureSetupToken, matchesSetupToken } from "./setup-token.js";
-import { countUsers, createOwnerAndSpace, findUserById, findUserByUsername, toUser } from "./users.js";
+import {
+  countUsers,
+  createOwnerAndSpace,
+  findUserById,
+  findUserByUsername,
+  insertMember,
+  insertUser,
+  toUser,
+} from "./users.js";
 
 const DAY = 86_400_000;
 const TOUCH_AFTER_MS = 5 * 60_000;
 const TICKET_TTL_MS = 30_000;
 const AUTH_WINDOW_MS = 15 * 60_000;
+const RESET_TTL_MS = 60 * 60_000;
+/** No 0/O/1/I/L/U: a code read aloud or typed from a chat message survives. */
+const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+function newResetCode(): string {
+  const bytes = randomBytes(12);
+  const chars = [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]!);
+  return [chars.slice(0, 4), chars.slice(4, 8), chars.slice(8, 12)].map((g) => g.join("")).join("-");
+}
+
+/** Codes are typed by people: ignore case, spaces and dashes. */
+const normaliseCode = (code: string) => code.toUpperCase().replace(/[\s-]/g, "");
 
 export interface AccountsSettings {
   signup: "invite-only" | "open" | "closed";
@@ -49,6 +73,8 @@ export interface SessionResult {
   expiresAt: Date;
   user: User;
   sessionId: string;
+  spaceId?: string;
+  defaultRoleId?: string | null;
 }
 
 export interface AccountsDeps {
@@ -61,6 +87,8 @@ export interface AccountsDeps {
   instanceSecret: string;
   defaultInstanceName: string;
   now?: () => number;
+  /** Tells every connected client about a profile change (gateway). */
+  broadcast?: (t: string, d: unknown) => void;
 }
 
 /** Application layer of `accounts` (05 §2): authorises, orchestrates and publishes events. No HTTP types here. */
@@ -70,6 +98,10 @@ export class AccountsService {
   #auth!: LocalAuthAdapter;
   #setupComplete = false;
   #instanceName: string | null = null;
+  readonly #joinHooks: JoinHook[] = [];
+  readonly #joinedHooks: JoinedHook[] = [];
+  #redeemer: InviteRedeemer | null = null;
+  #resetAuthorizer: ResetAuthorizer = { canReset: () => Promise.resolve(false) };
 
   constructor(deps: AccountsDeps) {
     this.#d = deps;
@@ -78,6 +110,30 @@ export class AccountsService {
 
   bindAuth(adapter: LocalAuthAdapter): void {
     this.#auth = adapter;
+  }
+
+  addJoinHook(hook: JoinHook): void {
+    this.#joinHooks.push(hook);
+  }
+
+  addJoinedHook(hook: JoinedHook): void {
+    this.#joinedHooks.push(hook);
+  }
+
+  async #afterJoin(info: JoinInfo): Promise<void> {
+    for (const hook of this.#joinedHooks) await hook(info);
+  }
+
+  setRedeemer(r: InviteRedeemer): void {
+    this.#redeemer = r;
+  }
+
+  setResetAuthorizer(a: ResetAuthorizer): void {
+    this.#resetAuthorizer = a;
+  }
+
+  async #runJoinHooks(tx: Db<AccountsTables>, info: JoinInfo): Promise<void> {
+    for (const hook of this.#joinHooks) await hook(tx, info);
   }
 
   /** Loads first-run state; if the instance has no owner yet, makes sure the setup token exists and says where it is. */
@@ -131,19 +187,228 @@ export class AccountsService {
     const result = await this.#d.db.transaction(async (tx) => {
       // BEGIN IMMEDIATE makes this check-then-insert atomic; the one-owner index is the backstop.
       if ((await countUsers(tx)) > 0) throw new AppError("CONFLICT", "This server is already set up.");
-      const owner = await createOwnerAndSpace(
+      const { owner, spaceId } = await createOwnerAndSpace(
         tx,
         { username: input.username, displayName: input.displayName, passwordHash, instanceName },
         now,
       );
-      return this.#insertSession(tx, owner.id, meta, clientName, now, toUser(owner));
+      await this.#runJoinHooks(tx, { userId: owner.id, spaceId, isOwner: true, defaultRoleId: null });
+      return { ...(await this.#insertSession(tx, owner.id, meta, clientName, now, toUser(owner))), spaceId };
     });
     this.#setupComplete = true;
     this.#instanceName = instanceName;
     await deleteSetupToken(this.#d.dataDir);
+    await this.#afterJoin({
+      userId: result.user.id,
+      spaceId: result.spaceId,
+      isOwner: true,
+      defaultRoleId: null,
+    });
     this.#d.events.emit("user.created", { userId: result.user.id });
+    this.#d.events.emit("member.joined", { userId: result.user.id });
     this.#d.log.info({ userId: result.user.id }, "owner account created; setup token deleted");
     return result;
+  }
+
+  // ---- registration (11 §1.5) ----------------------------------------------------------------
+
+  /** Creates a member with a password. Needs an invite unless signup is open; the invite use and the account commit together. */
+  async register(input: RegisterRequest, meta: ClientMeta, clientName: string): Promise<SessionResult> {
+    const policy = this.#d.settings.signup;
+    if (policy === "closed")
+      throw new AppError("PERMISSION_DENIED", "Registration is closed. Ask an admin to create your account.");
+    // Invite codes are bearer secrets: slow down guessing (11 §5).
+    await enforceRateLimit(this.#d.kv, { key: `register:ip:${meta.ip}`, max: 10, windowMs: AUTH_WINDOW_MS });
+    if (input.inviteCode === undefined && policy !== "open")
+      throw new AppError("PERMISSION_DENIED", "You need an invite to join this server.", {
+        reason: "invite_required",
+      });
+    if (input.inviteCode !== undefined && !this.#redeemer)
+      throw new AppError("FEATURE_DISABLED", "Invites are turned off on this server.");
+    this.#checkPassword(input.password);
+    const passwordHash = await hashPassword(input.password, this.#d.settings.argon2);
+    const now = this.#now();
+    const result = await this.#d.db.transaction(async (tx) => {
+      const space = await tx.query.selectFrom("space").select("id").limit(1).executeTakeFirst();
+      if (!space) throw new AppError("SETUP_REQUIRED", "This server has not been set up yet.");
+      let row;
+      try {
+        row = await insertUser(
+          tx,
+          { username: input.username, displayName: input.displayName, passwordHash },
+          now,
+        );
+      } catch (err) {
+        if (/UNIQUE constraint failed: user\.username/.test((err as Error).message))
+          throw new AppError("CONFLICT", "That username is taken.", { field: "username" });
+        throw err;
+      }
+      await insertMember(tx, { spaceId: space.id, userId: row.id }, now);
+      let defaultRoleId: string | null = null;
+      if (input.inviteCode !== undefined) {
+        defaultRoleId = (await this.#redeemer!.redeem(tx, input.inviteCode, row.id, now)).defaultRoleId;
+      }
+      await this.#runJoinHooks(tx, { userId: row.id, spaceId: space.id, isOwner: false, defaultRoleId });
+      return {
+        ...(await this.#insertSession(tx, row.id, meta, clientName, now, toUser(row))),
+        spaceId: space.id,
+        defaultRoleId,
+      };
+    });
+    await this.#afterJoin({
+      userId: result.user.id,
+      spaceId: result.spaceId,
+      isOwner: false,
+      defaultRoleId: result.defaultRoleId,
+    });
+    this.#d.events.emit("user.created", { userId: result.user.id });
+    this.#d.events.emit("member.joined", { userId: result.user.id });
+    return result;
+  }
+
+  // ---- password reset codes (11 §1.6) --------------------------------------------------------
+
+  /** Issues a one-time code for another user. A new code replaces any unused one. */
+  async issueResetCode(
+    actorUserId: string,
+    targetUserId: string,
+  ): Promise<{ code: string; expiresAt: Date }> {
+    const target = await findUserById(this.#d.db, targetUserId);
+    if (!target) throw new AppError("NOT_FOUND", "No such user.");
+    if (!(await this.#resetAuthorizer.canReset(actorUserId, targetUserId)))
+      throw new AppError("PERMISSION_DENIED", "You cannot reset that password.");
+    return this.createResetCode(targetUserId, actorUserId);
+  }
+
+  /** No authorisation here: the route (after its check) and the CLI have already decided. */
+  async createResetCode(
+    targetUserId: string,
+    createdBy: string | null,
+  ): Promise<{ code: string; expiresAt: Date }> {
+    const code = newResetCode();
+    const now = this.#now();
+    const expiresAt = new Date(now + RESET_TTL_MS);
+    await this.#d.db.transaction(async (tx) => {
+      await tx.query
+        .deleteFrom("password_reset")
+        .where("user_id", "=", targetUserId)
+        .where("used_at", "is", null)
+        .execute();
+      await tx.query
+        .insertInto("password_reset")
+        .values({
+          id: newId(now),
+          user_id: targetUserId,
+          code_hash: sha256(normaliseCode(code)),
+          created_by: createdBy,
+          created_at: now,
+          expires_at: expiresAt.getTime(),
+          used_at: null,
+        })
+        .execute();
+    });
+    return { code, expiresAt };
+  }
+
+  /** Redeems a code: sets the password and signs the user out everywhere. Single use, claimed atomically. */
+  async redeemResetCode(code: string, newPassword: string, ip: string): Promise<void> {
+    await enforceRateLimit(this.#d.kv, { key: `reset:ip:${ip}`, max: 10, windowMs: AUTH_WINDOW_MS });
+    this.#checkPassword(newPassword);
+    const hash = await hashPassword(newPassword, this.#d.settings.argon2);
+    const now = this.#now();
+    const wanted = sha256(normaliseCode(code));
+    const revoked = await this.#d.db.transaction(async (tx) => {
+      const row = await tx.query
+        .selectFrom("password_reset")
+        .selectAll()
+        .where("code_hash", "=", wanted)
+        .executeTakeFirst();
+      if (!row || row.used_at !== null || row.expires_at <= now)
+        throw new AppError("NOT_FOUND", "That code is not valid or has expired.", { reason: "reset_code" });
+      const claimed = await tx.query
+        .updateTable("password_reset")
+        .set({ used_at: now })
+        .where("id", "=", row.id)
+        .where("used_at", "is", null)
+        .executeTakeFirst();
+      if (Number(claimed.numUpdatedRows) === 0)
+        throw new AppError("NOT_FOUND", "That code is not valid or has expired.", { reason: "reset_code" });
+      await tx.query.updateTable("user").set({ password_hash: hash }).where("id", "=", row.user_id).execute();
+      const live = await tx.query
+        .selectFrom("session")
+        .select("id")
+        .where("user_id", "=", row.user_id)
+        .where("revoked_at", "is", null)
+        .execute();
+      await tx.query
+        .updateTable("session")
+        .set({ revoked_at: now })
+        .where("user_id", "=", row.user_id)
+        .where("revoked_at", "is", null)
+        .execute();
+      return live.map((s) => ({ userId: row.user_id, sessionId: s.id }));
+    });
+    for (const r of revoked) this.#d.events.emit("session.revoked", r);
+  }
+
+  // ---- profile -------------------------------------------------------------------------------
+
+  async patchProfile(
+    userId: string,
+    patch: { displayName?: string | undefined; statusText?: string | null | undefined },
+  ): Promise<User> {
+    const set: { display_name?: string; status_text?: string | null } = {};
+    if (patch.displayName !== undefined) set.display_name = patch.displayName;
+    if (patch.statusText !== undefined) set.status_text = patch.statusText === "" ? null : patch.statusText;
+    if (Object.keys(set).length > 0)
+      await this.#d.db.query.updateTable("user").set(set).where("id", "=", userId).execute();
+    const row = await findUserById(this.#d.db, userId);
+    if (!row) throw new AppError("NOT_FOUND", "No such user.");
+    this.#announceUser(row);
+    return toUser(row);
+  }
+
+  async setAvatarKey(userId: string, key: string | null): Promise<void> {
+    await this.#d.db.query.updateTable("user").set({ avatar_key: key }).where("id", "=", userId).execute();
+    const row = await findUserById(this.#d.db, userId);
+    if (row) this.#announceUser(row);
+  }
+
+  #announceUser(row: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar_key: string | null;
+    status_text: string | null;
+  }): void {
+    this.#d.broadcast?.("USER_UPDATE", {
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      avatarKey: row.avatar_key,
+      statusText: row.status_text,
+    });
+  }
+
+  async getUsers(ids: readonly string[]): Promise<Map<string, PublicUser>> {
+    const out = new Map<string, PublicUser>();
+    const unique = [...new Set(ids)];
+    for (let i = 0; i < unique.length; i += 200) {
+      const rows = await this.#d.db.query
+        .selectFrom("user")
+        .select(["id", "username", "display_name", "avatar_key", "is_instance_owner"])
+        .where("id", "in", unique.slice(i, i + 200))
+        .execute();
+      for (const r of rows)
+        out.set(r.id, {
+          id: r.id,
+          username: r.username,
+          displayName: r.display_name,
+          avatarKey: r.avatar_key,
+          isInstanceOwner: r.is_instance_owner === 1,
+        });
+    }
+    return out;
   }
 
   async renameInstance(name: string): Promise<{ name: string; ownerId: string | null }> {

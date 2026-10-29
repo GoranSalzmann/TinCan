@@ -135,8 +135,8 @@ async function expectConsistent(s: TestServer, enabled: Set<string>) {
   const caps = await s.request("GET", "/api/v1/capabilities");
   expect(CapabilitiesSchema.safeParse(caps.body).success).toBe(true);
   const stand = ALL.filter((m) => !real.has(m.id));
-  const expectedFeatures = stand
-    .filter((m) => enabled.has(m.id))
+  // Every enabled module except core and accounts announces itself as a feature.
+  const expectedFeatures = ALL.filter((m) => enabled.has(m.id) && m.id !== "core" && m.id !== "accounts")
     .map((m) => m.id)
     .sort();
   expect(Object.keys(caps.body.features).sort()).toEqual(expectedFeatures);
@@ -153,8 +153,9 @@ async function expectConsistent(s: TestServer, enabled: Set<string>) {
       name: string;
     }>`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`.execute(db.query)
   ).rows.map((r) => r.name);
-  const expectedTables = new Set(["_migrations", "outbox", "user", "session", "space", "member"]);
-  for (const m of stand) if (enabled.has(m.id)) for (const t of m.migrations!.tables!) expectedTables.add(t);
+  const expectedTables = new Set(["_migrations"]);
+  for (const m of ALL)
+    if (enabled.has(m.id)) for (const t of m.migrations?.tables ?? []) expectedTables.add(t);
   expect([...tables].sort()).toEqual([...expectedTables].sort());
 
   // the gateway answers FEATURE_DISABLED for a command whose module is off, and runs it when it is on

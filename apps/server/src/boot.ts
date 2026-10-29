@@ -12,6 +12,7 @@ import type { CoreConfig } from "./config/schema.js";
 import { ConfigError } from "./config/errors.js";
 import { InProcessEventBus } from "./framework/events.js";
 import { Scheduler } from "./framework/jobs.js";
+import { Outbox } from "./framework/outbox.js";
 import { ApiMap, CapabilityStore, type BootDescription, type KernelFacade } from "./framework/kernel.js";
 import { resolveModules, type ResolvedModules } from "./framework/loader.js";
 import type {
@@ -58,6 +59,9 @@ export interface RunningApp {
   events: InProcessEventBus;
   ports: Ports;
   scheduler: Scheduler;
+  outbox: Outbox;
+  /** Module APIs (04 §5), for tests and the admin CLI. */
+  apis: ApiMap;
   /** `http://host:port` once listening. */
   address: string | null;
   close(): Promise<void>;
@@ -214,6 +218,8 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
   const hub = new GatewayHub(
     gw.ringBufferEvents === undefined ? {} : { ringBufferEvents: gw.ringBufferEvents },
   );
+  const outbox = new Outbox(ports.db, logger.child({ module: "outbox" }));
+  scheduler.every("outbox.drain", 1000, async () => void (await outbox.drain()), { jitter: 0 });
   const security: SecurityState = { authenticator: null, gates: [] };
   const apis = new ApiMap();
 
@@ -282,7 +288,16 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     },
     contributeReady: (fn) => void hub.readyContributors.push(fn),
     dispatchToUser: (userId, t, d) => hub.dispatchToUser(userId, t, d),
+    dispatchToUsers: (ids, t, d) => hub.dispatchToUsers(ids, t, d),
     dispatchToAll: (t, d) => hub.dispatchToAll(t, d),
+    dispatchToChannel: (c, t, d, except) => hub.dispatchToChannel(c, t, d, except),
+    provideChannelAccess: (fn) => {
+      hub.channelAccess = fn;
+    },
+    setChannelAccess: (userId, channels) => hub.setChannels(userId, channels),
+    isOnline: (userId) => hub.isOnline(userId),
+    onlineUserIds: () => hub.onlineUserIds(),
+    onPresenceChange: (fn) => void hub.presenceListeners.push(fn),
   };
   const securityRegistrar: SecurityRegistrar = {
     setAuthenticator: (fn) => {
@@ -306,6 +321,7 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
           capabilities,
           security: securityRegistrar,
           jobs: scheduler,
+          outbox,
           api: apis,
           log: makeLogger(m.id),
         };
@@ -346,6 +362,8 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     events,
     ports,
     scheduler,
+    outbox,
+    apis,
     address,
     async close() {
       if (closed) return;
@@ -353,6 +371,7 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
       // Graceful shutdown (05 §1): stop accepting, tell sockets to resume elsewhere, flush, close the DB.
       hub.shutdown();
       await scheduler.stop();
+      outbox.close();
       if (listening) await app.close();
       else await app.close();
       await events.idle();

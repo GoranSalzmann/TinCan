@@ -17,6 +17,8 @@ export class GatewaySession {
   readonly ring: RingBuffer;
   conn: Connection | null = null;
   detachedAt: number | null = null;
+  /** Channels this session's user may currently see (11 §2.5): the delivery filter of 05 §5. */
+  channels: ReadonlySet<string> = new Set();
 
   constructor(id: string, actor: Actor, ring: RingBuffer) {
     this.id = id;
@@ -32,6 +34,11 @@ export interface HubOptions {
 }
 
 export type ReadyContributor = (actor: Actor) => Promise<Record<string, unknown>> | Record<string, unknown>;
+export type ChannelAccessProvider = (userId: string) => Promise<ReadonlySet<string>> | ReadonlySet<string>;
+export type PresenceListener = (userId: string, online: boolean) => void;
+
+/** A user who loses every socket stays "online" this long, so a page reload does not flicker (07 §4.5). */
+const OFFLINE_GRACE_MS = 5_000;
 
 /**
  * Gateway sessions, sequencing and fan-out (05 §5). A session outlives its socket for the replay
@@ -42,7 +49,11 @@ export class GatewayHub {
   readonly sessions = new Map<string, GatewaySession>();
   readonly commands = new Map<string, GatewayCommandHandler>();
   readonly readyContributors: ReadyContributor[] = [];
+  channelAccess: ChannelAccessProvider | null = null;
+  readonly presenceListeners: PresenceListener[] = [];
   readonly #opts: Required<HubOptions>;
+  readonly #online = new Set<string>();
+  readonly #offlineTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(opts: HubOptions = {}) {
     this.#opts = {
@@ -56,15 +67,86 @@ export class GatewayHub {
     return this.#opts.ringBufferMs;
   }
 
-  create(actor: Actor): GatewaySession {
+  /** `channels` is the user's current visibility set, computed by `roles` just before the session is created. */
+  create(actor: Actor, channels: ReadonlySet<string> = new Set()): GatewaySession {
     const id = randomBytes(18).toString("base64url");
     const session = new GatewaySession(
       id,
       actor,
       new RingBuffer(this.#opts.ringBufferEvents, this.#opts.ringBufferMs),
     );
+    session.channels = channels;
     this.sessions.set(id, session);
     return session;
+  }
+
+  /** Called whenever a socket attaches to a session (IDENTIFY, RESUME). */
+  attach(session: GatewaySession, conn: Connection): void {
+    session.conn = conn;
+    session.detachedAt = null;
+    this.#markOnline(session.actor.userId);
+  }
+
+  /** Called when a socket leaves a session. The session itself stays for the replay window. */
+  detach(session: GatewaySession, conn: Connection): void {
+    if (session.conn !== conn) return;
+    session.conn = null;
+    session.detachedAt = this.#opts.now();
+    this.#maybeOffline(session.actor.userId);
+  }
+
+  isOnline(userId: string): boolean {
+    return this.#online.has(userId);
+  }
+
+  onlineUserIds(): string[] {
+    return [...this.#online];
+  }
+
+  #hasSocket(userId: string): boolean {
+    for (const s of this.sessions.values()) if (s.actor.userId === userId && s.conn) return true;
+    return false;
+  }
+
+  #markOnline(userId: string): void {
+    const timer = this.#offlineTimers.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.#offlineTimers.delete(userId);
+    }
+    if (this.#online.has(userId)) return;
+    this.#online.add(userId);
+    for (const l of this.presenceListeners) l(userId, true);
+  }
+
+  #maybeOffline(userId: string): void {
+    if (!this.#online.has(userId) || this.#hasSocket(userId) || this.#offlineTimers.has(userId)) return;
+    const timer = setTimeout(() => {
+      this.#offlineTimers.delete(userId);
+      if (this.#hasSocket(userId) || !this.#online.delete(userId)) return;
+      for (const l of this.presenceListeners) l(userId, false);
+    }, OFFLINE_GRACE_MS);
+    timer.unref();
+    this.#offlineTimers.set(userId, timer);
+  }
+
+  /** Replaces the visibility set of every session of a user (permission change, channel created or deleted). */
+  setChannels(userId: string, channels: ReadonlySet<string>): void {
+    for (const s of this.sessions.values()) if (s.actor.userId === userId) s.channels = channels;
+  }
+
+  /** Sends to every session whose user can currently see the channel (05 §5 "authorisation on delivery"). */
+  dispatchToChannel(channelId: string, t: string, d: unknown, exceptUserId?: string): void {
+    for (const session of this.sessions.values()) {
+      if (session.actor.userId === exceptUserId) continue;
+      if (session.channels.has(channelId)) this.#dispatch(session, t, d);
+    }
+  }
+
+  dispatchToUsers(userIds: Iterable<string>, t: string, d: unknown): void {
+    const wanted = new Set(userIds);
+    for (const session of this.sessions.values())
+      if (wanted.has(session.actor.userId)) this.#dispatch(session, t, d);
   }
 
   /** Sequences one event for a session, buffers it for replay, and sends it if the socket is attached. */
@@ -96,6 +178,7 @@ export class GatewayHub {
       this.sessions.delete(id);
       session.conn?.close(closeCode, reason);
       session.conn = null;
+      this.#maybeOffline(session.actor.userId);
     }
   }
 
@@ -111,6 +194,7 @@ export class GatewayHub {
       ) {
         this.sessions.delete(id);
         removed++;
+        this.#maybeOffline(session.actor.userId);
       }
     }
     return removed;

@@ -215,13 +215,13 @@ describe("channelPermissions (table-driven, order of 11 §2.3)", () => {
   it("explains each step", () => {
     const trace: Parameters<typeof channelPermissions>[4] = [];
     channelPermissions(member(), set, [ow("role", "everyone", 0n, PERM.SEND_MESSAGES)], "text", trace);
-    expect(trace!.map((t) => t.step)).toEqual([
+    expect(trace.map((t) => t.step)).toEqual([
       "base (owner, @everyone and roles)",
       "@everyone overwrite",
       "bits that do not apply to a text channel",
     ]);
-    expect(trace![1]!.before & PERM.SEND_MESSAGES).toBe(PERM.SEND_MESSAGES);
-    expect(trace![1]!.after & PERM.SEND_MESSAGES).toBe(0n);
+    expect(trace[1]!.before & PERM.SEND_MESSAGES).toBe(PERM.SEND_MESSAGES);
+    expect(trace[1]!.after & PERM.SEND_MESSAGES).toBe(0n);
   });
 });
 
