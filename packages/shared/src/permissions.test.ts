@@ -122,19 +122,13 @@ describe("channelPermissions (table-driven, order of 11 §2.3)", () => {
     {
       name: "role denies and allows aggregate: allow wins over deny among roles",
       member: member(["mod", "muted"]),
-      overwrites: [
-        ow("role", "muted", 0n, PERM.SEND_MESSAGES),
-        ow("role", "mod", PERM.SEND_MESSAGES, 0n),
-      ],
+      overwrites: [ow("role", "muted", 0n, PERM.SEND_MESSAGES), ow("role", "mod", PERM.SEND_MESSAGES, 0n)],
       expectAllowed: ["SEND_MESSAGES"],
     },
     {
       name: "a member overwrite beats the role overwrites",
       member: member(["mod"]),
-      overwrites: [
-        ow("role", "mod", PERM.SEND_MESSAGES, 0n),
-        ow("member", "u1", 0n, PERM.SEND_MESSAGES),
-      ],
+      overwrites: [ow("role", "mod", PERM.SEND_MESSAGES, 0n), ow("member", "u1", 0n, PERM.SEND_MESSAGES)],
       expectDenied: ["SEND_MESSAGES"],
     },
     {
@@ -146,7 +140,10 @@ describe("channelPermissions (table-driven, order of 11 §2.3)", () => {
     {
       name: "overwrites of other members and roles do not apply",
       member: member(),
-      overwrites: [ow("member", "someone-else", 0n, PERM.SEND_MESSAGES), ow("role", "mod", 0n, PERM.SEND_MESSAGES)],
+      overwrites: [
+        ow("member", "someone-else", 0n, PERM.SEND_MESSAGES),
+        ow("role", "mod", 0n, PERM.SEND_MESSAGES),
+      ],
       expectAllowed: ["SEND_MESSAGES"],
     },
     {
@@ -164,7 +161,10 @@ describe("channelPermissions (table-driven, order of 11 §2.3)", () => {
     {
       name: "an allow cannot grant what only the allow names: view comes back, send does not",
       member: member(["muted"]),
-      overwrites: [ow("role", "everyone", 0n, PERM.VIEW_CHANNEL | PERM.SEND_MESSAGES), ow("role", "muted", PERM.VIEW_CHANNEL, 0n)],
+      overwrites: [
+        ow("role", "everyone", 0n, PERM.VIEW_CHANNEL | PERM.SEND_MESSAGES),
+        ow("role", "muted", PERM.VIEW_CHANNEL, 0n),
+      ],
       expectAllowed: ["VIEW_CHANNEL"],
       expectDenied: ["SEND_MESSAGES"],
     },
@@ -248,7 +248,10 @@ function scenario(r: () => number) {
     const id = `r${i}`;
     roles.set(id, { id, position: 1 + i * 3, permissions: randomBits(r) & ~PERM.ADMINISTRATOR });
   }
-  const rs: RoleSet = { everyone: { id: "everyone", position: 0, permissions: randomBits(r) & ~PERM.ADMINISTRATOR }, roles };
+  const rs: RoleSet = {
+    everyone: { id: "everyone", position: 0, permissions: randomBits(r) & ~PERM.ADMINISTRATOR },
+    roles,
+  };
   const m: MemberFacts = {
     userId: "u1",
     isOwner: false,
@@ -351,43 +354,260 @@ describe("authorizeAction", () => {
   });
 
   const cases: { name: string; actor: ActorFacts; action: Action; ok: boolean }[] = [
-    { name: "plain members cannot manage roles", actor: plain, action: { kind: "role.create", position: 1, permissions: 0n }, ok: false },
-    { name: "admin creates a role below own rank", actor: adminActor, action: { kind: "role.create", position: 19, permissions: PERM.SEND_MESSAGES }, ok: true },
-    { name: "admin cannot create a role at own rank", actor: adminActor, action: { kind: "role.create", position: 20, permissions: 0n }, ok: false },
-    { name: "admin cannot create a role with ADMINISTRATOR (not held)", actor: adminActor, action: { kind: "role.create", position: 1, permissions: PERM.ADMINISTRATOR }, ok: false },
-    { name: "admin edits a lower role", actor: adminActor, action: { kind: "role.update", role: roleFacts(mod), newPermissions: PERM.SEND_MESSAGES }, ok: true },
-    { name: "admin cannot edit own role", actor: adminActor, action: { kind: "role.update", role: roleFacts(admin), newPermissions: 0n }, ok: false },
-    { name: "admin cannot raise a role to own rank", actor: adminActor, action: { kind: "role.update", role: roleFacts(mod), newPosition: 20 }, ok: false },
-    { name: "admin cannot add a bit it lacks", actor: adminActor, action: { kind: "role.update", role: roleFacts(mod), newPermissions: MODERATOR_PERMISSIONS | PERM.ADMINISTRATOR }, ok: false },
-    { name: "keeping an existing bit is not an escalation", actor: adminActor, action: { kind: "role.update", role: roleFacts(muted), newPermissions: 0n }, ok: true },
-    { name: "admin edits @everyone within own bits", actor: adminActor, action: { kind: "role.update", role: { position: 0, permissions: EVERYONE_PERMISSIONS, isDefault: true }, newPermissions: EVERYONE_PERMISSIONS | PERM.MENTION_EVERYONE }, ok: true },
-    { name: "@everyone cannot be moved", actor: adminActor, action: { kind: "role.update", role: { position: 0, permissions: 0n, isDefault: true }, newPosition: 3 }, ok: false },
-    { name: "@everyone cannot be deleted", actor: owner, action: { kind: "role.delete", role: { position: 0, permissions: 0n, isDefault: true } }, ok: false },
-    { name: "managed roles cannot be deleted", actor: owner, action: { kind: "role.delete", role: { position: 1, permissions: 0n, isManaged: true } }, ok: false },
-    { name: "admin deletes a lower role", actor: adminActor, action: { kind: "role.delete", role: roleFacts(mod) }, ok: true },
-    { name: "moderator cannot delete roles", actor: modActor, action: { kind: "role.delete", role: roleFacts(muted) }, ok: false },
-    { name: "admin assigns a lower role to a lower member", actor: adminActor, action: { kind: "role.assign", role: roleFacts(mod), member: target([]) }, ok: true },
-    { name: "admin cannot assign a role to a peer", actor: adminActor, action: { kind: "role.assign", role: roleFacts(mod), member: target(["admin"]) }, ok: false },
-    { name: "admin cannot assign to the owner", actor: adminActor, action: { kind: "role.assign", role: roleFacts(muted), member: target([], true) }, ok: false },
-    { name: "admin cannot assign a role above own rank", actor: adminActor, action: { kind: "role.assign", role: roleFacts(superRole), member: target([]) }, ok: false },
-    { name: "owner assigns anything", actor: owner, action: { kind: "role.assign", role: roleFacts(superRole), member: target(["admin"]) }, ok: true },
-    { name: "removing a role needs the same rank", actor: adminActor, action: { kind: "role.unassign", role: roleFacts(superRole), member: target([]) }, ok: false },
-    { name: "moderator kicks a plain member", actor: modActor, action: { kind: "member.kick", member: target([]) }, ok: true },
-    { name: "moderator cannot kick an admin", actor: modActor, action: { kind: "member.kick", member: target(["admin"]) }, ok: false },
-    { name: "moderator cannot kick a peer", actor: modActor, action: { kind: "member.kick", member: target(["mod"]) }, ok: false },
-    { name: "nobody acts against the owner", actor: adminActor, action: { kind: "member.timeout", member: target([], true) }, ok: false },
-    { name: "moderator cannot ban (no BAN_MEMBERS)", actor: modActor, action: { kind: "member.ban", member: target([]) }, ok: false },
-    { name: "admin bans a moderator", actor: adminActor, action: { kind: "member.ban", member: target(["mod"]) }, ok: true },
-    { name: "own nickname needs CHANGE_NICKNAME", actor: plain, action: { kind: "member.nickname", member: target([]), self: true }, ok: true },
-    { name: "other nicknames need rank", actor: modActor, action: { kind: "member.nickname", member: target(["admin"]), self: false }, ok: false },
-    { name: "moderator renames a plain member", actor: modActor, action: { kind: "member.nickname", member: target([]), self: false }, ok: true },
-    { name: "admin resets a plain member's password", actor: adminActor, action: { kind: "member.reset-password", member: target([]) }, ok: true },
-    { name: "admin cannot reset the owner's password", actor: adminActor, action: { kind: "member.reset-password", member: target([], true) }, ok: false },
-    { name: "moderator cannot reset passwords", actor: modActor, action: { kind: "member.reset-password", member: target([]) }, ok: false },
-    { name: "overwrite within held bits", actor: adminActor, action: { kind: "overwrite.set", allow: PERM.SEND_MESSAGES, actorChannelPermissions: ADMIN_PERMISSIONS, role: roleFacts(mod) }, ok: true },
-    { name: "overwrite cannot allow a bit the actor lacks in the channel", actor: adminActor, action: { kind: "overwrite.set", allow: PERM.SEND_MESSAGES, actorChannelPermissions: PERM.VIEW_CHANNEL, role: roleFacts(mod) }, ok: false },
-    { name: "overwrite on a higher role is refused", actor: adminActor, action: { kind: "overwrite.set", allow: 0n, actorChannelPermissions: ADMIN_PERMISSIONS, role: roleFacts(superRole) }, ok: false },
-    { name: "overwrite needs MANAGE_CHANNELS", actor: modActor, action: { kind: "overwrite.set", allow: 0n, actorChannelPermissions: MODERATOR_PERMISSIONS, role: roleFacts(muted) }, ok: false },
+    {
+      name: "plain members cannot manage roles",
+      actor: plain,
+      action: { kind: "role.create", position: 1, permissions: 0n },
+      ok: false,
+    },
+    {
+      name: "admin creates a role below own rank",
+      actor: adminActor,
+      action: { kind: "role.create", position: 19, permissions: PERM.SEND_MESSAGES },
+      ok: true,
+    },
+    {
+      name: "admin cannot create a role at own rank",
+      actor: adminActor,
+      action: { kind: "role.create", position: 20, permissions: 0n },
+      ok: false,
+    },
+    {
+      name: "admin cannot create a role with ADMINISTRATOR (not held)",
+      actor: adminActor,
+      action: { kind: "role.create", position: 1, permissions: PERM.ADMINISTRATOR },
+      ok: false,
+    },
+    {
+      name: "admin edits a lower role",
+      actor: adminActor,
+      action: { kind: "role.update", role: roleFacts(mod), newPermissions: PERM.SEND_MESSAGES },
+      ok: true,
+    },
+    {
+      name: "admin cannot edit own role",
+      actor: adminActor,
+      action: { kind: "role.update", role: roleFacts(admin), newPermissions: 0n },
+      ok: false,
+    },
+    {
+      name: "admin cannot raise a role to own rank",
+      actor: adminActor,
+      action: { kind: "role.update", role: roleFacts(mod), newPosition: 20 },
+      ok: false,
+    },
+    {
+      name: "admin cannot add a bit it lacks",
+      actor: adminActor,
+      action: {
+        kind: "role.update",
+        role: roleFacts(mod),
+        newPermissions: MODERATOR_PERMISSIONS | PERM.ADMINISTRATOR,
+      },
+      ok: false,
+    },
+    {
+      name: "keeping an existing bit is not an escalation",
+      actor: adminActor,
+      action: { kind: "role.update", role: roleFacts(muted), newPermissions: 0n },
+      ok: true,
+    },
+    {
+      name: "admin edits @everyone within own bits",
+      actor: adminActor,
+      action: {
+        kind: "role.update",
+        role: { position: 0, permissions: EVERYONE_PERMISSIONS, isDefault: true },
+        newPermissions: EVERYONE_PERMISSIONS | PERM.MENTION_EVERYONE,
+      },
+      ok: true,
+    },
+    {
+      name: "@everyone cannot be moved",
+      actor: adminActor,
+      action: {
+        kind: "role.update",
+        role: { position: 0, permissions: 0n, isDefault: true },
+        newPosition: 3,
+      },
+      ok: false,
+    },
+    {
+      name: "@everyone cannot be deleted",
+      actor: owner,
+      action: { kind: "role.delete", role: { position: 0, permissions: 0n, isDefault: true } },
+      ok: false,
+    },
+    {
+      name: "managed roles cannot be deleted",
+      actor: owner,
+      action: { kind: "role.delete", role: { position: 1, permissions: 0n, isManaged: true } },
+      ok: false,
+    },
+    {
+      name: "admin deletes a lower role",
+      actor: adminActor,
+      action: { kind: "role.delete", role: roleFacts(mod) },
+      ok: true,
+    },
+    {
+      name: "moderator cannot delete roles",
+      actor: modActor,
+      action: { kind: "role.delete", role: roleFacts(muted) },
+      ok: false,
+    },
+    {
+      name: "admin assigns a lower role to a lower member",
+      actor: adminActor,
+      action: { kind: "role.assign", role: roleFacts(mod), member: target([]) },
+      ok: true,
+    },
+    {
+      name: "admin cannot assign a role to a peer",
+      actor: adminActor,
+      action: { kind: "role.assign", role: roleFacts(mod), member: target(["admin"]) },
+      ok: false,
+    },
+    {
+      name: "admin cannot assign to the owner",
+      actor: adminActor,
+      action: { kind: "role.assign", role: roleFacts(muted), member: target([], true) },
+      ok: false,
+    },
+    {
+      name: "admin cannot assign a role above own rank",
+      actor: adminActor,
+      action: { kind: "role.assign", role: roleFacts(superRole), member: target([]) },
+      ok: false,
+    },
+    {
+      name: "owner assigns anything",
+      actor: owner,
+      action: { kind: "role.assign", role: roleFacts(superRole), member: target(["admin"]) },
+      ok: true,
+    },
+    {
+      name: "removing a role needs the same rank",
+      actor: adminActor,
+      action: { kind: "role.unassign", role: roleFacts(superRole), member: target([]) },
+      ok: false,
+    },
+    {
+      name: "moderator kicks a plain member",
+      actor: modActor,
+      action: { kind: "member.kick", member: target([]) },
+      ok: true,
+    },
+    {
+      name: "moderator cannot kick an admin",
+      actor: modActor,
+      action: { kind: "member.kick", member: target(["admin"]) },
+      ok: false,
+    },
+    {
+      name: "moderator cannot kick a peer",
+      actor: modActor,
+      action: { kind: "member.kick", member: target(["mod"]) },
+      ok: false,
+    },
+    {
+      name: "nobody acts against the owner",
+      actor: adminActor,
+      action: { kind: "member.timeout", member: target([], true) },
+      ok: false,
+    },
+    {
+      name: "moderator cannot ban (no BAN_MEMBERS)",
+      actor: modActor,
+      action: { kind: "member.ban", member: target([]) },
+      ok: false,
+    },
+    {
+      name: "admin bans a moderator",
+      actor: adminActor,
+      action: { kind: "member.ban", member: target(["mod"]) },
+      ok: true,
+    },
+    {
+      name: "own nickname needs CHANGE_NICKNAME",
+      actor: plain,
+      action: { kind: "member.nickname", member: target([]), self: true },
+      ok: true,
+    },
+    {
+      name: "other nicknames need rank",
+      actor: modActor,
+      action: { kind: "member.nickname", member: target(["admin"]), self: false },
+      ok: false,
+    },
+    {
+      name: "moderator renames a plain member",
+      actor: modActor,
+      action: { kind: "member.nickname", member: target([]), self: false },
+      ok: true,
+    },
+    {
+      name: "admin resets a plain member's password",
+      actor: adminActor,
+      action: { kind: "member.reset-password", member: target([]) },
+      ok: true,
+    },
+    {
+      name: "admin cannot reset the owner's password",
+      actor: adminActor,
+      action: { kind: "member.reset-password", member: target([], true) },
+      ok: false,
+    },
+    {
+      name: "moderator cannot reset passwords",
+      actor: modActor,
+      action: { kind: "member.reset-password", member: target([]) },
+      ok: false,
+    },
+    {
+      name: "overwrite within held bits",
+      actor: adminActor,
+      action: {
+        kind: "overwrite.set",
+        allow: PERM.SEND_MESSAGES,
+        actorChannelPermissions: ADMIN_PERMISSIONS,
+        role: roleFacts(mod),
+      },
+      ok: true,
+    },
+    {
+      name: "overwrite cannot allow a bit the actor lacks in the channel",
+      actor: adminActor,
+      action: {
+        kind: "overwrite.set",
+        allow: PERM.SEND_MESSAGES,
+        actorChannelPermissions: PERM.VIEW_CHANNEL,
+        role: roleFacts(mod),
+      },
+      ok: false,
+    },
+    {
+      name: "overwrite on a higher role is refused",
+      actor: adminActor,
+      action: {
+        kind: "overwrite.set",
+        allow: 0n,
+        actorChannelPermissions: ADMIN_PERMISSIONS,
+        role: roleFacts(superRole),
+      },
+      ok: false,
+    },
+    {
+      name: "overwrite needs MANAGE_CHANNELS",
+      actor: modActor,
+      action: {
+        kind: "overwrite.set",
+        allow: 0n,
+        actorChannelPermissions: MODERATOR_PERMISSIONS,
+        role: roleFacts(muted),
+      },
+      ok: false,
+    },
   ];
   for (const c of cases) {
     it(c.name, () => {

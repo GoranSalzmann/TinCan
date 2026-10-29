@@ -298,8 +298,7 @@ export type Action =
     };
 
 export type AuthResult =
-  | { ok: true }
-  | { ok: false; reason: string; missing?: PermissionName; code: "PERMISSION_DENIED" };
+  { ok: true } | { ok: false; reason: string; missing?: PermissionName; code: "PERMISSION_DENIED" };
 
 const OK: AuthResult = { ok: true };
 const deny = (reason: string, missing?: PermissionName): AuthResult => ({
@@ -399,14 +398,16 @@ export function authorizeAction(actor: ActorFacts, action: Action): AuthResult {
     case "member.reset-password": {
       const e = need(actor, "MANAGE_INSTANCE");
       if (e) return e;
-      if (action.member.isOwner && !actor.isOwner) return deny("only the owner can reset the owner's password");
+      if (action.member.isOwner && !actor.isOwner)
+        return deny("only the owner can reset the owner's password");
       return above(action.member.rank) ? OK : deny("that member ranks at or above you");
     }
     case "overwrite.set": {
       const e = need(actor, "MANAGE_CHANNELS");
       if (e) return e;
       const extra = actor.isOwner ? 0n : action.allow & ~action.actorChannelPermissions;
-      if (extra !== 0n) return deny(`you cannot allow ${namesOf(extra).join(", ")}, which you lack in this channel`);
+      if (extra !== 0n)
+        return deny(`you cannot allow ${namesOf(extra).join(", ")}, which you lack in this channel`);
       if (action.role && !action.role.isDefault && !above(action.role.position))
         return deny("that role ranks at or above your highest role");
       if (action.member) {
