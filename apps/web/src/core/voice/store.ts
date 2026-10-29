@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
 import type { VoiceParticipant } from "@tincan/shared";
+import type { StreamQuality } from "./video.js";
 
 export type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting" | "failed";
 export type Quality = "excellent" | "good" | "poor" | "lost" | "unknown";
@@ -15,6 +16,10 @@ export type VoiceNotice =
   | "full"
   | "mic_denied"
   | "mic_missing"
+  | "camera_denied"
+  | "camera_missing"
+  | "camera_failed"
+  | "screen_failed"
   | "denoiser_downgraded"
   | "disconnected"
   | null;
@@ -34,6 +39,31 @@ interface VoiceState {
   localLevel: number;
   /** The transport the media ended up on, for the status line and diagnostics (08 §10). */
   transport: "udp" | "tcp" | "relay" | null;
+  /** Video (M4). Stream keys are `userId:camera` and `userId:screen` (video.ts). */
+  cameraOn: boolean;
+  screenOn: boolean;
+  /** What the server lets this person publish right now; follows permission changes mid-call. */
+  canCamera: boolean;
+  canScreen: boolean;
+  /** Streams this client receives; nothing is received until the person opts in (R-041). */
+  watching: Record<string, true>;
+  streamQuality: Record<string, StreamQuality>;
+  streamMuted: Record<string, boolean>;
+  /** Who watches what, reported by the viewers' own clients (08 §5.6). */
+  viewers: Record<string, string[]>;
+  /** Server caps for the top layer in kbit/s (08 §5.2). */
+  caps: { cameraKbps: number; screenKbps: number };
+  /** What this person is sharing right now, for the sharing bar (W-13). */
+  share: {
+    preset: string;
+    hint: "detail" | "motion";
+    audio: boolean;
+    surface: "monitor" | "window" | "browser" | null;
+  } | null;
+  /** The one-time "the sharer can see that you're watching" notice (U15, W-14): shown for this person. */
+  watchNotice: string | null;
+  /** Bumped when a video track arrives or goes, so surfaces re-attach. */
+  rev: number;
   apply: (t: string, d: unknown) => void;
   patch: (p: Partial<VoiceState>) => void;
   reset: () => void;
@@ -51,6 +81,18 @@ const initial = {
   quality: {} as Record<string, Quality>,
   localLevel: 0,
   transport: null as "udp" | "tcp" | "relay" | null,
+  cameraOn: false,
+  screenOn: false,
+  canCamera: false,
+  canScreen: false,
+  watching: {} as Record<string, true>,
+  streamQuality: {} as Record<string, StreamQuality>,
+  streamMuted: {} as Record<string, boolean>,
+  viewers: {} as Record<string, string[]>,
+  caps: { cameraKbps: 1700, screenKbps: 6000 },
+  share: null as VoiceState["share"],
+  watchNotice: null as string | null,
+  rev: 0,
 };
 
 /** Applies one VOICE_STATE_UPDATE to the presence map. Idempotent (07 §5). */
