@@ -26,7 +26,7 @@ exist to compare milestones, not to promise dates.
 | M0 | Spikes & design closure | M | Risks D1–D6 answered; UI design sketches; docs updated with facts |
 | M1 | Skeleton | M | Repo, CI, module loader, config, accounts, setup flow, web shell, compose stack |
 | M2 | Text chat | L | Channels, messages, realtime, roles/permissions, invites, uploads, unread, search |
-| M3 | Voice (web + Electron minimal) | L | Voice channels, presence, audio pipeline v1, device settings, TURN, doctor |
+| M3 | Voice (web) | L | Voice channels, presence, audio pipeline v1, device settings, TURN, doctor |
 | M4 | Video, screenshare & desktop polish | XL | Camera, screenshare presets, viewer opt-in, global mute shortcuts, tray, installers, updater |
 | M5 | Hardening & ops | L | E2EE, moderation, audit, backups, metrics, security review, load tests |
 | M6 | Beta | M | Wider testers, bug burn-down, docs complete, signing/notarisation |
@@ -80,15 +80,15 @@ LiveKit integration (explicit room creation, token minting, webhooks, presence
 and permission reconciliation),
 voice channels UI with sidebar presence, voice manager + device manager, audio
 pipeline v1 (browser AEC + DeepFilterNet tier + fallback, presets, mic test,
-PTT in-window), connectivity diagnostics, TURN configured, Electron shell
-minimal (window, secure bridge, keychain, instance entry, installers unsigned),
-`doctor` network checks, staging deployment.
-**Exit:** friends can talk in voice channels from web/desktop with good audio;
+PTT in-window), connectivity diagnostics, TURN configured,
+`doctor` network checks, staging deployment. (The minimal Electron shell moved to M4, decided 2026-10-29.)
+**Exit:** friends can talk in voice channels from the web client with good audio;
 reconnect works; the 3-person media test passes in CI.
 **This is the dogfooding start.**
-**Status (2026-10-29): built; not yet confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: not built, moved out pending your decision (recommended: M4).** Needs from you: open the voice ports, walk [qa/m3.md](qa/m3.md) on the VPS with another person, listen to the mic test. Ports 7881/tcp and 7882/udp are still closed on mkarl.io.
+**Status (2026-10-29): built; not yet confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: moved to M4 (your decision, 2026-10-29).** Needs from you: open the voice ports, walk [qa/m3.md](qa/m3.md) on the VPS with another person, listen to the mic test. Deployed on mkarl.io 2026-10-29 with 7881/tcp and 7882/udp open; no call made yet.
 
 ### M4. Video, screenshare, desktop polish
+First: the minimal Electron shell (window, secure bridge, keychain, instance entry, installers unsigned).
 Camera + screenshare with presets, simulcast/dynacast, viewer opt-in/stream view,
 quality controls, sharer viewer list, stream-audio volume, desktop source picker + system audio per OS, global mute/deafen/leave shortcuts and CLI commands,
 tray/badges/notifications/autostart, deep links, pop-out/PiP, auto-update,
