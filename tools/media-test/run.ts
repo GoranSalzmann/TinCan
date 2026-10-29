@@ -35,6 +35,8 @@ const results: { name: string; ok: boolean; note?: string }[] = [];
 const pagesToShoot: Page[] = [];
 
 async function step(name: string, fn: () => Promise<void>): Promise<void> {
+  // MEDIA_SKIP=<regex> skips steps by name while working on one part (the later steps may depend on the skipped ones).
+  if (process.env.MEDIA_SKIP && new RegExp(process.env.MEDIA_SKIP).test(name)) return;
   const t0 = Date.now();
   try {
     await fn();
@@ -200,6 +202,36 @@ const trackPeerConnections = `(() => {
   window.RTCPeerConnection = Wrapped;
 })()`;
 
+/**
+ * The browser's own screen picker cannot be driven in a test, so `getDisplayMedia` answers with an animated canvas (real
+ * motion, so real bitrate) and, when audio is asked for, the fake microphone as "tab audio". Everything after the picker is
+ * the real code path: publish, simulcast, subscribe, opt-in.
+ */
+const displayMediaShim = `(() => {
+  const md = navigator.mediaDevices;
+  if (!md) return;
+  md.getDisplayMedia = async (c) => {
+    const cv = document.createElement('canvas');
+    cv.width = 1920; cv.height = 1080;
+    const g = cv.getContext('2d');
+    let n = 0;
+    setInterval(() => {
+      n++;
+      g.fillStyle = 'hsl(' + ((n * 3) % 360) + ' 70% 40%)';
+      g.fillRect(0, 0, 1920, 1080);
+      g.fillStyle = '#fff';
+      g.font = '64px monospace';
+      for (let i = 0; i < 12; i++) g.fillText('Tin Can screen ' + n + ' ' + 'x'.repeat(i * 3), 40 + ((n * 7 + i * 50) % 600), 90 * i + 80);
+    }, 33);
+    const stream = cv.captureStream(30);
+    if (c && c.audio) {
+      const a = await md.getUserMedia({ audio: true });
+      a.getAudioTracks().forEach((t) => stream.addTrack(t));
+    }
+    return stream;
+  };
+})()`;
+
 async function launch(extraArgs: string[] = []): Promise<Browser> {
   return chromium.launch({
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
@@ -215,9 +247,10 @@ async function launch(extraArgs: string[] = []): Promise<Browser> {
 }
 
 async function client(browser: Browser, name: string, initScripts: string[] = []): Promise<Client> {
-  const ctx = await browser.newContext({ permissions: ["microphone"], baseURL: WEB });
+  const ctx = await browser.newContext({ permissions: ["microphone", "camera"], baseURL: WEB });
   await ctx.addInitScript({ content: trackPeerConnections });
   await ctx.addInitScript({ content: `localStorage.setItem('tincan.debug', '1')` });
+  await ctx.addInitScript({ content: displayMediaShim });
   for (const content of initScripts) await ctx.addInitScript({ content });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log(`  [${name}] page error: ${e.message}`));
@@ -299,6 +332,47 @@ interface Inbound {
 }
 
 const inbound = (p: Page) => p.evaluate<Inbound>(INBOUND);
+
+/** Video as the browser's own statistics see it: what was received, and which simulcast layers were sent. */
+const VIDEO_STATS = `(async () => {
+  const out = { inbound: [], outbound: [] };
+  for (const pc of window.__pcs) {
+    (await pc.getStats()).forEach((s) => {
+      if (s.kind !== 'video') return;
+      if (s.type === 'inbound-rtp') out.inbound.push({ bytes: s.bytesReceived || 0, frames: s.framesDecoded || 0, width: s.frameWidth || 0, height: s.frameHeight || 0 });
+      if (s.type === 'outbound-rtp') out.outbound.push({ rid: s.rid || '', bytes: s.bytesSent || 0, width: s.frameWidth || 0, active: s.active !== false });
+    });
+  }
+  return out;
+})()`;
+
+interface VideoStats {
+  inbound: { bytes: number; frames: number; width: number; height: number }[];
+  outbound: { rid: string; bytes: number; width: number; active: boolean }[];
+}
+const videoStats = (p: Page) => p.evaluate<VideoStats>(VIDEO_STATS);
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** Publisher upload in kbit/s over `ms`, all video layers together. */
+async function uploadKbps(p: Page, ms: number): Promise<number> {
+  const a = await videoStats(p);
+  await sleep(ms);
+  const b = await videoStats(p);
+  return ((sum(b.outbound.map((o) => o.bytes)) - sum(a.outbound.map((o) => o.bytes))) * 8) / ms;
+}
+
+/** Bytes per second of one simulcast layer (by rid) over `ms`. */
+async function layerKbps(p: Page, ms: number): Promise<Record<string, number>> {
+  const a = await videoStats(p);
+  await sleep(ms);
+  const b = await videoStats(p);
+  const out: Record<string, number> = {};
+  for (const o of b.outbound) {
+    const before = a.outbound.find((x) => x.rid === o.rid)?.bytes ?? 0;
+    out[o.rid || "-"] = ((o.bytes - before) * 8) / ms;
+  }
+  return out;
+}
 
 const sidebarCount = (p: Page, n: number) =>
   p.getByRole("list", { name: new RegExp(`^${n} (person|people) in Lounge`) }).waitFor({ timeout: 15_000 });
@@ -514,6 +588,247 @@ async function main(): Promise<number> {
       }
       await bo.page.evaluate(`window.__tincanVoice.setUserVolume("${ids.cy}", 1)`);
     });
+
+    // ---- M4: camera and screen share, on the real stack ----------------------------------------------
+
+    const vm = <T>(p: Page, expr: string) => p.evaluate<T>(`window.__tincanVoice.${expr}`);
+    const controls = (p: Page) => p.getByRole("toolbar", { name: "Call controls" });
+    const sourcesOf = async (userId: string): Promise<string[]> => {
+      const v = await api<{ voice: Record<string, { userId: string; sources: string[] }[]> }>(
+        "GET",
+        "/voice/state",
+        owner.token,
+      );
+      return (v.voice[lounge] ?? []).find((p) => p.userId === userId)?.sources ?? [];
+    };
+    const camKey = `${ids.ann}:camera`;
+    const screenKey = `${ids.cy}:screen`;
+    const received = async (p: Page) => sum((await videoStats(p)).inbound.map((i) => i.bytes));
+
+    await step("a camera is published; others get a placeholder and download no video", async () => {
+      await controls(ann.page).getByRole("button", { name: "Turn camera on" }).click();
+      await until("camera on the server", async () => (await sourcesOf(ids.ann!)).includes("camera"), 15_000);
+      await until(
+        "own preview",
+        async () =>
+          (await ann.page.evaluate<number>(
+            `document.querySelector('video[data-stream="${camKey}"]')?.videoWidth ?? 0`,
+          )) > 0,
+      );
+      for (const c of [bo, cy]) await c.page.getByRole("button", { name: "Watch camera" }).waitFor();
+      await sleep(2500);
+      for (const c of [bo, cy]) {
+        if ((await received(c.page)) > 0) throw new Error(`${c.name} downloaded video before opting in`);
+        const subs = await vm<string[]>(c.page, "subscriptions()");
+        if (subs.some((x) => x.includes("camera")))
+          throw new Error(`${c.name} is subscribed: ${subs.join(",")}`);
+      }
+    });
+
+    await step(
+      "watching a camera in a small tile receives a small simulcast layer; High asks for the big one",
+      async () => {
+        await bo.page.getByRole("button", { name: "Watch camera" }).click();
+        await until(
+          "video frames",
+          async () => (await videoStats(bo.page)).inbound.some((i) => i.frames > 10),
+          20_000,
+        );
+        await bo.page.getByText("can see that you’re watching").waitFor({ timeout: 5000 });
+        await bo.page.getByRole("button", { name: "Got it" }).click();
+        await sleep(3000);
+        const small = await videoStats(bo.page);
+        if (!small.inbound.some((i) => i.width > 0 && i.width <= 640))
+          throw new Error(`widths ${small.inbound.map((i) => i.width).join(",")} for a tile of 16 rem`);
+        // Dynacast pauses the layers nobody asked for after a few seconds: wait for it, then check what is sent.
+        const sent = async () =>
+          Object.fromEntries((await videoStats(ann.page)).outbound.map((o) => [o.rid, o.active]));
+        await until(
+          "the top layer to stop for a small tile",
+          async () => {
+            const l = await sent();
+            return l.f === false && l.h === true;
+          },
+          20_000,
+        );
+        const layers = await layerKbps(ann.page, 2000);
+        if ((layers.f ?? 0) > 30)
+          throw new Error(`the top layer is still sent for a small tile: ${JSON.stringify(layers)}`);
+        if ((layers.q ?? 0) + (layers.h ?? 0) < 50)
+          throw new Error(`no lower layer sent: ${JSON.stringify(layers)}`);
+        await vm(bo.page, `setStreamQuality("${camKey}", "high")`);
+        await until(
+          "big layer",
+          async () => (await videoStats(bo.page)).inbound.some((i) => i.width >= 1000),
+          15_000,
+        );
+        await until("the top layer to be sent", async () => (await sent()).f === true, 15_000);
+        const high = await layerKbps(ann.page, 3000);
+        if ((high.f ?? 0) < 100) throw new Error(`High does not send the top layer: ${JSON.stringify(high)}`);
+        await vm(bo.page, `setStreamQuality("${camKey}", "auto")`);
+        await until(
+          "small layer again",
+          async () => (await videoStats(bo.page)).inbound.some((i) => i.width > 0 && i.width <= 640),
+          15_000,
+        );
+      },
+    );
+
+    await step(
+      "G4: publisher upload stays flat as viewers rise, and drops when nobody watches (dynacast)",
+      async () => {
+        await vm(bo.page, `setStreamQuality("${camKey}", "high")`);
+        await cy.page.getByRole("button", { name: "Watch camera" }).click();
+        await until(
+          "cy video",
+          async () => (await videoStats(cy.page)).inbound.some((i) => i.frames > 10),
+          20_000,
+        );
+        await vm(cy.page, `setStreamQuality("${camKey}", "high")`);
+        await sleep(4000);
+        const two = await uploadKbps(ann.page, 5000);
+        await vm(cy.page, `unwatch("${ids.ann}", "camera")`);
+        await sleep(4000);
+        const one = await uploadKbps(ann.page, 5000);
+        console.log(`    upload with 1 viewer ${one.toFixed(0)} kbps, with 2 viewers ${two.toFixed(0)} kbps`);
+        if (one < 200) throw new Error(`too little video to measure: ${one.toFixed(0)} kbps`);
+        if (two > one * 1.3)
+          throw new Error(`upload grew with viewers: ${one.toFixed(0)} → ${two.toFixed(0)} kbps`);
+        await vm(bo.page, `unwatch("${ids.ann}", "camera")`);
+        await sleep(8000);
+        const none = await uploadKbps(ann.page, 4000);
+        console.log(`    upload with no viewer ${none.toFixed(0)} kbps`);
+        if (none > one * 0.25) throw new Error(`dynacast did not stop the layers: ${none.toFixed(0)} kbps`);
+      },
+    );
+
+    await step(
+      "a screen share with audio is published; nothing downloads until someone watches",
+      async () => {
+        await controls(cy.page).getByRole("button", { name: "Share screen" }).click();
+        const dialog = cy.page.getByRole("dialog", { name: "Share your screen" });
+        await dialog.getByRole("button", { name: "Continue" }).click();
+        await until(
+          "screen and its audio on the server",
+          async () => {
+            const s = await sourcesOf(ids.cy!);
+            return s.includes("screen_share") && s.includes("screen_share_audio");
+          },
+          20_000,
+        );
+        await cy.page.getByRole("region", { name: "Sharing" }).getByText("Nobody is watching yet").waitFor();
+        for (const c of [ann, bo]) await c.page.getByRole("button", { name: "Watch stream" }).waitFor();
+        const before = await received(ann.page);
+        await sleep(2500);
+        if ((await received(ann.page)) - before > 2000) throw new Error("video arrived without opting in");
+        const subs = await vm<string[]>(ann.page, "subscriptions()");
+        if (subs.some((x) => x.startsWith(`${ids.cy}:screen`)))
+          throw new Error(`subscribed already: ${subs.join(",")}`);
+      },
+    );
+
+    await step(
+      "watching a screen share: video and its own audio, the sharer sees the viewer, the notice shows once",
+      async () => {
+        await ann.page.getByRole("button", { name: "Watch stream" }).click();
+        await ann.page.getByRole("region", { name: "cy’s stream" }).waitFor();
+        await until(
+          "screen frames",
+          async () => (await videoStats(ann.page)).inbound.some((i) => i.frames > 10),
+          20_000,
+        );
+        await until(
+          "video element",
+          async () =>
+            (await ann.page.evaluate<number>(
+              `document.querySelector('video[data-stream="${screenKey}"]')?.videoWidth ?? 0`,
+            )) > 0,
+        );
+        const subs = await vm<string[]>(ann.page, "subscriptions()");
+        for (const want of [`${ids.cy}:screen_share`, `${ids.cy}:screen_share_audio`])
+          if (!subs.includes(want)) throw new Error(`not subscribed to ${want}: ${subs.join(",")}`);
+        await ann.page.getByText("can see that you’re watching").waitFor({ timeout: 5000 });
+        await ann.page.getByRole("button", { name: "Got it" }).click();
+        await cy.page
+          .getByRole("region", { name: "Sharing" })
+          .getByText(/ann is watching/)
+          .waitFor({ timeout: 10_000 });
+        // The stream's audio has its own chain and volume, apart from the person's voice (R-047).
+        const e = await ann.page.evaluate<{ left: number; right: number }>(LEVELS(`${ids.cy}:screen`, 3000));
+        if (e.left + e.right === 0) throw new Error("no stream audio");
+        if (Math.min(e.left, e.right) / Math.max(e.left, e.right) < 0.5)
+          throw new Error(`stream audio lost a channel: ${e.left.toFixed(2)} / ${e.right.toFixed(2)}`);
+        await vm(ann.page, `setUserVolume("${ids.cy}:screen", 3)`);
+        if ((await vm<number>(ann.page, `volumeOf("${ids.cy}")`)) !== 1)
+          throw new Error("voice volume followed the stream");
+        const voice = await ann.page.evaluate<{ left: number; right: number }>(LEVELS(ids.cy!, 2000));
+        if (voice.left + voice.right === 0) throw new Error("the person's voice went silent with the stream");
+        await vm(ann.page, `setUserVolume("${ids.cy}:screen", 1)`);
+      },
+    );
+
+    await step("quality controls: Pause video stops the download, Auto brings it back", async () => {
+      const quality = ann.page.getByRole("region", { name: "cy’s stream" }).getByLabel("Quality");
+      await quality.selectOption("paused");
+      await sleep(2000);
+      const a = await received(ann.page);
+      await sleep(2500);
+      if ((await received(ann.page)) - a > 5000) throw new Error("video kept arriving while paused");
+      await quality.selectOption("auto");
+      const b = await received(ann.page);
+      await until("video again", async () => (await received(ann.page)) - b > 20_000, 15_000);
+    });
+
+    await step("stopping watching releases the stream, and the sharer's list updates", async () => {
+      await ann.page.getByRole("button", { name: "Stop watching" }).click();
+      await until(
+        "unsubscribed",
+        async () =>
+          !(await vm<string[]>(ann.page, "subscriptions()")).some((x) => x.startsWith(`${ids.cy}:screen`)),
+        8000,
+      );
+      await cy.page
+        .getByRole("region", { name: "Sharing" })
+        .getByText("Nobody is watching yet")
+        .waitFor({ timeout: 10_000 });
+      await ann.page.getByRole("button", { name: "Watch stream" }).waitFor();
+    });
+
+    await step(
+      "taking VIDEO and SCREEN_SHARE away stops the camera and the share mid-call, and giving them back allows them again",
+      async () => {
+        await api("PUT", `/channels/${lounge}/overwrites/member/${ids.ann}`, owner.token, {
+          allow: "0",
+          deny: permissionsToString(PERM.VIDEO),
+        });
+        await until("camera revoked", async () => !(await sourcesOf(ids.ann!)).includes("camera"), 10_000);
+        const cam = controls(ann.page).getByRole("button", { name: "Turn camera on" });
+        await cam.waitFor({ timeout: 5000 });
+        await until("camera button disabled", async () => await cam.isDisabled(), 5000);
+        await api("DELETE", `/channels/${lounge}/overwrites/member/${ids.ann}`, owner.token);
+        await until("camera button enabled", async () => await cam.isEnabled(), 10_000);
+        await cam.click();
+        await until("camera back", async () => (await sourcesOf(ids.ann!)).includes("camera"), 15_000);
+        await controls(ann.page).getByRole("button", { name: "Turn camera off" }).click();
+
+        await api("PUT", `/channels/${lounge}/overwrites/member/${ids.cy}`, owner.token, {
+          allow: "0",
+          deny: permissionsToString(PERM.SCREEN_SHARE),
+        });
+        await until(
+          "share revoked",
+          async () => !(await sourcesOf(ids.cy!)).includes("screen_share"),
+          10_000,
+        );
+        await cy.page.getByRole("region", { name: "Sharing" }).waitFor({ state: "detached", timeout: 5000 });
+        await api("DELETE", `/channels/${lounge}/overwrites/member/${ids.cy}`, owner.token);
+        await until(
+          "share button enabled",
+          async () => await controls(cy.page).getByRole("button", { name: "Share screen" }).isEnabled(),
+          10_000,
+        );
+      },
+    );
 
     await step("taking CONNECT away removes the person from the call within seconds", async () => {
       const t0 = Date.now();

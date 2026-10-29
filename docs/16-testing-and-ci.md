@@ -68,7 +68,7 @@ Server booted in-process with real adapters and a real LiveKit container
 
 ## 6. Media tests
 
-> **As built in M3.** `tools/media-test` (`pnpm media-test`, workflow `media.yml`, nightly and on voice changes) runs the real server, the web client and a real LiveKit with three headless Chromium clients on fake devices: join, Opus audio with under 5 % loss, presence, mute, deafen, app restart mid-call, a network drop, SPEAK revoked and restored, CONNECT revoked, leave, and no unexpected reconciler repairs. Not yet built: screenshare, upload independence in CI (measured once in D1), simulcast under throttling, E2EE, UDP-blocked TURN paths.
+> **As built in M3.** `tools/media-test` (`pnpm media-test`, workflow `media.yml`, nightly and on voice changes) runs the real server, the web client and a real LiveKit with three headless Chromium clients on fake devices: join, Opus audio with under 5 % loss, presence, mute, deafen, app restart mid-call, a network drop, SPEAK revoked and restored, CONNECT revoked, leave, and no unexpected reconciler repairs. **M4 added** camera and screen-share steps: nothing downloads before Watch; a small tile receives a small simulcast layer and High asks for the big one; the **upload independence check (G4)** (flat from one to two viewers, zero with none); a screen share with audio, the sharer's viewer list, the once-only notice, Pause video and Stop watching; VIDEO and SCREEN_SHARE revoked and restored mid-call. The screen picker is replaced by an animated canvas (18 M4-10). `MEDIA_SKIP=<regex>` runs a subset. Not yet built: simulcast under throttling, more than two viewers, E2EE, UDP-blocked TURN paths.
 
 Headless Chromium with fake media devices:
 `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream

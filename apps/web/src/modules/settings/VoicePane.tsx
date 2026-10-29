@@ -14,6 +14,7 @@ import { createPipeline, type Pipeline } from "../../core/voice/pipeline.js";
 import { PRESETS, useAudioPrefs, type NoiseTier, type Preset } from "../../core/voice/prefs.js";
 import { useVoice } from "../../core/voice/store.js";
 import { Banner } from "../../ui/Banner.js";
+import { CameraSection } from "./CameraSection.js";
 import { Button } from "../../ui/Button.js";
 import { toast, toastError } from "../../ui/toast.js";
 
@@ -422,6 +423,7 @@ export function VoicePane() {
       <p className="m-0 text-sm text-text-muted">
         {t("voice.pane.status", { tier: t(`voice.noise.${tier}` as MessageKey) })}
       </p>
+      <CameraSection />
       <ConnectionTest />
     </div>
   );

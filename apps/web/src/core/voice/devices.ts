@@ -5,11 +5,12 @@ import { useAudioPrefs } from "./prefs.js";
 export interface Devices {
   inputs: MediaDeviceInfo[];
   outputs: MediaDeviceInfo[];
+  cameras: MediaDeviceInfo[];
 }
 
 /** Lists audio devices and keeps the list current when one is plugged in or removed (12 §6.1). */
 export function useDevices(): Devices {
-  const [devices, setDevices] = useState<Devices>({ inputs: [], outputs: [] });
+  const [devices, setDevices] = useState<Devices>({ inputs: [], outputs: [], cameras: [] });
   useEffect(() => {
     let alive = true;
     const refresh = async () => {
@@ -19,6 +20,7 @@ export function useDevices(): Devices {
         setDevices({
           inputs: all.filter((d) => d.kind === "audioinput"),
           outputs: all.filter((d) => d.kind === "audiooutput"),
+          cameras: all.filter((d) => d.kind === "videoinput"),
         });
       } catch {
         // no device API (insecure origin): the pickers stay empty and say so

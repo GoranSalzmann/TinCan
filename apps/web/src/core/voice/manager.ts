@@ -8,7 +8,12 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPreset as LkVideoPreset,
+  VideoQuality,
+  type LocalTrackPublication,
   type RemoteTrackPublication,
+  type TrackPublishOptions,
+  type VideoTrack,
 } from "livekit-client";
 import { request } from "../api/client.js";
 import { sendCommand, useSession } from "../session/store.js";
@@ -17,10 +22,51 @@ import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
 import { useVoice, type Quality, type VoiceNotice } from "./store.js";
 import { clampVolume, limiterFor, loadVolumes, saveVolumes } from "./volume.js";
 import { autoThreshold, NoiseFloor, PushToTalk, rms, VoiceActivity } from "./transmit.js";
+import {
+  encodeWatching,
+  markWatchNoticeSeen,
+  parseStreamKey,
+  resolvePreset,
+  streamKey,
+  useVideoPrefs,
+  viewersFrom,
+  watchNoticeSeen,
+  WATCHING_ATTRIBUTE,
+  type StreamQuality,
+  type StreamSource,
+  type VideoPreset,
+} from "./video.js";
 import type { VoiceJoinResponse } from "@tincan/shared";
 
-/** `TrackSource.MICROPHONE` in LiveKit's protocol enum, which livekit-client does not re-export. */
+/** `TrackSource` in LiveKit's protocol enum, which livekit-client does not re-export. */
+const PROTOCOL_CAMERA = 1;
 const PROTOCOL_MICROPHONE = 2;
+const PROTOCOL_SCREEN_SHARE = 3;
+
+const SOURCE_OF: Record<StreamSource, Track.Source> = {
+  camera: Track.Source.Camera,
+  screen: Track.Source.ScreenShare,
+};
+const streamSourceOf = (s: Track.Source): StreamSource | null =>
+  s === Track.Source.Camera ? "camera" : s === Track.Source.ScreenShare ? "screen" : null;
+
+/** Publish options for a preset: simulcast layers below the top one, and the top layer's cap (08 §5.2). */
+function publishOptionsFor(source: StreamSource, p: VideoPreset): TrackPublishOptions {
+  const encoding = { maxBitrate: p.kbps * 1000, maxFramerate: p.fps };
+  const layers = p.layers.map((l) => new LkVideoPreset(l.width, l.height, l.kbps * 1000, l.fps));
+  return source === "camera"
+    ? { simulcast: layers.length > 0, videoEncoding: encoding, videoSimulcastLayers: layers }
+    : {
+        simulcast: layers.length > 0,
+        screenShareEncoding: encoding,
+        screenShareSimulcastLayers: layers,
+        // Stream audio is stereo and music-like: no DTX or RED, higher bitrate (08 §6).
+        forceStereo: true,
+        dtx: false,
+        red: false,
+        audioPreset: { maxBitrate: 96_000 },
+      };
+}
 
 const QUALITY: Record<string, Quality> = {
   [ConnectionQuality.Excellent]: "excellent",
@@ -47,6 +93,9 @@ class VoiceManager {
   #chains = new Map<string, { gain: GainNode; limiter: DynamicsCompressorNode }>();
   #playback: AudioContext | null = null;
   #cleanups: (() => void)[] = [];
+  /** Streams the person asked to watch; kept across a camera being switched off and on (R-041). */
+  #wanted = new Set<string>();
+  #dims = new Map<string, { width: number; height: number }>();
 
   get room(): Room | null {
     return this.#room;
@@ -62,7 +111,10 @@ class VoiceManager {
       speaking: {},
       quality: {},
       transport: null,
+      ...VIDEO_RESET,
     });
+    this.#wanted.clear();
+    this.#dims.clear();
     this.#leaving = false;
 
     const grant = await request<VoiceJoinResponse>(
@@ -98,6 +150,12 @@ class VoiceManager {
     });
     this.#room = room;
     this.#wire(room);
+    try {
+      if (localStorage.getItem("tincan.debug"))
+        (window as unknown as { __tincanVoice?: VoiceManager }).__tincanVoice = this;
+    } catch {
+      // no storage: no hook
+    }
 
     try {
       await room.connect(grant.url, grant.token, { autoSubscribe: false });
@@ -109,6 +167,17 @@ class VoiceManager {
       for (const pub of p.trackPublications.values()) this.#subscribeIfAudio(pub);
 
     this.#capKbps = grant.publishDefaults.audioBitrateKbps;
+    const may = (s: string) => (grant.publishDefaults.sources as string[]).includes(s);
+    useVoice.getState().patch({
+      canCamera: may("camera"),
+      canScreen: may("screen_share"),
+      caps: {
+        cameraKbps: grant.publishDefaults.video.cameraMaxKbps,
+        screenKbps: grant.publishDefaults.video.screenshareMaxKbps,
+      },
+    });
+    for (const p of room.remoteParticipants.values())
+      for (const pub of p.trackPublications.values()) this.#onPublished(pub, p.identity);
     if (pipeline) await this.#publishMic(room, prefs);
     useVoice.getState().patch({ status: "connected", muted: !pipeline, deafened: false });
     this.#announceSelf();
@@ -171,7 +240,9 @@ class VoiceManager {
       localLevel: 0,
       transport: null,
       notice: keep,
+      ...VIDEO_RESET,
     });
+    this.#wanted.clear();
     if (had && !o.silent) void request("POST", "/voice/leave").catch(() => undefined);
     if (had && o.silent) void request("POST", "/voice/leave").catch(() => undefined);
   }
@@ -216,7 +287,10 @@ class VoiceManager {
     if (room) {
       for (const p of room.remoteParticipants.values()) {
         for (const pub of p.trackPublications.values()) {
-          if (pub.kind === Track.Kind.Audio) void pub.setSubscribed(!deafened);
+          if (pub.source === Track.Source.Microphone) void pub.setSubscribed(!deafened);
+          // Stream audio follows its video: only streams being watched come back on undeafen (08 §4.2).
+          if (pub.source === Track.Source.ScreenShareAudio)
+            void pub.setSubscribed(!deafened && this.#wanted.has(streamKey(p.identity, "screen")));
         }
       }
     }
@@ -239,7 +313,7 @@ class VoiceManager {
     const chain = this.#chains.get(userId);
     if (!chain) return;
     const v = this.volumeOf(userId);
-    chain.gain.gain.value = v;
+    chain.gain.gain.value = useVoice.getState().streamMuted[userId] === true ? 0 : v;
     const l = limiterFor(v);
     chain.limiter.threshold.value = l.threshold;
     chain.limiter.knee.value = l.knee;
@@ -375,11 +449,325 @@ class VoiceManager {
 
   // ---- room events ---------------------------------------------------------------------------
 
+  /** Voice is received at once; stream audio only together with its video (08 §4.2). */
   #subscribeIfAudio(pub: RemoteTrackPublication): void {
-    if (pub.kind === Track.Kind.Audio && !useVoice.getState().deafened) void pub.setSubscribed(true);
+    if (pub.source === Track.Source.Microphone && !useVoice.getState().deafened) void pub.setSubscribed(true);
+  }
+
+  /** A remote publication appeared (or was there when we joined): audio now, video waits for "Watch". */
+  #onPublished(pub: RemoteTrackPublication, identity: string): void {
+    this.#subscribeIfAudio(pub);
+    const source = streamSourceOf(pub.source);
+    if (!source) return;
+    const key = streamKey(identity, source);
+    if (source === "camera" && useVideoPrefs.getState().prefs.autoWatchCameras) this.watch(identity, source);
+    else if (this.#wanted.has(key)) this.#applySubscription(key);
+  }
+
+  // ---- watching (opt-in), quality, stream audio ------------------------------------------------
+
+  #publicationsOf(key: string): { video?: RemoteTrackPublication; audio?: RemoteTrackPublication } {
+    const k = parseStreamKey(key);
+    const p = k ? this.#room?.remoteParticipants.get(k.userId) : undefined;
+    if (!k || !p) return {};
+    return {
+      video: p.getTrackPublication(SOURCE_OF[k.source]),
+      audio: k.source === "screen" ? p.getTrackPublication(Track.Source.ScreenShareAudio) : undefined,
+    };
+  }
+
+  #applySubscription(key: string): void {
+    const { video, audio } = this.#publicationsOf(key);
+    const want = this.#wanted.has(key);
+    void video?.setSubscribed(want);
+    void audio?.setSubscribed(want && !useVoice.getState().deafened);
+    if (want) this.#applyQuality(key);
+  }
+
+  #announceWatching(): void {
+    const room = this.#room;
+    if (!room || room.state !== ConnectionState.Connected) return;
+    void room.localParticipant
+      .setAttributes({ [WATCHING_ATTRIBUTE]: encodeWatching(this.#wanted) })
+      .catch((err) => console.warn("voice: could not publish what this client watches", err));
+  }
+
+  /** Opt in to a stream: the only thing that makes video (and a share's audio) download. */
+  watch(userId: string, source: StreamSource): void {
+    const key = streamKey(userId, source);
+    this.#wanted.add(key);
+    const st = useVoice.getState();
+    st.patch({
+      watching: { ...st.watching, [key]: true },
+      watchNotice: st.watchNotice ?? (watchNoticeSeen() ? null : userId),
+    });
+    this.#applySubscription(key);
+    this.#announceWatching();
+  }
+
+  unwatch(userId: string, source: StreamSource): void {
+    const key = streamKey(userId, source);
+    if (!this.#wanted.delete(key)) return;
+    this.#dims.delete(key);
+    const st = useVoice.getState();
+    const { [key]: _w, ...watching } = st.watching;
+    const { [key]: _q, ...streamQuality } = st.streamQuality;
+    st.patch({ watching, streamQuality, rev: st.rev + 1 });
+    this.#applySubscription(key);
+    this.#announceWatching();
+  }
+
+  dismissWatchNotice(): void {
+    markWatchNoticeSeen();
+    useVoice.getState().patch({ watchNotice: null });
+  }
+
+  setStreamQuality(key: string, q: StreamQuality): void {
+    const st = useVoice.getState();
+    st.patch({ streamQuality: { ...st.streamQuality, [key]: q } });
+    this.#applyQuality(key);
+  }
+
+  /** The surface tells how big the video is drawn; "auto" asks for the layer that fits (08 §5.4). */
+  reportSize(key: string, width: number, height: number): void {
+    this.#dims.set(key, { width: Math.ceil(width), height: Math.ceil(height) });
+    if ((useVoice.getState().streamQuality[key] ?? "auto") === "auto") this.#applyQuality(key);
+  }
+
+  #applyQuality(key: string): void {
+    const pub = this.#publicationsOf(key).video;
+    if (!pub || !pub.isDesired) return;
+    const q = useVoice.getState().streamQuality[key] ?? "auto";
+    pub.setEnabled(q !== "paused");
+    if (q === "high") pub.setVideoQuality(VideoQuality.HIGH);
+    else if (q === "low") pub.setVideoQuality(VideoQuality.LOW);
+    else if (q === "auto") {
+      const d = this.#dims.get(key);
+      const dpr = typeof devicePixelRatio === "number" ? devicePixelRatio : 1;
+      pub.setVideoDimensions(
+        d
+          ? { width: Math.ceil(d.width * dpr), height: Math.ceil(d.height * dpr) }
+          : { width: 320, height: 180 },
+      );
+    }
+  }
+
+  setStreamMuted(key: string, muted: boolean): void {
+    const st = useVoice.getState();
+    st.patch({ streamMuted: { ...st.streamMuted, [key]: muted } });
+    this.#applyVolume(key);
+  }
+
+  /** The video track to draw for a stream: our own camera or share, or the remote one once subscribed. */
+  videoTrack(key: string): VideoTrack | undefined {
+    const room = this.#room;
+    const k = parseStreamKey(key);
+    if (!room || !k) return undefined;
+    if (k.userId === room.localParticipant.identity) {
+      return room.localParticipant.getTrackPublication(SOURCE_OF[k.source])?.videoTrack;
+    }
+    return this.#publicationsOf(key).video?.videoTrack;
+  }
+
+  /** Test hook: what this client asked the server to send for a stream. */
+  requested(key: string): Record<string, unknown> | null {
+    const pub = this.#publicationsOf(key).video as unknown as Record<string, unknown> | undefined;
+    return pub
+      ? {
+          dims: pub.requestedVideoDimensions,
+          quality: pub.requestedMaxQuality,
+          disabled: pub.requestedDisabled,
+          subscribed: pub.subscribed,
+        }
+      : null;
+  }
+
+  /** Test hook: which remote tracks this client receives right now, as `identity:source`. */
+  subscriptions(): string[] {
+    const out: string[] = [];
+    for (const p of this.#room?.remoteParticipants.values() ?? [])
+      for (const pub of p.trackPublications.values())
+        if (pub.isSubscribed) out.push(`${p.identity}:${pub.source}`);
+    return out.sort();
+  }
+
+  /** Test hook next to `levels`: what is being received for a stream, from the receiver's own statistics. */
+  async streamStats(
+    key: string,
+  ): Promise<{ width: number; height: number; fps: number; codec: string } | null> {
+    const s = await (
+      this.videoTrack(key) as { getReceiverStats?: () => Promise<unknown> } | undefined
+    )?.getReceiverStats?.();
+    const r = s as
+      { frameWidth?: number; frameHeight?: number; framesPerSecond?: number; mimeType?: string } | undefined;
+    return r
+      ? {
+          width: r.frameWidth ?? 0,
+          height: r.frameHeight ?? 0,
+          fps: r.framesPerSecond ?? 0,
+          codec: r.mimeType ?? "",
+        }
+      : null;
+  }
+
+  // ---- camera and screen share ---------------------------------------------------------------
+
+  async setCamera(on: boolean): Promise<void> {
+    const room = this.#room;
+    const st = useVoice.getState();
+    if (!room) return;
+    if (!on) {
+      await room.localParticipant.setCameraEnabled(false).catch(() => undefined);
+      st.patch({ cameraOn: false });
+      return;
+    }
+    const prefs = useVideoPrefs.getState().prefs;
+    const preset = resolvePreset("camera", prefs.cameraPreset, st.caps.cameraKbps);
+    if (!preset) return void st.patch({ notice: "camera_failed" });
+    try {
+      await room.localParticipant.setCameraEnabled(
+        true,
+        {
+          // "ideal": a camera that was unplugged falls back to the default one instead of failing (W-21).
+          deviceId: prefs.cameraDeviceId ? { ideal: prefs.cameraDeviceId } : undefined,
+          resolution: { width: preset.width, height: preset.height, frameRate: preset.fps },
+        },
+        publishOptionsFor("camera", preset),
+      );
+      useVoice.getState().patch({ cameraOn: true });
+    } catch (err) {
+      const name = (err as DOMException).name;
+      useVoice.getState().patch({
+        cameraOn: false,
+        notice:
+          name === "NotFoundError"
+            ? "camera_missing"
+            : name === "NotAllowedError"
+              ? "camera_denied"
+              : "camera_failed",
+      });
+    }
+  }
+
+  /** Changing the camera or its preset while on: switch the device in place, republish for a new preset. */
+  async applyCameraPrefs(prev: { deviceId: string | null; preset: string }): Promise<void> {
+    const room = this.#room;
+    if (!room || !useVoice.getState().cameraOn) return;
+    const prefs = useVideoPrefs.getState().prefs;
+    if (prefs.cameraPreset !== prev.preset) {
+      await this.setCamera(false);
+      await this.setCamera(true);
+    } else if (prefs.cameraDeviceId && prefs.cameraDeviceId !== prev.deviceId) {
+      await room.switchActiveDevice("videoinput", prefs.cameraDeviceId).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Screen share through the browser's own picker (W-16). Cancelling the picker is not an error. Audio is only
+   * available where the browser offers it: tab audio in Chromium, system audio on Windows and ChromeOS, none in
+   * Firefox or Safari (docs/18 §K).
+   */
+  async startScreenShare(o: { preset: string; hint: "detail" | "motion"; audio: boolean }): Promise<void> {
+    const room = this.#room;
+    const st = useVoice.getState();
+    if (!room) return;
+    const preset = resolvePreset("screen", o.preset, st.caps.screenKbps);
+    if (!preset) return void st.patch({ notice: "screen_failed" });
+    try {
+      await room.localParticipant.setScreenShareEnabled(
+        true,
+        {
+          audio: o.audio
+            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            : false,
+          resolution: { width: preset.width, height: preset.height, frameRate: preset.fps },
+          contentHint: o.hint,
+          selfBrowserSurface: "exclude",
+          surfaceSwitching: "include",
+          systemAudio: "include",
+          suppressLocalAudioPlayback: true,
+        },
+        publishOptionsFor("screen", preset),
+      );
+      this.#noteLocalShare(preset.id, o.hint);
+    } catch (err) {
+      const name = (err as DOMException).name;
+      if (name === "NotAllowedError" || name === "AbortError") return; // the person cancelled the picker
+      useVoice.getState().patch({ notice: "screen_failed" });
+    }
+  }
+
+  async stopScreenShare(): Promise<void> {
+    await this.#room?.localParticipant.setScreenShareEnabled(false).catch(() => undefined);
+    useVoice.getState().patch({ screenOn: false, share: null });
+  }
+
+  /** Quality and optimisation while live, within the cap; the picker is not shown again (W-13). Audio is fixed at start. */
+  async updateScreenShare(o: { preset: string; hint: "detail" | "motion" }): Promise<void> {
+    const room = this.#room;
+    const track = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+    const st = useVoice.getState();
+    if (!room || !track) return;
+    const preset = resolvePreset("screen", o.preset, st.caps.screenKbps);
+    if (!preset) return;
+    track.mediaStreamTrack.contentHint = o.hint;
+    await track.mediaStreamTrack
+      .applyConstraints({
+        frameRate: preset.fps,
+        width: { ideal: preset.width },
+        height: { ideal: preset.height },
+      })
+      .catch(() => undefined);
+    const sender = track.sender;
+    if (sender) {
+      const params = sender.getParameters();
+      // Simulcast layers go smallest to largest (q, h, f); a single layer is the top one.
+      const bitrates = [...preset.layers.map((l) => l.kbps).reverse(), preset.kbps];
+      const offset = Math.max(0, params.encodings.length - bitrates.length);
+      params.encodings.forEach((e, i) => {
+        e.maxBitrate = (bitrates[i - offset] ?? preset.kbps) * 1000;
+      });
+      await sender.setParameters(params).catch(() => undefined);
+    }
+    this.#noteLocalShare(preset.id, o.hint);
+  }
+
+  #noteLocalShare(presetId: string, hint: "detail" | "motion"): void {
+    const lp = this.#room?.localParticipant;
+    const video = lp?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+    const surface = video?.mediaStreamTrack.getSettings()?.displaySurface;
+    useVoice.getState().patch({
+      screenOn: true,
+      share: {
+        preset: presetId,
+        hint,
+        audio: !!lp?.getTrackPublication(Track.Source.ScreenShareAudio),
+        surface: surface === "monitor" || surface === "window" || surface === "browser" ? surface : null,
+      },
+    });
+  }
+
+  #onLocalUnpublished(pub: LocalTrackPublication): void {
+    // The room keeps tracks running after an unpublish (the microphone is republished); camera and screen must stop,
+    // or the camera light stays on after a permission loss.
+    if (pub.source === Track.Source.Camera) {
+      pub.track?.stop();
+      useVoice.getState().patch({ cameraOn: false });
+    } else if (pub.source === Track.Source.ScreenShare) {
+      pub.track?.stop();
+      useVoice.getState().patch({ screenOn: false, share: null });
+    } else if (pub.source === Track.Source.ScreenShareAudio) {
+      pub.track?.stop();
+    }
+  }
+
+  #refreshViewers(room: Room): void {
+    const everyone = [room.localParticipant, ...room.remoteParticipants.values()];
+    useVoice.getState().patch({ viewers: viewersFrom(everyone) });
   }
 
   #chain(track: RemoteAudioTrack, userId: string, ctx: AudioContext): void {
+    // `userId` is a person for voice and a stream key (`userId:screen`) for stream audio: separate volumes (R-047).
     const gain = ctx.createGain();
     const limiter = ctx.createDynamicsCompressor();
     this.#chains.set(userId, { gain, limiter });
@@ -407,19 +795,46 @@ class VoiceManager {
 
   #wire(room: Room): void {
     // Audio is subscribed as soon as it is published; video will wait for "Watch" in M4 (08 §4.2).
-    room.on(RoomEvent.TrackPublished, (pub) => this.#subscribeIfAudio(pub));
-    room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
-      if (track.kind !== Track.Kind.Audio) return;
+    room.on(RoomEvent.TrackPublished, (pub, participant) => this.#onPublished(pub, participant.identity));
+    room.on(RoomEvent.TrackUnpublished, (pub, participant) => {
+      const source = streamSourceOf(pub.source);
+      if (!source) return;
+      // A share that ends is over; a camera that is switched off and on keeps the person's choice.
+      if (source === "screen") this.unwatch(participant.identity, source);
+      else useVoice.getState().patch({ rev: useVoice.getState().rev + 1 });
+      this.#dims.delete(streamKey(participant.identity, source));
+    });
+    room.on(RoomEvent.LocalTrackUnpublished, (pub) => this.#onLocalUnpublished(pub));
+    room.on(RoomEvent.ParticipantAttributesChanged, () => this.#refreshViewers(room));
+    room.on(RoomEvent.ParticipantConnected, () => this.#refreshViewers(room));
+    room.on(RoomEvent.ParticipantDisconnected, () => this.#refreshViewers(room));
+    room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
+      if (track.kind === Track.Kind.Video) {
+        useVoice.getState().patch({ rev: useVoice.getState().rev + 1 });
+        const source = streamSourceOf(pub.source);
+        if (source) this.#applyQuality(streamKey(participant.identity, source));
+        return;
+      }
+      const stream = pub.source === Track.Source.ScreenShareAudio;
+      const key = stream ? streamKey(participant.identity, "screen") : participant.identity;
       const el = track.attach();
-      el.dataset.tincanVoice = participant.identity;
+      el.dataset.tincanVoice = key;
       el.style.display = "none";
       document.body.appendChild(el);
-      if (track instanceof RemoteAudioTrack && this.#playback)
-        this.#chain(track, participant.identity, this.#playback);
+      if (track instanceof RemoteAudioTrack && this.#playback) this.#chain(track, key, this.#playback);
       const sink = useAudioPrefs.getState().prefs.outputDeviceId;
       if (sink) void room.switchActiveDevice("audiooutput", sink).catch(() => undefined);
     });
-    room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((el) => el.remove()));
+    room.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
+      track.detach().forEach((el) => el.remove());
+      if (track.kind === Track.Kind.Video) {
+        useVoice.getState().patch({ rev: useVoice.getState().rev + 1 });
+      } else if (pub.source === Track.Source.ScreenShareAudio) {
+        const key = streamKey(participant.identity, "screen");
+        this.#chains.delete(key);
+        this.#debugTaps.delete(key);
+      }
+    });
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
       const self = useSession.getState().user?.id;
       const local = self ? useVoice.getState().speaking[self] : undefined;
@@ -436,9 +851,11 @@ class VoiceManager {
     room.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant) => {
       if (participant !== room.localParticipant) return;
       const perm = participant.permissions;
-      const mayPublishMic =
+      const may = (source: number) =>
         !!perm?.canPublish &&
-        (perm.canPublishSources.length === 0 || perm.canPublishSources.includes(PROTOCOL_MICROPHONE));
+        (perm.canPublishSources.length === 0 || perm.canPublishSources.includes(source));
+      const mayPublishMic = may(PROTOCOL_MICROPHONE);
+      useVoice.getState().patch({ canCamera: may(PROTOCOL_CAMERA), canScreen: may(PROTOCOL_SCREEN_SHARE) });
       if (mayPublishMic) void this.#publishMic(room, useAudioPrefs.getState().prefs);
     });
     room.on(RoomEvent.Reconnecting, () => useVoice.getState().patch({ status: "reconnecting" }));
@@ -501,5 +918,20 @@ const captureKey = (p: AudioPrefs) => ({
   a: p.echoCancellation,
   c: p.autoGain,
 });
+
+/** Video state that belongs to one call. */
+const VIDEO_RESET = {
+  cameraOn: false,
+  screenOn: false,
+  canCamera: false,
+  canScreen: false,
+  watching: {},
+  streamQuality: {},
+  streamMuted: {},
+  viewers: {},
+  share: null,
+  watchNotice: null,
+  rev: 0,
+};
 
 export const voiceManager = new VoiceManager();

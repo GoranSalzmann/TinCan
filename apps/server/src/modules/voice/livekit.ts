@@ -149,6 +149,9 @@ function permissionMessage(p: LkPermission) {
     canSubscribe: p.canSubscribe,
     canPublish: p.canPublish,
     canPublishData: false,
+    // UpdateParticipant replaces the whole permission: without this a client would lose the right to publish its
+    // "watching" attribute (08 §5.6) after any permission change.
+    canUpdateMetadata: true,
     canPublishSources: p.sources.map((s) => SOURCE_TO_ENUM[s]),
   };
 }

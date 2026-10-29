@@ -42,6 +42,11 @@ export const VoiceJoinResponseSchema = z.object({
     red: z.boolean(),
     /** Sources this user may publish; the client greys out the others. */
     sources: z.array(z.enum(VOICE_SOURCES)),
+    /** Caps for the top video layer in kbit/s; the client offers only presets within them (08 §5.2). */
+    video: z.object({
+      cameraMaxKbps: z.number().int(),
+      screenshareMaxKbps: z.number().int(),
+    }),
   }),
   userLimit: z.number().int(),
 });

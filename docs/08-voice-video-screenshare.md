@@ -30,6 +30,8 @@ spike phase (18 §D) before being treated as fact.
 
 > **Measured in M3 (18 §J, LiveKit v1.13.10).** `rtc.udp_port: 7882` is a single-port mux (every client used it); `bind_addresses` binds only the HTTP port (7881 and TURN stay public); TURN certificates are read at start only. Defaults confirmed: `room.empty_timeout` and `departure_timeout` are set per room by the app at creation (60 s and 20 s); `prometheus.port` replaces the deprecated `prometheus_port`; TURN relay range defaults to 30000–40000/udp. Dynacast keeps publisher upload flat in the number of viewers (1.57 / 1.55 / 1.51 Mbps for 1 / 3 / 5 viewers of a 1080p30 simulcast source) and stops the top layer when viewers only need small tiles.
 
+> **Measured in M4 (18 §K).** Publisher upload for a 720p30 simulcast camera was 1290 kbps with one viewer, 1292 with two and 0 with none (layers go inactive about 8 s after the last viewer). A 374×209 tile received the 640×360 layer; High received 1280×720. Dynacast pauses a layer a few seconds after the last request, not at once.
+
 ### 3.1 Processes
 `livekit-server` (SFU + built-in TURN) is configured via `livekit.yaml`. Redis is
 optional for a single node without egress/ingress (05, 14).
@@ -72,6 +74,8 @@ self-test (§10) checks this.
 3. `room.connect(url, token, { autoSubscribe: false })`.
 4. Publish the processed microphone track (09).
 5. Subscribe manually (see §5).
+
+> **As built in M4.** `adaptiveStream` stays off: livekit-client cannot go back from a manual quality to the automatic one, so "Auto" reports the drawn tile size with `setVideoDimensions` (18 M4-3). Camera and screen tracks are stopped by the client when the server unpublishes them (M4-4).
 
 ### 4.2 Why manual subscription
 With `autoSubscribe: true` the client would receive every video track
@@ -161,6 +165,8 @@ transfer; a metered "1 TB/month" plan is consumed fast by heavy screenshare
 - **Limits, stated honestly:** the list is client-reported and best-effort. A modified client could watch without being listed. If enforceable visibility is ever required, the server must control subscription permissions per track (`updateSubscriptionPermissions`-style) and derive the list from that; not in v1.
 - Under E2EE the attributes remain visible to the server (metadata, 10 §2).
 
+> **As built in M4.** The attribute is `watching`, a comma separated list of `userId:camera` / `userId:screen` keys; any participant can read it (18 M4-7). Setting it needs `canUpdateMetadata`, which every permission update must keep (M4-1).
+
 ### 5.7 Stream audio volume (R-047)
 Screenshare audio arrives as its own track (`screen_share_audio`), played in its own media element, so the viewer gets a separate volume slider (0–100%) and mute on the stream tile, independent of the sharer's per-user voice volume. Persisted locally per sharer. Subscribed only while the stream is watched (4.2).
 
@@ -203,6 +209,8 @@ Permission changes during a call are applied with `updateParticipant`
 (and by disconnecting when CONNECT is lost), triggered by the `roles` event
 (`PERMISSIONS_UPDATE`). If that call fails, the next reconciliation pass
 (≤ 30 s) applies the change (18 T25).
+
+> **As built in M4.** Server-wide caps `voice.camera.maxBitrateKbps` (1700) and `voice.screenshare.maxBitrateKbps` (6000) in `config.yaml`; the channel setting `maxScreenshareKbps` lowers the screen cap for one channel. All of them are delivered in `publishDefaults.video` and are advisory.
 
 ## 9. Voice channel settings (per channel, in `channel.settings`)
 

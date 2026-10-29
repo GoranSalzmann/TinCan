@@ -140,7 +140,7 @@ Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads
 
 ### 3.8 Voice (modules `voice`, `video`, `screenshare`, `voice-e2ee`)
 
-> **As built in M3.** `POST /voice/channels/:id/join` returns `{url, token, expiresAt, roomName, publishDefaults:{audioBitrateKbps, dtx, red, sources}, userLimit}` (no `e2ee` yet, M5); a hidden or missing channel answers 404, a full one 409 with `details.reason = channel_full`. `POST /voice/leave`, `GET /voice/state` and `GET /voice/status` (needs MANAGE_INSTANCE; webhook and reconciler counters) exist. Added: `POST /voice/diagnostics` hands out a 60 s listen-only token for a private room `diag_<userId>` that never shows as presence (the connection test, 08 §10). Not built: `/voice/channels/:id/token` (LiveKit refreshes tokens, D1), `e2ee-key`, `members/:userId/mute|move|disconnect` (M5). `VOICE_STATE_UPDATE` carries `{channelId, userId, joined, participant?}`; `VOICE_SERVER_DISCONNECT` reasons used: `moved`, `permission_lost`, `channel_deleted`.
+> **As built in M3.** `POST /voice/channels/:id/join` returns `{url, token, expiresAt, roomName, publishDefaults:{audioBitrateKbps, dtx, red, sources, video:{cameraMaxKbps, screenshareMaxKbps}}, userLimit}` (M4: the video caps are the server-wide `voice.camera.maxBitrateKbps` and `voice.screenshare.maxBitrateKbps`, the screen one lowered by the channel setting `maxScreenshareKbps`; advisory, because LiveKit cannot enforce a publisher's bitrate), no `e2ee` yet (M5); a hidden or missing channel answers 404, a full one 409 with `details.reason = channel_full`. `POST /voice/leave`, `GET /voice/state` and `GET /voice/status` (needs MANAGE_INSTANCE; webhook and reconciler counters) exist. Added: `POST /voice/diagnostics` hands out a 60 s listen-only token for a private room `diag_<userId>` that never shows as presence (the connection test, 08 §10). Not built: `/voice/channels/:id/token` (LiveKit refreshes tokens, D1), `e2ee-key`, `members/:userId/mute|move|disconnect` (M5). `VOICE_STATE_UPDATE` carries `{channelId, userId, joined, participant?}`; `VOICE_SERVER_DISCONNECT` reasons used: `moved`, `permission_lost`, `channel_deleted`.
 | Method & path | Purpose |
 |---|---|
 | GET `/voice/state` | Snapshot: for each visible voice channel, participants and their published sources |
@@ -165,7 +165,7 @@ Quota: the sum of a user's non-deleted attachment sizes must stay under `uploads
 |---|---|
 | GET `/admin/modules` | Resolved module graph, adapters, warnings |
 | GET/PATCH `/admin/instance` | Name, icon, signup policy (non-module settings) |
-| GET/PATCH `/admin/uploads` | Largest file and per-person upload space, changeable at runtime (owner; 18 §K) |
+| GET/PATCH `/admin/uploads` | Largest file and per-person upload space, changeable at runtime (owner; 18 §L) |
 | POST `/admin/users/:id/reset-token` | Generate a one-time password-reset code (11 §1.6) |
 | GET `/admin/stats` | User/message counts, storage use, voice usage |
 

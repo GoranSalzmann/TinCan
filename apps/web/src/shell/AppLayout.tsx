@@ -12,6 +12,7 @@ import { useChat } from "../core/state/chat.js";
 import { memberName, useCan, useCommunity } from "../core/state/community.js";
 import { useUi } from "../core/state/ui.js";
 import { ChannelList } from "../modules/channels/ChannelList.js";
+import { SharingBar } from "../modules/voice/SharingBar.js";
 import { VoiceDock } from "../modules/voice/VoiceDock.js";
 import { MemberList } from "../modules/members/MemberList.js";
 // The settings panes are used rarely; they load when first opened.
@@ -425,6 +426,7 @@ export function AppLayout() {
               <Users aria-hidden="true" size={20} />
             </button>
           ) : null}
+          <SharingBar />
           <Outlet />
         </main>
       </div>

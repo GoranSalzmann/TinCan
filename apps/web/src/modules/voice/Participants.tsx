@@ -20,7 +20,7 @@ import { Avatar } from "../../ui/Avatar.js";
  * Speaking is shown by a ring (shape) and by the label for assistive technology, never by colour alone
  * (style guide §4). Tiles do not reorder when someone speaks (design W-10).
  */
-function useParticipantView(p: VoiceParticipant) {
+export function useParticipantView(p: VoiceParticipant) {
   const t = useT();
   const member = useCommunity((s) => s.members[p.userId]);
   const self = useSession((s) => s.user?.id);
@@ -66,14 +66,17 @@ export function ParticipantRow({ p }: { p: VoiceParticipant }) {
 }
 
 /** 0–300 %, remembered per person. Above 100 % the label turns to a warning colour and says so. */
-function VolumeSlider({
+export function VolumeSlider({
   userId,
   name,
   onVolume,
+  label,
 }: {
   userId: string;
   name: string;
   onVolume: (v: number) => void;
+  /** Accessible name when it is not "Volume for {name}" (stream audio). */
+  label?: string;
 }) {
   const t = useT();
   const [value, setValue] = useState(() => loadVolume(userId));
@@ -86,7 +89,7 @@ function VolumeSlider({
         max={MAX_VOLUME}
         step={VOLUME_STEP}
         value={value}
-        aria-label={t("voice.volume", { name })}
+        aria-label={label ?? t("voice.volume", { name })}
         aria-valuetext={`${percent(value)}%`}
         onChange={(e) => {
           const v = clampVolume(Number(e.target.value));
@@ -99,38 +102,5 @@ function VolumeSlider({
         {boosted ? t("voice.volume.boosted", { percent: percent(value) }) : `${percent(value)}%`}
       </span>
     </label>
-  );
-}
-
-/** A tile in the call view (W-10). */
-export function ParticipantTile({
-  p,
-  onVolume,
-}: {
-  p: VoiceParticipant;
-  onVolume?: (volume: number) => void;
-}) {
-  const v = useParticipantView(p);
-  return (
-    <li
-      className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 bg-bg-sidebar p-6 ${v.speaking ? "border-success" : "border-transparent"}`}
-      aria-label={v.speaking ? v.t("voice.speaking", { name: v.name }) : v.label}
-    >
-      <Avatar name={v.name} avatarKey={v.avatarKey} size={72} />
-      <div className="flex items-center gap-2">
-        <bdi className="max-w-48 truncate font-medium">{v.label}</bdi>
-        {v.deafened ? (
-          <Headphones aria-label={v.t("voice.deafened")} size={16} />
-        ) : v.muted ? (
-          <MicOff aria-label={v.t("voice.muted")} size={16} />
-        ) : null}
-      </div>
-      {v.quality === "poor" || v.quality === "lost" ? (
-        <span className="text-xs text-warning-text">
-          {v.t(v.quality === "lost" ? "voice.quality.lost" : "voice.quality.poor")}
-        </span>
-      ) : null}
-      {onVolume && !v.mine ? <VolumeSlider userId={p.userId} name={v.name} onVolume={onVolume} /> : null}
-    </li>
   );
 }

@@ -361,7 +361,65 @@ The `voice` module (rooms, tokens from permissions, signed webhook, presence, re
 
 See the runbook in [qa/m3.md](qa/m3.md). In short: open **7881/tcp and 7882/udp** (and **5349/tcp and 3478/udp** if you want the relay) in the provider's firewall and the host's; add a second DNS name if you want TURN; update and restart; walk the checklist with another person on another network.
 
-## K. Runtime upload limits (2026-10-29)
+## K. M4 build notes (2026-10-29)
+
+Camera and screen share in the web client. Measured in Docker Desktop on a Ryzen 7 5800X with LiveKit **v1.13.10**, livekit-client 2.23.0 and Chromium 148 on fake devices; **not on the VPS, not in Firefox or Safari**. Decisions in §F and §J were not changed. Electron, the desktop source picker, global shortcuts, tray, installers and Wayland stay in M6.
+
+### Facts learned while building
+
+| Ref | Note | Doc |
+|---|---|---|
+| M4-1 | **Existing bug fixed (M3 code):** LiveKit's `UpdateParticipant` replaces the whole permission. `permissionMessage` did not send `canUpdateMetadata`, so after the first fast-path or reconciler update a client lost the right to set its own attributes (the "watching" list, 08 §5.6, depends on it). Now sent as `true`; the join token already had it. Nothing in M3 used attributes, so it went unnoticed. | 08 §5.6, §8 |
+| M4-2 | **Dynacast stops an unwanted layer a few seconds after the last request for it**, not at once. A fixed measuring window right after watching saw the top layer still flowing for part of it (377 kbps) while `outbound-rtp.active` was already `false`. The media test waits for `active === false` and then measures. | 16 §6 |
+| M4-3 | **Receive size: the client reports it, `adaptiveStream` stays off.** In livekit-client, `setVideoQuality` and `setVideoDimensions` replace each other and there is no public way back to the automatic mode once a quality was set. "Auto" is therefore `setVideoDimensions` from the drawn tile size (a `ResizeObserver`, times the device pixel ratio); High and Low use `setVideoQuality`; Pause video uses `setEnabled(false)`. A 374×209 tile received the 640×360 layer; High received 1280×720; Auto went back. | 08 §4.1, §5.4 |
+| M4-4 | **A camera or share is not stopped by an unpublish** because the room option `stopLocalTrackOnUnpublish: false` (needed so the microphone can be republished) applies to every source. When the server takes VIDEO or SCREEN_SHARE away, LiveKit unpublishes and the camera light would stay on. The client stops those tracks itself on `LocalTrackUnpublished`. | 12 |
+| M4-5 | **Grants and source numbers.** On the wire the client sees `canPublishSources` as numbers: camera 1, microphone 2, screen share 3, screen-share audio 4. An empty list with `canPublish` means all. The control bar follows `ParticipantPermissionsChanged`, so a revoked camera disables its button and a restored permission enables it without rejoining. | 08 §8 |
+| M4-6 | **Opt-in is enforced by not subscribing.** `autoSubscribe` is off, video and screen-share audio are subscribed only after Watch, and the test asserts no inbound video RTP before it. "Watch" outside the call joins first. A camera that is switched off and on keeps the viewer's choice; a screen share that ends clears it, so the next share is a new opt-in. Deafen and undeafen only bring back stream audio of streams that are watched. | 08 §4.2 |
+| M4-7 | **Viewer list.** A viewer sets the participant attribute `watching` to a comma separated list of stream keys (`userId:camera`, `userId:screen`) when it opts in or out; every client recomputes the map from all participants' attributes and the sharer's bar shows its own. Anyone in the room can read everyone's list (it is metadata, not secret), and a modified client can lie or stay unlisted. The viewer is told once per device (U15). | 08 §5.6 |
+| M4-8 | **Stream audio** is a separate chain per sharer (`userId:screen`) with its own gain, the same limiter above 100 % and its own mute, stored in the same per-browser volume table. Published stereo with DTX and RED off at up to 96 kbps (08 §6). The voice of the same person is untouched (tested: changing the stream volume leaves `volumeOf(user)` at 1 and the voice level non-zero). The stereo and limiter behaviour of `d8b5637` and `5f00fed` is unchanged. The wire bitrate of stream audio was **not** measured. | 08 §5.7, §6 |
+| M4-9 | **Screen share audio per browser (from the browsers' documentation, not tested here).** Chrome and Edge: tab audio on every OS, system audio only on Windows and ChromeOS for a whole screen; no audio for a window. Firefox: no audio capture in `getDisplayMedia`. Safari: none. The dialog says to share a tab and tick the browser's audio option; there is no per-browser detection, because the API cannot tell beforehand. `suppressLocalAudioPlayback` is requested so that a shared tab does not play twice. | 08 §6, qa/m4.md §E |
+| M4-10 | **The media test cannot drive the browser's screen picker.** `getDisplayMedia` is replaced by an animated canvas (real motion, hence real bitrate) and, when audio is asked for, the fake microphone as "tab audio". Everything after the picker is the real path. Whether Chrome's real picker, `contentHint`, `surfaceSwitching` and `suppressLocalAudioPlayback` behave is for a person to see (qa/m4.md §D). | 16 §6 |
+| M4-11 | `MEDIA_SKIP=<regex>` skips media-test steps by name (passed through `docker.sh`), so the video steps run in about 2 minutes while working on them. | 16 §6 |
+
+### Spike D1 follow-up (publisher upload against viewers)
+
+Run inside the media test, so it now runs in CI on every video change. One publisher with a simulcast 720p30 camera (720/360/180, cap 1.7 Mbps), fake source, both viewers asking for the top layer:
+
+| Viewers | Publisher upload |
+|---|---|
+| 1 | 1290 kbps |
+| 2 | 1292 kbps |
+| 0 | 0 kbps (every layer inactive after about 8 s) |
+
+The test fails if upload with two viewers exceeds 1.3 × the upload with one, or if the upload with none stays above 25 %. The M3 numbers (1, 3, 5 viewers of a 1080p source) are in §J D1-4. **Not done, needs more than this machine:** more than two viewers of a camera (the media test has three people), real content and real CPU on the VPS, throttled uplinks (simulcast under loss), and the egress of N real viewers against the provider's port. qa/m4.md §B and §F list the rows.
+
+### Built
+
+Server: `publishDefaults.video` with the camera and screen caps; the module config `voice.camera.maxBitrateKbps` (default 1700) and `voice.screenshare.maxBitrateKbps` (default 6000); the channel setting `maxScreenshareKbps` (300 to 20 000, lowers but never raises the server cap); `canUpdateMetadata` kept on permission updates; 7 new server tests (caps, config, each bit its own sources, camera revoked by the fast path, screen switch off and on mid-call, camera and screen revoked by the reconciler after a failed fast path with a single counted repair, track presence for people who can see the channel). The grants, channel switches, webhook track presence and the 30 s reconciler re-check were already in M3 and are unchanged.
+
+Web: camera (device, Low/Standard/High, simulcast and dynacast, mirrored self-view, device change in place, republish for a preset change); screen share (dialog with the three presets limited by the server cap, content hint, audio request, live change of quality and hint, sharing bar with the viewer list and an upload estimate); tiles in the call view with the speaking ring, one tab stop with arrow keys, watched screens first; opt-in with Watch on tiles; stream view in focus and grid layouts with volume (0 to 300 %), mute, Auto/High/Low/Pause video, picture in picture, fullscreen, Stop watching; one-time watching notice; auto-watch cameras (off by default); a camera section in the voice settings; unit and component tests for the presets, caps, stream keys, viewer list, tile order and keyboard movement; media test with 11 new steps including G4.
+
+### Cut or deferred from M4
+
+| What | Where it goes |
+|---|---|
+| Electron source picker, system audio per OS, pop-out window, global shortcuts, tray, Wayland | M6, unchanged |
+| Pop-out (W-17) is the browser's picture in picture only; the Document PiP / window decision (T14) | M6, with D3 |
+| A limit on how many people may share at once in a channel | Not built. LiveKit cannot unpublish a track except by revoking the source, which the reconciler would then undo within 30 s. The Host's levers are `screenshareAllowed` and the bitrate caps |
+| Bitrate caps are advisory | LiveKit cannot enforce a publisher's bitrate; a modified client can exceed them. Egress is bounded by the number of viewers the Host lets in |
+| Admin screen for the channel's video switches and `maxScreenshareKbps` | API only (`PATCH /channels/:id`); the channel settings pane has none of the voice settings yet |
+| "Stats for nerds", a quality menu on camera tiles, the stream view for cameras | Cameras have Watch and Stop watching on the tile; the stream view is for screens. Resolution is shown in the stream view header |
+| Changing "Share audio" while live | Needs a new capture; stop and start again (the dialog says so) |
+| Stream previews, background blur | v1.1 (§F) |
+| Simulcast under throttling, UDP-blocked video, more than three people in the media test | Needs a Linux CI runner with `tc`/`iptables` (16 §6) |
+| E2EE for video | M5 |
+| Firefox, Safari, phones | Untested; qa/m4.md lists the rows |
+
+### What I need from you
+
+See [qa/m4.md](qa/m4.md). In short: update the VPS like for M3 (no new ports); open a call with a second person and walk sections C to E with a real camera and a real screen picker in Chrome or Edge and in Firefox; say what you see for screen share audio on your OS; run the D1 numbers on the VPS if you want capacity figures.
+
+## L. Runtime upload limits (2026-10-29)
 
 The owner can change the largest file and the per-person upload space in **Settings › Server › Uploads**, with no restart (`GET/PATCH /admin/uploads`, owner only). The values are stored in the `upload_setting` table (uploads migration 2) and override `uploads.maxBytes` / `uploads.userQuotaBytes` from the config file, which stay the starting values. `/capabilities` reports the values in force, so the composer's own size check follows without a reload.
 

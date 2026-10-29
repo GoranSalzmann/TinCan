@@ -77,7 +77,7 @@ export function ServerPane() {
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
 
-/** The owner's file size and per-person upload limits; they apply to the next upload, no restart (18 §K). */
+/** The owner's file size and per-person upload limits; they apply to the next upload, no restart (18 §L). */
 function UploadLimitsCard() {
   const t = useT();
   const apply = useSession((s) => s.setUploadLimits);

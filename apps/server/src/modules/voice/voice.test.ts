@@ -557,6 +557,120 @@ describe("permission enforcement: fast path and reconciler (T25)", () => {
   });
 });
 
+describe("camera and screen share (M4, 08 §5.2, §8)", () => {
+  const room = () => fake.rooms.get(voiceRoomName(lounge))!;
+  const grantOf = (id: string) => room().participants.get(id)!.permission;
+  async function inRoom(name: string, sources: VoiceSource[] = ["microphone", "camera"]) {
+    const u = await s.register(name);
+    fake.connect(voiceRoomName(lounge), u.id, { sid: `PA_${name}`, sources });
+    await joined(u.id, `PA_${name}`);
+    return u;
+  }
+
+  it("hands out video caps: server default, a lower channel cap, never a higher one", async () => {
+    const ann = await s.register("ann");
+    const join = async () =>
+      (await api(ann.token).post(`/voice/channels/${lounge}/join`)).body.publishDefaults.video;
+    expect(await join()).toEqual({ cameraMaxKbps: 1700, screenshareMaxKbps: 6000 });
+    await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 2500 } });
+    expect(await join()).toEqual({ cameraMaxKbps: 1700, screenshareMaxKbps: 2500 });
+    await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 20_000 } });
+    expect((await join()).screenshareMaxKbps).toBe(6000);
+    const bad = await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 10 } });
+    expect(bad.status).toBe(400);
+  });
+
+  it("the server-wide caps come from the module config", async () => {
+    await s.close();
+    await start({ voice: { camera: { maxBitrateKbps: 900 }, screenshare: { maxBitrateKbps: 1500 } } });
+    const ann = await s.register("ann");
+    const res = await api(ann.token).post(`/voice/channels/${lounge}/join`);
+    expect(res.body.publishDefaults.video).toEqual({ cameraMaxKbps: 900, screenshareMaxKbps: 1500 });
+  });
+
+  it("each bit controls its own sources: VIDEO the camera, SCREEN_SHARE the screen and its audio", async () => {
+    const ann = await s.register("ann");
+    await deny(lounge, ann.id, "VIDEO");
+    const g1 = claims((await api(ann.token).post(`/voice/channels/${lounge}/join`)).body.token).video;
+    expect(g1.canPublishSources).not.toContain(1 /* camera */);
+    const bo = await s.register("bo");
+    await deny(lounge, bo.id, "SCREEN_SHARE");
+    const res = await api(bo.token).post(`/voice/channels/${lounge}/join`);
+    expect(res.body.publishDefaults.sources).toEqual(["microphone", "camera"]);
+  });
+
+  it("takes the camera away within seconds when VIDEO is revoked mid-call, and leaves the rest", async () => {
+    const ann = await inRoom("ann", ["microphone", "camera", "screen_share"]);
+    await deny(lounge, ann.id, "VIDEO");
+    await expect.poll(() => grantOf(ann.id).sources, { timeout: 2000 }).not.toContain("camera");
+    expect(grantOf(ann.id)).toMatchObject({ canPublish: true, canSubscribe: true });
+    expect(grantOf(ann.id).sources.sort()).toEqual(["microphone", "screen_share", "screen_share_audio"]);
+  });
+
+  it("takes screen share (video and audio) away when the channel switch is turned off mid-call", async () => {
+    const ann = await inRoom("ann");
+    await api(owner).patch(`/channels/${lounge}`, { settings: { screenshareAllowed: false } });
+    await expect.poll(() => grantOf(ann.id).sources, { timeout: 2000 }).toEqual(["microphone", "camera"]);
+    await api(owner).patch(`/channels/${lounge}`, { settings: { videoAllowed: false } });
+    await expect.poll(() => grantOf(ann.id).sources, { timeout: 2000 }).toEqual(["microphone"]);
+    // And back on: the grant widens again, so the client can publish after the switch returns.
+    await api(owner).patch(`/channels/${lounge}`, {
+      settings: { videoAllowed: true, screenshareAllowed: true },
+    });
+    await expect.poll(() => grantOf(ann.id).sources.length, { timeout: 2000 }).toBe(4);
+  });
+
+  it("the reconciler revokes camera and screen share when the fast path failed (≤ 30 s, T25)", async () => {
+    const ann = await inRoom("ann", ["microphone", "camera", "screen_share"]);
+    fake.failing.add("updatePermission");
+    await deny(lounge, ann.id, "VIDEO", "SCREEN_SHARE");
+    await new Promise((r) => setTimeout(r, 300));
+    fake.failing.clear();
+    expect(grantOf(ann.id).sources).toContain("camera"); // the fast path gave up quietly
+    await voiceApi().reconcileNow();
+    expect(grantOf(ann.id).sources).toEqual(["microphone"]);
+    expect(voiceApi().stats().reconcile.repairs.permission_updated).toBe(1);
+    // A second pass finds nothing left to repair.
+    await voiceApi().reconcileNow();
+    expect(voiceApi().stats().reconcile.repairs.permission_updated).toBe(1);
+  });
+
+  it("shows who is live with camera or screen to people who can see the channel, from track webhooks", async () => {
+    const ann = await s.register("ann");
+    await joined(ann.id, "PA_1");
+    const bo = await s.register("bo");
+    await deny(lounge, bo.id, "VIEW_CHANNEL");
+    for (const [sid, source] of [
+      ["TR_1", "camera"],
+      ["TR_2", "screen_share"],
+      ["TR_3", "screen_share_audio"],
+    ] as const) {
+      await post(
+        event("track_published", voiceRoomName(lounge), ann.id, "PA_1", {
+          track: { sid, source, muted: false },
+        }),
+      );
+    }
+    expect((await state())[lounge]![0]!.sources.sort()).toEqual([
+      "camera",
+      "screen_share",
+      "screen_share_audio",
+    ]);
+    expect(await state(bo.token)).toEqual({});
+    await post(
+      event("track_unpublished", voiceRoomName(lounge), ann.id, "PA_1", {
+        track: { sid: "TR_2", source: "screen_share", muted: false },
+      }),
+    );
+    await post(
+      event("track_unpublished", voiceRoomName(lounge), ann.id, "PA_1", {
+        track: { sid: "TR_3", source: "screen_share_audio", muted: false },
+      }),
+    );
+    expect((await state())[lounge]![0]!.sources).toEqual(["camera"]);
+  });
+});
+
 describe("module switch", () => {
   it("is off without a livekit section, and the capability appears when on", async () => {
     const caps = (await s.request("GET", "/api/v1/capabilities", { token: owner })).body;
