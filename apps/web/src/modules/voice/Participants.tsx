@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Headphones, MicOff } from "lucide-react";
+import { useState } from "react";
 import type { VoiceParticipant } from "@tincan/shared";
 import { useT } from "../../core/i18n/index.js";
 import { useSession } from "../../core/session/store.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
 import { useVoice } from "../../core/voice/store.js";
+import {
+  clampVolume,
+  isBoosted,
+  loadVolume,
+  MAX_VOLUME,
+  percent,
+  VOLUME_STEP,
+} from "../../core/voice/volume.js";
 import { Avatar } from "../../ui/Avatar.js";
 
 /**
@@ -56,6 +65,43 @@ export function ParticipantRow({ p }: { p: VoiceParticipant }) {
   );
 }
 
+/** 0–300 %, remembered per person. Above 100 % the label turns to a warning colour and says so. */
+function VolumeSlider({
+  userId,
+  name,
+  onVolume,
+}: {
+  userId: string;
+  name: string;
+  onVolume: (v: number) => void;
+}) {
+  const t = useT();
+  const [value, setValue] = useState(() => loadVolume(userId));
+  const boosted = isBoosted(value);
+  return (
+    <label className="flex flex-col items-center gap-1 text-xs">
+      <input
+        type="range"
+        min={0}
+        max={MAX_VOLUME}
+        step={VOLUME_STEP}
+        value={value}
+        aria-label={t("voice.volume", { name })}
+        aria-valuetext={`${percent(value)}%`}
+        onChange={(e) => {
+          const v = clampVolume(Number(e.target.value));
+          setValue(v);
+          onVolume(v);
+        }}
+        className="w-32"
+      />
+      <span className={boosted ? "font-semibold text-warning-text" : "text-text-muted"}>
+        {boosted ? t("voice.volume.boosted", { percent: percent(value) }) : `${percent(value)}%`}
+      </span>
+    </label>
+  );
+}
+
 /** A tile in the call view (W-10). */
 export function ParticipantTile({
   p,
@@ -84,18 +130,7 @@ export function ParticipantTile({
           {v.t(v.quality === "lost" ? "voice.quality.lost" : "voice.quality.poor")}
         </span>
       ) : null}
-      {onVolume && !v.mine ? (
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          defaultValue={1}
-          aria-label={v.t("voice.volume", { name: v.name })}
-          onChange={(e) => onVolume(Number(e.target.value))}
-          className="w-32"
-        />
-      ) : null}
+      {onVolume && !v.mine ? <VolumeSlider userId={p.userId} name={v.name} onVolume={onVolume} /> : null}
     </li>
   );
 }

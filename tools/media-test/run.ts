@@ -174,6 +174,7 @@ async function launch(): Promise<Browser> {
 async function client(browser: Browser, name: string): Promise<Client> {
   const ctx = await browser.newContext({ permissions: ["microphone"], baseURL: WEB });
   await ctx.addInitScript({ content: trackPeerConnections });
+  await ctx.addInitScript({ content: `localStorage.setItem('tincan.debug', '1')` });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log(`  [${name}] page error: ${e.message}`));
   page.on("console", (m) => {
@@ -210,6 +211,19 @@ const CHANNELS = (ms: number) => `(async () => {
   }
   await ctx.close();
   return { left: energy[0], right: energy[1], sources: taps.length };
+})()`;
+
+/** Energy per channel of one person's voice after the per-person gain and limiter, over `ms`. */
+const LEVELS = (userId: string, ms: number) => `(async () => {
+  const m = window.__tincanVoice;
+  const e = [0, 0];
+  const end = Date.now() + ${ms};
+  while (Date.now() < end) {
+    const l = m.levels("${userId}");
+    if (l) { e[0] += l.left; e[1] += l.right; }
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  return { left: e[0], right: e[1] };
 })()`;
 
 const INBOUND = `(async () => {
@@ -432,6 +446,29 @@ async function main(): Promise<number> {
         if (ratio < 0.5)
           throw new Error(`${c.name}: left ${e.left.toFixed(3)} vs right ${e.right.toFixed(3)}`);
       }
+    });
+
+    await step("a person can be turned up past 100 %, still on both channels and limited", async () => {
+      const measure = async (volume: number) => {
+        await bo.page.evaluate(`window.__tincanVoice.setUserVolume("${ids.cy}", ${volume})`);
+        await sleep(300);
+        return bo.page.evaluate<{ left: number; right: number }>(LEVELS(ids.cy!, 4000));
+      };
+      // The fake microphone is a full-scale beep, so 300 % hits the limiter hard: it must not be quieter than 100 %, and it
+      // must not lose a channel. That the gain itself works is shown below 100 %, where nothing is limited.
+      const quiet = await measure(0.25);
+      const base = await measure(1);
+      const loud = await measure(3);
+      const sum = (e: { left: number; right: number }) => e.left + e.right;
+      if (sum(base) === 0) throw new Error("no signal at 100 %");
+      if (sum(base) < 4 * sum(quiet))
+        throw new Error(`25 % is not quieter: ${sum(quiet).toFixed(2)} vs ${sum(base).toFixed(2)}`);
+      if (sum(loud) < 0.9 * sum(base))
+        throw new Error(`300 % is quieter than 100 %: ${sum(loud).toFixed(2)} vs ${sum(base).toFixed(2)}`);
+      if (Math.min(loud.left, loud.right) / Math.max(loud.left, loud.right) < 0.5) {
+        throw new Error(`lost a channel at 300 %: ${loud.left.toFixed(2)} / ${loud.right.toFixed(2)}`);
+      }
+      await bo.page.evaluate(`window.__tincanVoice.setUserVolume("${ids.cy}", 1)`);
     });
 
     await step("taking CONNECT away removes the person from the call within seconds", async () => {

@@ -4,6 +4,7 @@ import {
   ConnectionState,
   DisconnectReason,
   LocalAudioTrack,
+  RemoteAudioTrack,
   Room,
   RoomEvent,
   Track,
@@ -14,20 +15,12 @@ import { sendCommand, useSession } from "../session/store.js";
 import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
 import { useVoice, type Quality, type VoiceNotice } from "./store.js";
+import { clampVolume, limiterFor, loadVolumes, saveVolumes } from "./volume.js";
 import { autoThreshold, PushToTalk, rms, VoiceActivity } from "./transmit.js";
 import type { VoiceJoinResponse } from "@tincan/shared";
 
 /** `TrackSource.MICROPHONE` in LiveKit's protocol enum, which livekit-client does not re-export. */
 const PROTOCOL_MICROPHONE = 2;
-const VOLUME_KEY = "tincan.voice.volumes.v1";
-
-function loadVolumes(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(VOLUME_KEY) ?? "{}") as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
 
 const QUALITY: Record<string, Quality> = {
   [ConnectionQuality.Excellent]: "excellent",
@@ -50,6 +43,9 @@ class VoiceManager {
   #leaving = false;
   #capKbps = 40;
   #volumes = loadVolumes();
+  /** Receive path per person: gain then limiter, then a tap for the tests (D8 volume above 100 %). */
+  #chains = new Map<string, { gain: GainNode; limiter: DynamicsCompressorNode }>();
+  #playback: AudioContext | null = null;
   #cleanups: (() => void)[] = [];
 
   get room(): Room | null {
@@ -90,7 +86,11 @@ class VoiceManager {
     pipeline?.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
 
     const settings = effectiveSettings(prefs);
+    // Our own context for playback, so a per-person gain above 1 is possible (HTMLMediaElement.volume stops at 1).
+    this.#playback = new AudioContext({ latencyHint: "interactive" });
+    void this.#playback.resume().catch(() => undefined);
     const room = new Room({
+      webAudioMix: { audioContext: this.#playback },
       adaptiveStream: false,
       dynacast: true,
       stopLocalTrackOnUnpublish: false,
@@ -182,6 +182,10 @@ class VoiceManager {
     if (this.#meter) clearInterval(this.#meter);
     this.#meter = null;
     for (const c of this.#cleanups.splice(0)) c();
+    this.#chains.clear();
+    this.#debugTaps.clear();
+    void this.#playback?.close().catch(() => undefined);
+    this.#playback = null;
     this.#ptt?.reset();
     this.#ptt = null;
     const room = this.#room;
@@ -221,17 +225,40 @@ class VoiceManager {
   }
 
   setUserVolume(userId: string, volume: number): void {
-    this.#volumes[userId] = volume;
-    try {
-      localStorage.setItem(VOLUME_KEY, JSON.stringify(this.#volumes));
-    } catch {
-      // not persisted
-    }
-    this.#room?.remoteParticipants.get(userId)?.setVolume(volume);
+    const v = clampVolume(volume);
+    this.#volumes[userId] = v;
+    saveVolumes(this.#volumes);
+    this.#applyVolume(userId);
   }
 
   volumeOf(userId: string): number {
     return this.#volumes[userId] ?? 1;
+  }
+
+  #applyVolume(userId: string): void {
+    const chain = this.#chains.get(userId);
+    if (!chain) return;
+    const v = this.volumeOf(userId);
+    chain.gain.gain.value = v;
+    const l = limiterFor(v);
+    chain.limiter.threshold.value = l.threshold;
+    chain.limiter.knee.value = l.knee;
+    chain.limiter.ratio.value = l.ratio;
+    chain.limiter.attack.value = l.attack;
+    chain.limiter.release.value = l.release;
+  }
+
+  /** Test hook (media test, `localStorage["tincan.debug"]`): energy per output channel after gain and limiter, per person. */
+  #debugTaps = new Map<string, AnalyserNode[]>();
+  levels(userId: string): { left: number; right: number } | null {
+    const taps = this.#debugTaps.get(userId);
+    if (!taps) return null;
+    const buf = new Float32Array(2048);
+    const e = taps.map((a) => {
+      a.getFloatTimeDomainData(buf);
+      return buf.reduce((sum, x) => sum + x * x, 0);
+    });
+    return { left: e[0] ?? 0, right: e[1] ?? 0 };
   }
 
   #announceSelf(): void {
@@ -354,6 +381,32 @@ class VoiceManager {
     if (pub.kind === Track.Kind.Audio && !useVoice.getState().deafened) void pub.setSubscribed(true);
   }
 
+  #chain(track: RemoteAudioTrack, userId: string, ctx: AudioContext): void {
+    const gain = ctx.createGain();
+    const limiter = ctx.createDynamicsCompressor();
+    this.#chains.set(userId, { gain, limiter });
+    this.#applyVolume(userId);
+    track.setWebAudioPlugins([gain, limiter]);
+    try {
+      if (localStorage.getItem("tincan.debug")) {
+        const split = ctx.createChannelSplitter(2);
+        limiter.connect(split);
+        this.#debugTaps.set(
+          userId,
+          [0, 1].map((i) => {
+            const an = ctx.createAnalyser();
+            an.fftSize = 2048;
+            split.connect(an, i);
+            return an;
+          }),
+        );
+        (window as unknown as { __tincanVoice?: VoiceManager }).__tincanVoice = this;
+      }
+    } catch {
+      // no storage: no hook
+    }
+  }
+
   #wire(room: Room): void {
     // Audio is subscribed as soon as it is published; video will wait for "Watch" in M4 (08 §4.2).
     room.on(RoomEvent.TrackPublished, (pub) => this.#subscribeIfAudio(pub));
@@ -363,7 +416,8 @@ class VoiceManager {
       el.dataset.tincanVoice = participant.identity;
       el.style.display = "none";
       document.body.appendChild(el);
-      participant.setVolume(this.volumeOf(participant.identity));
+      if (track instanceof RemoteAudioTrack && this.#playback)
+        this.#chain(track, participant.identity, this.#playback);
       const sink = useAudioPrefs.getState().prefs.outputDeviceId;
       if (sink) void room.switchActiveDevice("audiooutput", sink).catch(() => undefined);
     });

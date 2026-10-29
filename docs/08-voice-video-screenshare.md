@@ -170,7 +170,7 @@ Screenshare audio arrives as its own track (`screen_share_audio`), played in its
 - Opus mono at 24–40 kbps speech target (use LiveKit speech audio preset, verify exact bitrate), in-band FEC and **RED** redundancy enabled for loss resilience, **DTX** on for bandwidth savings (disable in "music mode").
 - Screenshare audio: separate `screen_share_audio` source, stereo, higher bitrate (≈ 64–96 kbps), **no** echo cancellation/noise suppression/AGC applied.
 - Active-speaker detection from LiveKit (server-side audio level) drives the speaking indicators; local mic level drives the local indicator for zero-latency feedback.
-- Per-user volume: client-side gain on the playback element (0–200%), persisted locally per user ID.
+- Per-user volume: client-side gain, 0–300 % (a Web Audio gain on the receive path followed by a limiter above 100 %, since `HTMLMediaElement.volume` stops at 100 %), persisted locally per user ID. Boosted speech is slightly more compressed and raises the noise with the voice.
 
 ## 7. Presence and state synchronisation
 

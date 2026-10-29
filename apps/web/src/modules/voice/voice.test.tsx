@@ -110,3 +110,33 @@ describe("voice UI", () => {
     }
   });
 });
+
+describe("volume slider", () => {
+  it("goes up to 300 %, remembers the value and says so above 100 %", async () => {
+    localStorage.setItem("tincan.voice.volumes.v1", JSON.stringify({ u2: 2 }));
+    const { ParticipantTile } = await import("./Participants.js");
+    useCommunity.setState({
+      members: {
+        u2: {
+          userId: "u2",
+          username: "bo",
+          displayName: "Bo",
+          nickname: null,
+          avatarKey: null,
+        } as unknown as Member,
+      },
+    });
+    const seen: number[] = [];
+    render(
+      <ul>
+        <ParticipantTile p={person("u2")} onVolume={(v) => seen.push(v)} />
+      </ul>,
+    );
+    const slider = screen.getByRole("slider", { name: "Volume for Bo" });
+    expect(slider).toHaveAttribute("max", "3");
+    expect(slider).toHaveValue("2");
+    expect(screen.getByText("200% (boosted)")).toBeInTheDocument();
+    localStorage.removeItem("tincan.voice.volumes.v1");
+    expect(seen).toEqual([]);
+  });
+});

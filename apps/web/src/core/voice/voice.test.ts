@@ -165,3 +165,45 @@ describe("connection test summary (W-25)", () => {
     expect(summarise({ ...r.steps, relay: { state: "ok" } }, null)).toBe("relay");
   });
 });
+
+describe("per-person volume (up to 300 %)", () => {
+  it("keeps old values valid and clamps or repairs the rest", async () => {
+    const { clampVolume, MAX_VOLUME } = await import("./volume.js");
+    expect(clampVolume(0.4)).toBe(0.4);
+    expect(clampVolume(1)).toBe(1);
+    expect(clampVolume(2.5)).toBe(2.5);
+    expect(clampVolume(99)).toBe(MAX_VOLUME);
+    expect(clampVolume(-1)).toBe(0);
+    for (const bad of ["loud", null, undefined, Number.NaN, Infinity]) expect(clampVolume(bad)).toBe(1);
+  });
+
+  it("loads what was saved, including values above 1, and survives broken storage", async () => {
+    const { loadVolumes, saveVolumes } = await import("./volume.js");
+    let stored = "";
+    const storage = { getItem: () => stored || null, setItem: (_k: string, v: string) => void (stored = v) };
+    saveVolumes({ a: 2.25, b: 0.5 }, storage);
+    expect(loadVolumes(storage)).toEqual({ a: 2.25, b: 0.5 });
+    stored = JSON.stringify({ old: 0.8, junk: "x", huge: 50 });
+    expect(loadVolumes(storage)).toEqual({ old: 0.8, junk: 1, huge: 3 });
+    stored = "{not json";
+    expect(loadVolumes(storage)).toEqual({});
+    expect(
+      loadVolumes({
+        getItem: () => {
+          throw new Error("blocked");
+        },
+      }),
+    ).toEqual({});
+  });
+
+  it("limits peaks only when boosted, so 100 % and below is untouched", async () => {
+    const { limiterFor, isBoosted, percent } = await import("./volume.js");
+    expect(limiterFor(1).ratio).toBe(1);
+    expect(limiterFor(0.3).ratio).toBe(1);
+    expect(limiterFor(1.5).ratio).toBeGreaterThan(10);
+    expect(limiterFor(1.5).threshold).toBeLessThan(0);
+    expect(isBoosted(1)).toBe(false);
+    expect(isBoosted(1.05)).toBe(true);
+    expect(percent(2.255)).toBe(226);
+  });
+});
