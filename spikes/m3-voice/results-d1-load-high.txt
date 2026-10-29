@@ -1,0 +1,12 @@
+PHASE 1793278717935 viewers=0
+viewers=0 {"video:q":{"kbps":190,"active":false},"video:h":{"kbps":440,"active":false}}
+PHASE 1793278736117 viewers=1
+viewers=1 {"video:q":{"kbps":490,"w":960,"h":540,"fps":20,"active":true},"video:h":{"kbps":1139,"w":1920,"h":1080,"fps":20,"active":true}}
+  viewer1 inbound {"video:2067525980":{"kbps":1097,"w":1920,"h":1080,"fps":20,"lost":0}}
+PHASE 1793278759533 viewers=3
+viewers=3 {"video:q":{"kbps":467,"w":960,"h":540,"fps":19,"active":true},"video:h":{"kbps":1092,"w":1920,"h":1080,"fps":19,"active":true}}
+  viewer1 inbound {"video:2067525980":{"kbps":1086,"w":1920,"h":1080,"fps":20,"lost":0}}
+PHASE 1793278782974 viewers=5
+viewers=5 {"video:q":{"kbps":455,"w":960,"h":540,"fps":20,"active":true},"video:h":{"kbps":1040,"w":1920,"h":1080,"fps":19,"active":true}}
+  viewer1 inbound {"video:2067525980":{"kbps":1064,"w":1920,"h":1080,"fps":20,"lost":0}}
+PHASE 1793278797986 done

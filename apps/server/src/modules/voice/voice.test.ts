@@ -223,6 +223,22 @@ describe("token grants follow permissions (08 §8)", () => {
   });
 });
 
+describe("connection test", () => {
+  it("hands out a listen-only token for a private room that is not presence", async () => {
+    const ann = await s.register("ann");
+    const res = await api(ann.token).post("/voice/diagnostics");
+    expect(res.status).toBe(200);
+    const c = claims(res.body.token);
+    expect(c.video.room).toBe(`diag_${ann.id}`);
+    expect(c.video.canPublish).toBe(false);
+    expect(c.video.canPublishData).toBe(false);
+    expect(c.exp - c.nbf).toBeLessThanOrEqual(61);
+    await post(event("participant_joined", res.body.roomName, ann.id, "PA_d"));
+    expect(await state(ann.token)).toEqual({});
+    expect((await s.request("POST", "/api/v1/voice/diagnostics")).status).toBe(401);
+  });
+});
+
 describe("webhook endpoint", () => {
   it("rejects a missing or wrong signature and counts it", async () => {
     const ann = await s.register("ann");

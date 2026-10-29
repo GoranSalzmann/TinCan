@@ -1,0 +1,38 @@
+# Media tests (16 §6, 17 M3): the real server and web client with a real LiveKit and three headless Chromium clients on
+# fake devices. Slower and heavier than the PR pipeline, so it runs nightly, on demand and when voice code changes.
+name: Media tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+  pull_request:
+    paths:
+      - "apps/server/src/modules/voice/**"
+      - "apps/web/src/core/voice/**"
+      - "apps/web/src/modules/voice/**"
+      - "tools/media-test/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  three-person-call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright-core install --with-deps chromium
+      - run: pnpm --filter @tincan/web build
+      - name: Three people in a voice channel
+        run: pnpm media-test

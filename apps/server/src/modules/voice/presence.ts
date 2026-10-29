@@ -205,7 +205,7 @@ export class PresenceStore {
 
   #put(e: PresenceEntry): void {
     let room = this.#rooms.get(e.channelId);
-    if (!room) this.#rooms.set(e.channelId, (room = new Map()));
+    if (!room) this.#rooms.set(e.channelId, (room = new Map<string, PresenceEntry>()));
     room.set(e.userId, e);
   }
 

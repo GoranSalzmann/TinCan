@@ -188,6 +188,43 @@ export class VoiceService {
     };
   }
 
+  /**
+   * Connection test (08 §10, W-25): a private room per person, listen-only and short-lived, outside the `vc_` namespace so
+   * it never shows up as presence and the reconciler ignores it.
+   */
+  async diagnosticsToken(
+    userId: string,
+  ): Promise<{ url: string; token: string; roomName: string; expiresAt: string }> {
+    await enforceRateLimit(this.#d.kv, { key: `voice-diag:${userId}`, max: 6, windowMs: 60_000 });
+    const room = `diag_${userId}`;
+    try {
+      await this.#d.rooms.createRoom({
+        name: room,
+        emptyTimeoutSecs: 10,
+        departureTimeoutSecs: 5,
+        maxParticipants: 2,
+      });
+    } catch {
+      throw new AppError("UNAVAILABLE", "Voice is offline right now. Text chat is unaffected.");
+    }
+    const ttl = 60;
+    const token = await mintToken({
+      apiKey: this.#d.livekit.apiKey,
+      apiSecret: this.#d.livekit.apiSecret,
+      identity: userId,
+      name: "connection test",
+      room,
+      permission: { canSubscribe: true, canPublish: false, sources: [] },
+      ttlSecs: ttl,
+    });
+    return {
+      url: this.#d.livekit.url,
+      token,
+      roomName: room,
+      expiresAt: new Date(this.#now() + ttl * 1000).toISOString(),
+    };
+  }
+
   /** Explicit leave: LiveKit and our presence are updated now instead of when the webhook lands. */
   async leave(userId: string): Promise<void> {
     const e = this.presence.find(userId);
@@ -200,14 +237,15 @@ export class VoiceService {
   ): Promise<void> {
     this.presence.remove(e.channelId, e.userId);
     this.#announce(e.channelId, e.userId, null);
+    // Say why first: the person's client also hears from LiveKit that it was removed, and should show our reason.
+    if (reason) {
+      this.#d.gateway.dispatchToUser(e.userId, "VOICE_SERVER_DISCONNECT", { channelId: e.channelId, reason });
+    }
     try {
       await this.#d.rooms.removeParticipant(voiceRoomName(e.channelId), e.userId);
     } catch (err) {
       // Already gone is the common case; anything else is repaired by the next reconciliation (T25).
       this.#d.log.debug({ err, channelId: e.channelId }, "voice: removeParticipant failed");
-    }
-    if (reason) {
-      this.#d.gateway.dispatchToUser(e.userId, "VOICE_SERVER_DISCONNECT", { channelId: e.channelId, reason });
     }
   }
 
@@ -428,12 +466,12 @@ export class VoiceService {
           const want = await this.#desired(p.identity, ch);
           if (want === "remove") {
             repairs.participant_removed++;
-            await this.#d.rooms.removeParticipant(room.name, p.identity).catch(() => undefined);
-            if (this.presence.remove(channelId, p.identity)) this.#announce(channelId, p.identity, null);
             this.#d.gateway.dispatchToUser(p.identity, "VOICE_SERVER_DISCONNECT", {
               channelId,
               reason: "permission_lost",
             });
+            await this.#d.rooms.removeParticipant(room.name, p.identity).catch(() => undefined);
+            if (this.presence.remove(channelId, p.identity)) this.#announce(channelId, p.identity, null);
             continue;
           }
           if (!samePermission(p.permission, want)) {

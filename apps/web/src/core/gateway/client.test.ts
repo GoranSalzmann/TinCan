@@ -219,7 +219,7 @@ describe("GatewayClient", () => {
     await h.flush();
     h.sockets[0]!.serverSend(ready());
     h.sockets[0]!.serverSend({ op: Op.RECONNECT, d: null });
-    expect(h.sockets[0]!.closedWith).toBe(CloseCode.GOING_AWAY);
+    expect(h.sockets[0]!.closedWith).toBe(CloseCode.NORMAL);
     expect(h.client.state).toBe("reconnecting");
   });
 

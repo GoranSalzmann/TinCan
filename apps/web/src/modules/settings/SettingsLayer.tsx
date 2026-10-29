@@ -8,6 +8,7 @@ import { useSession } from "../../core/session/store.js";
 import { useCan, useCommunity } from "../../core/state/community.js";
 import { ChannelsPane, InvitesPane, ServerPane } from "./ChannelPanes.js";
 import { MembersPane, RolesPane } from "./RolePanes.js";
+import { VoicePane } from "./VoicePane.js";
 import { AccountPane, AppearancePane, NotificationsPane, StoragePane } from "./UserPanes.js";
 
 /**
@@ -19,6 +20,7 @@ export function SettingsLayer() {
   const navigate = useNavigate();
   const { section } = useSettingsParams();
   const uploads = useSession((s) => !!s.capabilities?.features.uploads);
+  const voiceOn = useSession((s) => !!s.capabilities?.features.voice);
   const invitesOn = useSession((s) => !!s.capabilities?.features.invites);
   const owner = useSession((s) => s.user?.isInstanceOwner ?? false);
   const canChannels = useCan("MANAGE_CHANNELS");
@@ -40,6 +42,7 @@ export function SettingsLayer() {
     ["account", "settings.account", true],
     ["appearance", "settings.appearance", true],
     ["notifications", "settings.notifications", true],
+    ["voice", "settings.voice", voiceOn],
     ["storage", "settings.storage", uploads],
   ];
   const admin: [string, MessageKey, boolean][] = [
@@ -69,6 +72,7 @@ export function SettingsLayer() {
     account: <AccountPane />,
     appearance: <AppearancePane />,
     notifications: <NotificationsPane />,
+    voice: <VoicePane />,
     storage: <StoragePane />,
     server: <ServerPane />,
     channels: <ChannelsPane />,

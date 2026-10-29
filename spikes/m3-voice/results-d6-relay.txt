@@ -1,0 +1,10 @@
+normal {"state":"connected","pair":{"local":{"type":"host","protocol":"udp","address":"172.30.0.2"},"remote":{"type":"host","protocol":"udp","address":"172.30.0.10"},"rtt":0.001},"audioBytesSent":50464}
+UDP blocked
+tcp {"state":"connected","pair":{"local":{"type":"prflx","protocol":"tcp","address":"172.30.0.2"},"remote":{"type":"host","protocol":"tcp","address":"172.30.0.10"},"rtt":0},"audioBytesSent":41269}
+UDP blocked
+relay {"error":"ConnectionError: could not establish pc connection"}
+relayudp {"error":"ConnectionError: could not establish pc connection"}
+# relay and relayudp: the browser allocated a TURN relay candidate (172.30.0.10:39135) but LiveKit's connectivity checks from
+# 172.30.0.10:7882 to it got no answer (requestsSent 8, responsesReceived 0), in this bridge-network emulation where the TURN
+# server and the SFU share one address. NOT conclusive about a real host. To be repeated on the VPS with the in-app connection
+# test (Settings > Voice & audio > Test connection) from a network that blocks UDP.

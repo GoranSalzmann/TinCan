@@ -24,6 +24,19 @@ export function registerVoiceRoutes(app: FastifyInstance, svc: VoiceService, rol
     async (req) => svc.join(req.actor!.userId, req.params.id),
   );
 
+  http.post(
+    "/voice/diagnostics",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        response: {
+          200: z.object({ url: z.string(), token: z.string(), roomName: z.string(), expiresAt: z.string() }),
+        },
+      },
+    },
+    async (req) => svc.diagnosticsToken(req.actor!.userId),
+  );
+
   http.post("/voice/leave", { preHandler: app.authenticate }, async (req, reply) => {
     await svc.leave(req.actor!.userId);
     return reply.status(204).send();

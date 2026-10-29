@@ -1,0 +1,18 @@
+D2 denoiser candidates, package survey (2026-10-29, npm registry, not a quality or CPU measurement)
+
+@sapphi-red/web-noise-suppressor 0.4.1   MIT      unpacked 904 kB
+  ships: rnnoise.wasm 152 kB, rnnoise_simd.wasm 157 kB, speex.wasm 56 kB, gtcrn.wasm 197 kB + AudioWorklet processors.
+  RNNoise from xiph/rnnoise via shiguredo/rnnoise-wasm (BSD-3-Clause upstream). GTCRN from Xiaobin-Rong/gtcrn (MIT).
+  Everything is inside the package: self-hostable, no network fetch at run time.
+
+deepfilternet3-noise-filter 1.3.0        Apache-2.0 OR MIT   unpacked 73 kB
+  contains only a loader. WASM and model are fetched at run time from https://cdn.mezon.ai/AI/models/datas/noise_suppression/deepfilternet3
+  (config.cdnUrl). Not acceptable as shipped: a third-party host in the audio path, nothing to hash or reproduce.
+  A self-hosted DeepFilterNet needs a build of upstream (Rikorose/DeepFilterNet, MIT or Apache-2.0) to WASM with its model weights.
+
+@shiguredo/noise-suppression 2025.1.0    Apache-2.0  unpacked 4.9 MB   (not evaluated)
+
+CPU measurement attempted in headless Chromium and NOT obtained:
+  - OfflineAudioContext render: the worklet output was silent (RMS 0), so the 18 ms for 20 s were meaningless. Discarded.
+  - live AudioContext with renderCapacity: the context never started without an audio device; run killed after 2 minutes.
+  Needs a real machine (or a Chromium with a null audio sink). Script: probe/d2-denoise.mjs.

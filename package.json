@@ -24,7 +24,8 @@
     "check:dco": "node scripts/check-dco.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm check:headers && pnpm test && pnpm build && pnpm check:licenses && pnpm check:secrets",
     "dev": "pnpm --filter @tincan/server run dev",
-    "tincan": "node apps/server/dist/cli.js"
+    "tincan": "node apps/server/dist/cli.js",
+    "media-test": "tsx --conditions=tincan-src tools/media-test/run.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
@@ -32,11 +33,12 @@
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.0",
     "globals": "^16.0.0",
+    "playwright-core": "1.60.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "6.0.3",
-    "vite": "^8.3.5",
     "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }
 }

@@ -7,6 +7,7 @@ import { dispatchEvent, setDispatchSelf } from "../gateway/dispatch.js";
 import { setSelfId, useChat } from "../state/chat.js";
 import { useCommunity } from "../state/community.js";
 import { useUi } from "../state/ui.js";
+import { useVoice } from "../voice/store.js";
 
 /**
  * What the shell knows: the server's capabilities (04 §7), who is logged in, and the gateway state.
@@ -51,6 +52,8 @@ function forgetUser(): void {
   useCommunity.getState().reset();
   useChat.getState().reset();
   useUi.getState().select(null);
+  void import("../voice/actions.js").then((a) => a.leaveVoice({ silent: true }));
+  useVoice.getState().reset();
 }
 
 function rememberUser(id: string): void {

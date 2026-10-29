@@ -11,8 +11,12 @@ import { useChat } from "../../core/state/chat.js";
 import { useCan, useCommunity } from "../../core/state/community.js";
 import { isUnread } from "../../core/state/window.js";
 import { toast, toastError } from "../../ui/toast.js";
+import { joinVoice } from "../../core/voice/actions.js";
+import { useVoice } from "../../core/voice/store.js";
+import { ParticipantRow } from "../voice/Participants.js";
 import { CreateChannelDialog } from "./CreateChannelDialog.js";
 
+const NONE: never[] = [];
 const menuContent = "elev-2 z-60 min-w-48 p-1 text-sm text-text";
 const menuItem =
   "flex cursor-default items-center gap-2 rounded-md px-3 py-1.5 outline-none data-[highlighted]:bg-bg-hover data-[disabled]:text-text-disabled";
@@ -47,6 +51,7 @@ function ChannelRow({
   const mentions = read?.mentionCount ?? 0;
   const index = siblings.findIndex((c) => c.id === channel.id);
   const isVoice = channel.type === "voice";
+  const inVoice = useVoice((s) => s.presence[channel.id]) ?? NONE;
 
   const savePref = async (pref: ChannelPref | null) => {
     try {
@@ -82,14 +87,18 @@ function ChannelRow({
   );
 
   return (
-    <li className="group relative flex items-center">
+    <li className="group relative flex flex-wrap items-center">
       {isVoice ? (
-        <span
-          title={t("channel.voice.later")}
-          className="flex min-h-8 flex-1 items-center gap-2 rounded-md px-2 text-text-disabled"
+        <NavLink
+          to={`/voice/${channel.id}`}
+          onClick={() => void joinVoice(channel.id).catch(toastError)}
+          aria-label={t("channel.voice.join", { name: channel.name })}
+          className={({ isActive }) =>
+            `flex min-h-8 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""}`
+          }
         >
           {label}
-        </span>
+        </NavLink>
       ) : (
         <NavLink
           to={`/channels/${channel.id}`}
@@ -232,6 +241,16 @@ function ChannelRow({
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>
+      {isVoice && inVoice.length > 0 ? (
+        <ul
+          className="m-0 basis-full list-none p-0"
+          aria-label={t("channel.voice.in", { count: inVoice.length, name: channel.name })}
+        >
+          {inVoice.map((p) => (
+            <ParticipantRow key={p.userId} p={p} />
+          ))}
+        </ul>
+      ) : null}
     </li>
   );
 }

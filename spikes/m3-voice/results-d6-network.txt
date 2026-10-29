@@ -1,0 +1,20 @@
+D6 network facts, LiveKit v1.13.10 in Docker (bridge network 172.30.0.0/24, container 172.30.0.10), 2026-10-29
+
+bind_addresses: ["172.30.0.10"]            probe from another container: 7880 open, 7881 open, 5349 open
+bind_addresses: ["127.0.0.1"]              7880 CLOSED from another container, open on loopback; 7881 open, 5349 open
+bind_addresses: ["127.0.0.1","172.30.0.10"] 7880 open, 7881 open
+  -> bind_addresses restricts the HTTP port only. The ICE/TCP port and TURN/TLS stay on all interfaces (T26 confirmed).
+
+`livekit-server ports` with only rtc.udp_port: 7882 reports no UDP mux line in the CLI; the running server logs rtc.portUDP {Start:7882,End:0}.
+Five and more clients (D1, D4) all used 7882/udp: single-port mux works.
+
+TURN relay range: default relay_range_start/end 30000-40000 (UDP). Only relevant if clients relay to something other than the SFU on the same host.
+
+TURN/TLS certificate:
+  served cert before: CN=turn.example.test-a
+  files replaced on disk, no restart:   still -a   (no hot reload)
+  SIGHUP:                               the TLS listener was gone afterwards ("Could not read certificate" from s_client): SIGHUP stopped the server container, it did not reload
+  after `docker restart`:               CN=turn.example.test-b
+  -> T30 confirmed: a restart is the only way to take a renewed certificate; ListRooms (RoomService) works for the "no active room" check.
+
+Webhook payload: signed JWT in Authorization with sha256 of the body; content-type application/webhook+json.

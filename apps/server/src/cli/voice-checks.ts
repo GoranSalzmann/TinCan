@@ -46,7 +46,8 @@ function peerCert(host: string, port: number, servername: string, ms = 5000): Pr
     const sock = tlsConnect({ host, port, servername, rejectUnauthorized: false, timeout: ms }, () => {
       const cert = sock.getPeerCertificate();
       sock.end();
-      cert && cert.valid_to ? resolve(cert) : reject(new Error("no certificate presented"));
+      if (cert?.valid_to) resolve(cert);
+      else reject(new Error("no certificate presented"));
     });
     sock.on("timeout", () => {
       sock.destroy();

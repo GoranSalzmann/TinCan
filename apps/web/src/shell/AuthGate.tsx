@@ -7,6 +7,7 @@ import { useT } from "../core/i18n/index.js";
 import { useSession } from "../core/session/store.js";
 import { Button } from "../ui/Button.js";
 import { AppLayout, Landing } from "./AppLayout.js";
+import { CallView } from "../modules/voice/CallView.js";
 import { AuthCard } from "./AuthCard.js";
 import { LoginPage } from "./LoginPage.js";
 import { SetupPage } from "./SetupPage.js";
@@ -78,6 +79,7 @@ export function AppRoutes() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Landing />} />
           <Route path="channels/:channelId" element={<ChannelView />} />
+          <Route path="voice/:channelId" element={<CallView />} />
           <Route path="settings" element={<Navigate to="/settings/account" replace />} />
           <Route path="settings/:section" element={<SettingsRoute />} />
           <Route path="settings/:section/:id" element={<SettingsRoute />} />

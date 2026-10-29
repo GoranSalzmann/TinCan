@@ -1,0 +1,28 @@
+[0.0s] createRoom sid= RM_K9gAAgKhtoXU emptyTimeout= 20
+[0.0s] WEBHOOK room_started vc_test RM_K9gAAgKhtoXU  
+[0.0s] createRoom again: same sid? true metadata kept: {"epoch":1}
+[0.0s] token grant: {"roomJoin":true,"room":"vc_test","canSubscribe":true,"canPublish":true,"canPublishSources":["microphone"],"canPublishData":false,"canUpdateOwnMetadata":true}
+[0.1s] alice JOIN room.sid= RM_K9gAAgKhtoXU meta= {"epoch":1}
+[0.1s] alice REFRESH_TOKEN received
+[2.1s] participants: [ 'alice:1' ]
+[2.1s] alice UPDATE alice perm= {"sub":true,"pub":false,"src":[]}
+[2.1s] alice REFRESH_TOKEN received
+[3.1s] after updateParticipant: canPublish= false
+[3.1s] waiting for server-initiated refresh token ...
+[60.1s] alice LEAVE reason= 7 action= 0
+[60.1s] alice WS CLOSE 1000
+[60.1s] WEBHOOK participant_connection_aborted vc_test RM_K9gAAgKhtoXU alice 
+[68.1s] refresh tokens seen: 2
+[68.1s] refreshed grant: {"roomJoin":true,"room":"vc_test","canPublish":true,"canSubscribe":true,"canPublishData":false,"canPublishSources":["microphone"],"canUpdateOwnMetadata":true}
+[68.1s] refreshed grant: {"roomJoin":true,"room":"vc_test","canPublish":false,"canSubscribe":true,"canPublishData":false,"canUpdateOwnMetadata":false,"canSubscribeMetrics":false,"canManageAgentSession":false}
+[68.1s] alice JOIN room.sid= RM_K9gAAgKhtoXU meta= {"epoch":1}
+[68.1s] alice REFRESH_TOKEN received
+[69.0s] alice UPDATE alice perm= {"sub":true,"pub":true,"src":[]}
+[70.1s] alice LEAVE reason= 4 action= 0
+[70.1s] alice WS CLOSE 1000
+[70.1s] WEBHOOK participant_connection_aborted vc_test RM_K9gAAgKhtoXU alice 
+[73.1s] rooms after removal: [ 'vc_test:RM_K9gAAgKhtoXU:1' ]
+[80.3s] WEBHOOK room_finished vc_test RM_K9gAAgKhtoXU  
+[98.1s] rooms after emptyTimeout: 0
+[98.1s] recreated sid= RM_NYJFaYmYotjd differs: true
+[98.1s] WEBHOOK room_started vc_test RM_NYJFaYmYotjd  
