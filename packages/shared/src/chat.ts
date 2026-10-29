@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
-import { noControlChars } from "./community.js";
+import { DisplayNameSchema, UsernameSchema } from "./accounts.js";
 
 /** Wire schemas for messages, attachments, read state, search and synced settings (07 §3.6–3.7). */
 
@@ -153,17 +153,7 @@ export const NOTIFICATION_LEVELS = ["all", "mentions", "none"] as const;
 export type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 
 export const ProfilePatchSchema = z.object({
-  displayName: z
-    .string()
-    .transform((s) => s.trim())
-    .pipe(
-      z
-        .string()
-        .min(1)
-        .max(32)
-        .regex(/^[^\u0000-\u001f\u007f]*$/),
-    )
-    .optional(),
+  displayName: DisplayNameSchema.optional(),
   statusText: z
     .string()
     .transform((s) => s.trim())
@@ -174,20 +164,8 @@ export const ProfilePatchSchema = z.object({
 
 export const RegisterRequestSchema = z.object({
   inviteCode: z.string().min(4).max(64).optional(),
-  username: z
-    .string()
-    .transform((s) => s.trim().toLowerCase())
-    .pipe(z.string().regex(/^[a-z0-9._-]{2,32}$/, "2 to 32 characters: a-z, 0-9, dot, dash, underscore")),
-  displayName: z
-    .string()
-    .transform((s) => s.trim())
-    .pipe(
-      z
-        .string()
-        .min(1)
-        .max(32)
-        .regex(/^[^\u0000-\u001f\u007f]*$/),
-    ),
+  username: UsernameSchema,
+  displayName: DisplayNameSchema,
   password: z.string().min(1).max(256),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
