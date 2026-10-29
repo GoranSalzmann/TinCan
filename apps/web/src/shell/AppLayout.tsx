@@ -1,16 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Navigate, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, LogOut, Menu as MenuIcon, Users, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu as MenuIcon, Settings, Users, X } from "lucide-react";
 import { ACCENT_NAMES } from "../theme/tokens.js";
 import { useAppearance, type ThemePreference } from "../theme/store.js";
 import { PSEUDO_LOCALES, useLocale, useT, type Locale, type MessageKey } from "../core/i18n/index.js";
-import { useSession } from "../core/session/store.js";
+import { notificationPermission, badgeCount, requestNotificationPermission } from "../core/notifications.js";
+import { sendCommand, useSession } from "../core/session/store.js";
+import { useChat } from "../core/state/chat.js";
+import { memberName, useCan, useCommunity } from "../core/state/community.js";
+import { useUi } from "../core/state/ui.js";
+import { ChannelList } from "../modules/channels/ChannelList.js";
+import { MemberList } from "../modules/members/MemberList.js";
+// The settings panes are used rarely; they load when first opened.
+const SettingsLayer = lazy(() =>
+  import("../modules/settings/SettingsLayer.js").then((m) => ({ default: m.SettingsLayer })),
+);
+import { Avatar, PresenceDot } from "../ui/Avatar.js";
+import { ToastHost } from "../ui/toast.js";
 
 /**
- * The empty layout (W-01, 12 §4): channel list with the instance menu and user panel, a main column
- * with header and empty state, and a member list. No instance rail on the web (design U5). Channels,
- * messages and members fill these regions in M2; the shell only renders what modules contribute.
+ * The main layout (W-01, 12 §4): channel list with the instance menu and user panel, a main column that
+ * the router fills (a channel, or settings as a full-screen layer), and the member list. No instance
+ * rail on the web (design U5).
  */
 
 const menuContent = "elev-2 z-60 min-w-56 p-1 text-sm text-text";
@@ -50,17 +63,6 @@ function useMediaQuery(query: string): boolean {
     return () => mq.removeEventListener("change", on);
   }, [query]);
   return matches;
-}
-
-function Avatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-text-on-accent"
-    >
-      <bdi>{[...name][0]?.toUpperCase() ?? "?"}</bdi>
-    </span>
-  );
 }
 
 function AppearanceItems() {
@@ -139,24 +141,116 @@ function ConnectionStatus() {
   );
 }
 
+/** The browser tab shows unread and mentions, like the desktop badge will (12 §5.4). */
+function useTabBadge(name: string) {
+  const read = useChat((s) => s.read);
+  const settings = useCommunity((s) => s.settings);
+  useEffect(() => {
+    const { mentions, unread } = badgeCount(read, settings, Date.now());
+    document.title = mentions > 0 ? `(${mentions}) ${name}` : unread ? `• ${name}` : name;
+  }, [read, settings, name]);
+  useEffect(() => () => void (document.title = name), [name]);
+}
+
+/** Tells the stores when the window is looked at, and lets notifications open a channel. */
+function useFocusAndNavigator() {
+  const navigate = useNavigate();
+  const setFocused = useUi((s) => s.setFocused);
+  const setNavigator = useUi((s) => s.setNavigator);
+  useEffect(() => {
+    const update = () => setFocused(document.hasFocus() && document.visibilityState === "visible");
+    update();
+    window.addEventListener("focus", update);
+    window.addEventListener("blur", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.removeEventListener("focus", update);
+      window.removeEventListener("blur", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [setFocused]);
+  useEffect(() => {
+    setNavigator((channelId, messageId) => {
+      void navigate(`/channels/${channelId}`);
+      if (messageId) void useChat.getState().jumpTo(channelId, messageId);
+    });
+    return () => setNavigator(null);
+  }, [navigate, setNavigator]);
+}
+
+/** `/` goes to the channel you were last in, or the first text channel you can see. */
+export function Landing() {
+  const t = useT();
+  const ready = useCommunity((s) => s.ready);
+  const channels = useCommunity((s) => s.channels).filter((c) => c.type === "text");
+  const canManage = useCan("MANAGE_CHANNELS");
+  if (!ready)
+    return (
+      <div className="flex flex-1 items-center justify-center text-text-muted" role="status">
+        {t("app.loading")}
+      </div>
+    );
+  let last: string | null = null;
+  try {
+    last = localStorage.getItem("tincan.lastChannel");
+  } catch {
+    // no storage: fall back to the first channel
+  }
+  const target = channels.find((c) => c.id === last) ?? channels[0];
+  if (target) return <Navigate to={`/channels/${target.id}`} replace />;
+  return (
+    <div className="flex flex-1 items-center justify-center p-6 text-center">
+      <div className="flex max-w-prose flex-col gap-2">
+        <h2 className="text-2xl">{t("channel.none.title")}</h2>
+        <p className="text-text-muted">{canManage ? t("channel.none.admin") : t("channel.none.body")}</p>
+      </div>
+    </div>
+  );
+}
+
 export function AppLayout() {
   const t = useT();
   useRegionCycle();
+  useFocusAndNavigator();
+  const navigate = useNavigate();
+  const location = useLocation();
   const user = useSession((s) => s.user)!;
   const caps = useSession((s) => s.capabilities);
   const logout = useSession((s) => s.logout);
+  const me = useCommunity((s) => s.members[user.id]);
+  const presence = useCommunity((s) => s.presence[user.id] ?? "offline");
+  const canManageChannels = useCan("MANAGE_CHANNELS");
+  const canInvite = useCan("CREATE_INVITE");
+  const invitesOn = !!caps?.features.invites;
+  const inSettings = useMatch("/settings/*") !== null;
   const wide = useMediaQuery("(min-width: 1280px)");
   const medium = useMediaQuery("(min-width: 768px)");
   const [drawer, setDrawer] = useState(false);
   const [members, setMembers] = useState<boolean | null>(null);
+  const [perm, setPerm] = useState(notificationPermission());
   const instanceName = caps?.server.name ?? "Tin Can";
-  const showMembers = members ?? wide;
+  const showMembers = (members ?? wide) && !inSettings;
   const sidebarVisible = medium || drawer;
   const drawerButton = useRef<HTMLButtonElement>(null);
+  useTabBadge(instanceName);
 
   useEffect(() => {
     if (medium) setDrawer(false);
   }, [medium]);
+  // Choosing a channel closes the drawer; remember it for next time.
+  useEffect(() => {
+    setDrawer(false);
+    const m = /^\/channels\/([^/]+)/.exec(location.pathname);
+    if (m) {
+      try {
+        localStorage.setItem("tincan.lastChannel", m[1]!);
+      } catch {
+        // convenience only
+      }
+    }
+  }, [location.pathname]);
+
+  const chosen = presence === "offline" ? "online" : presence;
 
   return (
     <div className="flex h-dvh overflow-hidden bg-bg text-text">
@@ -193,6 +287,28 @@ export function AppLayout() {
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content align="start" sideOffset={4} className={menuContent}>
+                {invitesOn && canInvite ? (
+                  <Menu.Item className={menuItem} onSelect={() => void navigate("/settings/invites")}>
+                    {t("instance.invite")}
+                  </Menu.Item>
+                ) : null}
+                {canManageChannels ? (
+                  <Menu.Item className={menuItem} onSelect={() => void navigate("/settings/channels")}>
+                    {t("settings.channels")}
+                  </Menu.Item>
+                ) : null}
+                <Menu.Item className={menuItem} onSelect={() => void navigate("/settings/account")}>
+                  {t("instance.settings")}
+                </Menu.Item>
+                {perm === "default" ? (
+                  <Menu.Item
+                    className={menuItem}
+                    onSelect={() => void requestNotificationPermission().then(setPerm)}
+                  >
+                    {t("notifications.enable")}
+                  </Menu.Item>
+                ) : null}
+                <Menu.Separator className="my-1 h-px bg-border" />
                 <AppearanceItems />
                 <Menu.Separator className="my-1 h-px bg-border" />
                 <Menu.Item asChild className={menuItem}>
@@ -212,32 +328,58 @@ export function AppLayout() {
             </Menu.Portal>
           </Menu.Root>
 
-          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-4 text-center">
-            <p className="text-sm font-medium">{t("layout.sidebar.empty")}</p>
-            <p className="text-sm text-text-muted">{t("layout.sidebar.emptyHint")}</p>
-          </div>
+          <ChannelList />
 
           <div
             className="flex h-13 items-center gap-2 border-t border-border px-3"
             aria-label={t("user.panel")}
             role="group"
           >
-            <Avatar name={user.displayName} />
+            <span className="relative">
+              <Avatar
+                name={memberName(me, user.displayName)}
+                avatarKey={me?.avatarKey ?? user.avatarKey}
+                size={32}
+              />
+              <PresenceDot status={presence} className="absolute -end-0.5 -bottom-0.5 bg-bg-sidebar" />
+            </span>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-sm font-medium">
-                <bdi>{user.displayName}</bdi>
+                <bdi>{memberName(me, user.displayName)}</bdi>
               </div>
-              <div className="flex items-center gap-1 text-xs text-text-muted">
-                <span aria-hidden="true" className="inline-block size-2 rounded-full bg-presence-online" />
-                {t("user.status.online")}
-              </div>
+              <div className="truncate text-xs text-text-muted">{t(`user.status.${presence}`)}</div>
             </div>
+            <button
+              type="button"
+              aria-label={t("instance.settings")}
+              onClick={() => void navigate("/settings/account")}
+              className="rounded-md p-1.5 hover:bg-bg-hover"
+            >
+              <Settings aria-hidden="true" size={16} />
+            </button>
             <Menu.Root>
               <Menu.Trigger aria-label={t("user.menu")} className="rounded-md p-1.5 hover:bg-bg-hover">
                 <ChevronDown aria-hidden="true" size={16} />
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Content align="end" side="top" sideOffset={4} className={menuContent}>
+                  <Menu.Label className="px-3 py-1 text-xs font-semibold text-text-muted">
+                    {t("user.status")}
+                  </Menu.Label>
+                  <Menu.RadioGroup
+                    value={presence === "offline" ? "invisible" : chosen}
+                    onValueChange={(v) => sendCommand("presence.set", { status: v })}
+                  >
+                    {(["online", "idle", "dnd", "invisible"] as const).map((v) => (
+                      <Menu.RadioItem key={v} value={v} className={menuItem}>
+                        <span className="inline-block w-4 text-center" aria-hidden="true">
+                          <Menu.ItemIndicator>•</Menu.ItemIndicator>
+                        </span>
+                        {t(`user.status.${v}`)}
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioGroup>
+                  <Menu.Separator className="my-1 h-px bg-border" />
                   <Menu.Item className={`${menuItem} text-danger-text`} onSelect={() => void logout()}>
                     <LogOut aria-hidden="true" size={16} />
                     {t("user.logout")}
@@ -250,37 +392,37 @@ export function AppLayout() {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-          {!medium ? (
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
+          <button
+            ref={drawerButton}
+            type="button"
+            aria-label={drawer ? t("layout.menu.close") : t("layout.menu.open")}
+            aria-expanded={drawer}
+            onClick={() => setDrawer((d) => !d)}
+            className="rounded-md p-1.5 hover:bg-bg-hover"
+          >
+            {drawer ? <X aria-hidden="true" size={20} /> : <MenuIcon aria-hidden="true" size={20} />}
+          </button>
+          <span className="flex-1 truncate">{instanceName}</span>
+          <ConnectionStatus />
+        </div>
+        <div className="hidden h-0 md:block" />
+        <main id="main" tabIndex={-1} className="relative flex min-h-0 flex-1 flex-col">
+          <div className="absolute end-14 top-3 z-10 hidden md:block">
+            <ConnectionStatus />
+          </div>
+          {!inSettings ? (
             <button
-              ref={drawerButton}
               type="button"
-              aria-label={drawer ? t("layout.menu.close") : t("layout.menu.open")}
-              aria-expanded={drawer}
-              onClick={() => setDrawer((d) => !d)}
-              className="rounded-md p-1.5 hover:bg-bg-hover"
+              aria-label={t("layout.members.toggle")}
+              aria-pressed={showMembers}
+              onClick={() => setMembers(!showMembers)}
+              className={`absolute end-4 top-2 z-10 hidden rounded-md p-1.5 hover:bg-bg-hover md:block ${showMembers ? "bg-bg-selected" : ""}`}
             >
-              {drawer ? <X aria-hidden="true" size={20} /> : <MenuIcon aria-hidden="true" size={20} />}
+              <Users aria-hidden="true" size={20} />
             </button>
           ) : null}
-          <h1 className="flex-1 truncate text-lg">{t("layout.header.welcome")}</h1>
-          <ConnectionStatus />
-          <button
-            type="button"
-            aria-label={t("layout.members.toggle")}
-            aria-pressed={showMembers}
-            onClick={() => setMembers(!showMembers)}
-            className={`rounded-md p-1.5 hover:bg-bg-hover ${showMembers ? "bg-bg-selected" : ""}`}
-          >
-            <Users aria-hidden="true" size={20} />
-          </button>
-        </header>
-
-        <main id="main" tabIndex={-1} className="flex flex-1 items-center justify-center overflow-auto p-6">
-          <div className="flex max-w-prose flex-col items-center gap-2 text-center">
-            <h2 className="text-2xl">{t("layout.empty.title", { name: instanceName })}</h2>
-            <p className="text-base text-text-muted">{t("layout.empty.body")}</p>
-          </div>
+          <Outlet />
         </main>
       </div>
 
@@ -294,15 +436,15 @@ export function AppLayout() {
           <div className="flex h-12 items-center border-b border-border px-4 text-sm font-semibold">
             {t("layout.members")}
           </div>
-          <p className="px-4 py-3 text-sm text-text-muted">{t("layout.members.count", { count: 1 })}</p>
-          <div className="flex items-center gap-2 px-4">
-            <Avatar name={user.displayName} />
-            <span className="truncate text-sm">
-              <bdi>{user.displayName}</bdi>
-            </span>
-          </div>
+          <MemberList />
         </aside>
       ) : null}
+      {inSettings ? (
+        <Suspense fallback={null}>
+          <SettingsLayer />
+        </Suspense>
+      ) : null}
+      <ToastHost />
     </div>
   );
 }

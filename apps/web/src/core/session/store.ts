@@ -3,6 +3,10 @@ import { API_VERSION, type Capabilities, type User } from "@tincan/shared";
 import { create } from "zustand";
 import { api, ApiError } from "../api/client.js";
 import { GatewayClient, gatewayUrl, type GatewayState } from "../gateway/client.js";
+import { dispatchEvent, setDispatchSelf } from "../gateway/dispatch.js";
+import { setSelfId, useChat } from "../state/chat.js";
+import { useCommunity } from "../state/community.js";
+import { useUi } from "../state/ui.js";
 
 /**
  * What the shell knows: the server's capabilities (04 §7), who is logged in, and the gateway state.
@@ -35,6 +39,25 @@ export function stopGateway(): void {
   gateway = null;
 }
 
+/** Sends a gateway command such as typing.start or presence.set. */
+export function sendCommand(cmd: string, args: unknown): void {
+  gateway?.command(cmd, args);
+}
+
+/** Forgets everything tied to the signed-in user (logout, revoked session). */
+function forgetUser(): void {
+  setSelfId(null);
+  setDispatchSelf(null);
+  useCommunity.getState().reset();
+  useChat.getState().reset();
+  useUi.getState().select(null);
+}
+
+function rememberUser(id: string): void {
+  setSelfId(id);
+  setDispatchSelf(id);
+}
+
 export const useSession = create<SessionState>((set, get) => {
   function startGateway() {
     if (gateway) return;
@@ -42,10 +65,12 @@ export const useSession = create<SessionState>((set, get) => {
       url: gatewayUrl(window.location),
       getCredentials: async () => ({ ticket: (await api.gatewayTicket()).ticket }),
       client: { name: "web", version: "0.1.0", platform: "web" },
+      onDispatch: (t, d) => dispatchEvent(t, d),
       onState: (gw) => {
         set({ gateway: gw });
         if (gw === "unauthenticated") {
           stopGateway();
+          forgetUser();
           set({ user: null, gateway: "closed" });
         }
       },
@@ -87,7 +112,10 @@ export const useSession = create<SessionState>((set, get) => {
         }
       }
       set({ user, boot: "ready" });
-      if (user) startGateway();
+      if (user) {
+        rememberUser(user.id);
+        startGateway();
+      }
     },
 
     async login(username, password) {
@@ -100,12 +128,14 @@ export const useSession = create<SessionState>((set, get) => {
         await api.logout();
       } finally {
         stopGateway();
+        forgetUser();
         set({ user: null, gateway: "closed" });
       }
     },
 
     signedIn(user) {
       set({ user });
+      rememberUser(user.id);
       startGateway();
     },
 
@@ -116,6 +146,7 @@ export const useSession = create<SessionState>((set, get) => {
         wizardActive: true,
         ...(caps ? { capabilities: { ...caps, auth: { ...caps.auth, setupRequired: false } } } : {}),
       });
+      rememberUser(user.id);
       startGateway();
     },
 
