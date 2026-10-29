@@ -64,8 +64,6 @@ compose with Caddy + app (+ LiveKit placeholder), `tincan init/doctor` v0.
 empty layout; CI green; module boot matrix test exists.
 **Status (2026-10-28): built and confirmed by you.** CI green on `main`. Demo checklist in [qa/m1.md](qa/m1.md); cuts and deferrals in 18 §H. Not yet done: a run on a real VPS with a domain (needs you).
 
-**Status (2026-10-29): built, awaiting your review.** Demo checklist in [qa/m2.md](qa/m2.md); what was cut and learned in 18 §I. Server side is covered by tests (authorisation matrix of 420 cases, search crash-recovery, upload and invite races); the web client was smoke-tested in a browser for the core flow and still needs a hands-on pass over the rows listed in the checklist.
-
 ### M2. Text chat
 Channels/categories, roles + permission engine + overwrites, invites + register,
 messages (create/edit/delete/history/pagination/replies/mentions), realtime
@@ -75,6 +73,7 @@ ports (one adapter each in v1: SQLite, local, memory; 18 T32), markdown renderin
 notifications (web), admin panes (roles, channels, invites).
 **Exit:** a text-only Tin Can is pleasant enough for a friends group to use
 daily; authorisation matrix tests pass; the DB contract suite passes on SQLite.
+**Status (2026-10-29): built and confirmed by you.** Demo checklist in [qa/m2.md](qa/m2.md); what was cut and learned in 18 §I. Server side is covered by tests (authorisation matrix of 420 cases, search crash-recovery, upload and invite races).
 
 ### M3. Voice
 LiveKit integration (explicit room creation, token minting, webhooks, presence
