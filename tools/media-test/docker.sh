@@ -16,7 +16,7 @@ trap 'docker rm -f tincan-media-lk >/dev/null 2>&1 || true' EXIT
 
 docker volume create tincan-media-work >/dev/null
 docker run --rm --network container:tincan-media-lk --ipc=host \
-  -e MEDIA_LK=external -e CI=1 ${MEDIA_SHOTS:+-e MEDIA_SHOTS=/shots -v "$MEDIA_SHOTS:/shots"} \
+  -e MEDIA_LK=external -e CI=1 ${MEDIA_SKIP:+-e MEDIA_SKIP} ${MEDIA_SHOTS:+-e MEDIA_SHOTS=/shots -v "$MEDIA_SHOTS:/shots"} \
   -v "$(win "$root"):/src:ro" -v tincan-media-work:/work -w /work \
   mcr.microsoft.com/playwright:v1.60.0-noble sh -c '
     set -e

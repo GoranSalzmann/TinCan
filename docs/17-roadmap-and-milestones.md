@@ -94,6 +94,7 @@ quality controls, sharer viewer list, stream-audio volume (browser capture; scre
 audio where the browser offers it), permission bits and token grants, upload
 independence test in CI (G4). Desktop work moved to M6 (your decision, 2026-10-29).
 **Exit:** camera and screenshare work end to end in the web client in current Chrome/Edge and Firefox; the media test covers publish and subscribe.
+**Status (2026-10-29): built, not yet confirmed by you.** Camera, screen share, viewer opt-in, stream view, quality controls, the sharer's viewer list, stream-audio volume, the server caps and live revocation are in; the 3-person media test passes 22/22 in Chromium on fake devices, including the upload independence check (G4: 1290 kbps with one viewer, 1292 with two, 0 with none). **Not run:** Firefox, Safari, a real screen picker or camera, a phone, the VPS. Cuts and facts: 18 §K; walk-through: qa/m4.md.
 
 ### M5. Hardening & operations
 Voice E2EE + rotation + UI, moderation (kick/ban/timeout/server-mute/move) and
