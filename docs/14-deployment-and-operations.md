@@ -65,6 +65,8 @@ chat.example.com {
 ```
 
 ### 2.2 LiveKit config sketch (verify keys)
+
+> **As built in M3 (18 §J).** `tincan init` writes this file with `bind_addresses` (`127.0.0.1` and the Docker host gateway, `172.17.0.1` unless `--host-gateway-ip`), the image pinned to `livekit/livekit-server:v1.13.10`, `room.empty_timeout: 60`, `departure_timeout: 20`, and the webhook URL `http://127.0.0.1:3000/api/v1/internal/livekit/webhook`. The `tincan` service gets `extra_hosts: host.docker.internal:host-gateway` and `TINCAN_LIVEKIT__API_URL=http://host.docker.internal:7880`. Caddy answers 404 for `/api/internal/*` and `/api/v1/internal/*`, and the CSP has `'wasm-unsafe-eval'` for the denoiser.
 ```yaml
 port: 7880
 rtc:
@@ -87,6 +89,8 @@ webhook:
 ```
 
 ### 2.3 TLS for TURN (resolves T3 proposal)
+
+> **As built in M3 (18 §J).** `--turn-domain turn.example.com` adds a Caddy site for that name (certificate only) and mounts Caddy's data volume read-only into LiveKit, whose `turn.cert_file`/`key_file` point into it; TURN stays off without the flag. Instead of a copy helper, `tincan voice turn-reload` compares the certificate served on 5349 with the one Caddy serves on 443 and restarts LiveKit with `--apply` when no room has people, or when the served certificate has 7 days or less left. Run it daily from cron. TURN itself is **not yet verified on a real host** (18 §J D6-4).
 - Primary web/WSS traffic is TLS-terminated by Caddy on 443.
 - LiveKit's TURN/TLS needs its own certificate. v1 approach: a `turn.example.com` name served by Caddy only for certificate issuance; the issued cert/key files are made available to LiveKit through a shared read-only volume (a small helper copies Caddy's certificate files for that hostname). LiveKit reads the certificate only at start (no hot reload; verify in D6), and restarting it drops every call (§5), so the helper **defers the reload** (18 T30): after a renewal it restarts LiveKit only when no rooms are active (checked through LiveKit's `ListRooms` API), or, if rooms never empty, once the certificate LiveKit is using is within 7 days of expiry, preferring a configured quiet window. Caddy renews about 30 days before expiry, so in practice the restart lands in an empty moment. TURN/TLS listens on **5349**.
 - Many restrictive networks only allow outbound 443. Advanced option: serve TURN/TLS on 443 on a **separate IP** or via an SNI-based TCP router (Caddy layer4 plugin / HAProxy / nginx stream). Documented as optional; validated in spike D6. Real-world impact is measured by the connectivity diagnostics (08 §10): the percentage of users who need TURN/TLS on 443 will be small.

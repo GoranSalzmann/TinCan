@@ -1,0 +1,14 @@
+{
+  "name": "m3-voice-probe",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@livekit/protocol": "^1.45.0",
+    "@sapphi-red/web-noise-suppressor": "^0.4.1",
+    "livekit-client": "^2.23.0",
+    "livekit-server-sdk": "^2.19.2",
+    "playwright-core": "^1.60.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import { resolveDataDir } from "./doctor.js";
+import { apiUrlOnHost, decideTurnReload } from "./voice-checks.js";
 
 describe("resolveDataDir", () => {
   const only =
@@ -25,5 +26,32 @@ describe("resolveDataDir", () => {
 
   it("still fails for a missing relative path", () => {
     expect(resolveDataDir("./nope", "/trial", () => false).dir).not.toBeNull();
+  });
+});
+
+describe("TURN certificate reload (18 T30)", () => {
+  const base = { servedFingerprint: "a", currentFingerprint: "b", servedDaysLeft: 40, activeRooms: 0 };
+
+  it("does nothing while LiveKit serves the current certificate", () => {
+    expect(decideTurnReload({ ...base, currentFingerprint: "a", activeRooms: 3 })).toBe("none");
+  });
+
+  it("restarts at once when no room has people in it", () => {
+    expect(decideTurnReload(base)).toBe("restart");
+  });
+
+  it("waits while a call runs, until the served certificate is close to expiry", () => {
+    expect(decideTurnReload({ ...base, activeRooms: 2 })).toBe("wait");
+    expect(decideTurnReload({ ...base, activeRooms: 2, servedDaysLeft: 7 })).toBe("restart");
+    expect(decideTurnReload({ ...base, activeRooms: 2, servedDaysLeft: 12, deadlineDays: 14 })).toBe(
+      "restart",
+    );
+  });
+});
+
+describe("apiUrlOnHost", () => {
+  it("maps the container's host gateway name to loopback for the CLI on the host", () => {
+    expect(apiUrlOnHost("http://host.docker.internal:7880")).toBe("http://127.0.0.1:7880");
+    expect(apiUrlOnHost("http://10.0.0.5:7880")).toBe("http://10.0.0.5:7880");
   });
 });

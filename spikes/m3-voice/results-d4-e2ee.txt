@@ -1,0 +1,113 @@
+{
+ "label": "e2ee",
+ "sid": "RM_TiKoou5AvXyE",
+ "B_inbound_with_key": {
+  "audio:4203598882": {
+   "kbps": 48,
+   "lost": 0
+  },
+  "video:4220372089": {
+   "kbps": 782,
+   "w": 1280,
+   "h": 720,
+   "fps": 20,
+   "lost": 0
+  }
+ },
+ "B_speakers": {
+  "activeSpeakersSeen": [
+   "A"
+  ],
+  "eventCount": 2
+ },
+ "B_remoteAudioLevel": [
+  {
+   "id": "A",
+   "audioLevel": 0,
+   "isSpeaking": false
+  }
+ ],
+ "A_publisher": {
+  "audio:-": {
+   "kbps": 48,
+   "active": true
+  },
+  "video:h": {
+   "kbps": 333,
+   "w": 640,
+   "h": 360,
+   "fps": 20,
+   "active": true
+  },
+  "video:f": {
+   "kbps": 762,
+   "w": 1280,
+   "h": 720,
+   "fps": 20,
+   "active": true
+  },
+  "video:q": {
+   "kbps": 147,
+   "w": 320,
+   "h": 180,
+   "fps": 20,
+   "active": true
+  }
+ },
+ "late_joiner_inbound": {
+  "audio:1642035548": {
+   "kbps": 48,
+   "lost": 0
+  },
+  "video:2186107705": {
+   "kbps": 752,
+   "w": 1280,
+   "h": 720,
+   "fps": 20,
+   "lost": 0
+  }
+ },
+ "wrong_key_inbound": {
+  "audio:3135921189": {
+   "kbps": 48,
+   "lost": 0
+  },
+  "video:2973517182": {
+   "kbps": 769,
+   "lost": 0
+  }
+ },
+ "wrong_key_events": 0,
+ "after_rotation_B_inbound": {
+  "audio:4203598882": {
+   "kbps": 47,
+   "lost": 0
+  },
+  "video:4220372089": {
+   "kbps": 704,
+   "w": 1280,
+   "h": 720,
+   "fps": 20,
+   "lost": 0
+  }
+ },
+ "rotation_without_listener_update": {
+  "audio:4203598882": {
+   "kbps": 47,
+   "lost": 0
+  },
+  "video:4220372089": {
+   "kbps": 713,
+   "w": 1280,
+   "h": 720,
+   "lost": 0
+  }
+ },
+ "room_after": [
+  {
+   "sid": "RM_TiKoou5AvXyE",
+   "meta": "{\"epoch\":1}",
+   "n": 4
+  }
+ ]
+}

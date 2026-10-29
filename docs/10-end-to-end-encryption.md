@@ -52,6 +52,8 @@ channel only when the channel is not required.
 ## 4. Key management
 
 ### 4.1 Derivation (resolves T6)
+
+> **Confirmed in D4 (18 §J).** The room SID and room metadata are in the join response and identical for all participants, so a late joiner derives the same key from `secret + SID`; `createRoom` is idempotent and keeps metadata; the SID changes only after the room was empty past `empty_timeout`. E2EE with 3-layer simulcast and dynacast works (VP8). **T33 is closed:** the server's active-speaker events are identical with E2EE on, so server-side speaker detection works and the client-shared-levels fallback (§6) is dropped; speaking activity joins the metadata E2EE does not protect. Not tested: VP9/AV1 SVC, key index behaviour across sessions.
 No per-room keys are stored in the database.
 
 ```

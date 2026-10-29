@@ -64,7 +64,7 @@ added there as later batches surface them.
 | T30 | **Decided (§F): keep TURN/TLS on 5349 with a shared certificate; defer the LiveKit reload until no rooms are active, with a deadline before expiry. Caddy layer4 not adopted.** TURN/TLS termination: Caddy layer4 (SNI) terminates TLS and LiveKit TURN runs with `external_tls`, removing cert sharing and the renewal restart, and making TURN on 443 the default on one IP. Cost: a custom Caddy build. Fallback: defer the LiveKit reload until no rooms are active, with a deadline before expiry. Reopens T3 and the §F "TURN on 443 optional" decision (K-34, K-01) | 03 ADR-014, 14 §2.3 |
 | T31 | **Decided (§F): Electron header injection.** Desktop file access: Electron `webRequest.onBeforeSendHeaders` injects `Authorization` for the instance origin (plus the origin in the desktop CSP `img-src`), or the local storage adapter mints HMAC-signed expiring URLs with bucketed expiry so `signedUrl` never returns null (K-35) | 05 §3.2, 07 §3.7, 13 §3, 15 §5 |
 | T32 | **Decided (§F): v1 ships SQLite, local storage and in-memory pub/sub only; Postgres, Redis and S3 adapters are post-v1.** Decide now whether v1 ships one adapter per port (SQLite, local, memory; port interfaces and contract tests kept), rather than building Postgres/Redis in M2 and cutting them in M5 after paying the portability cost. Cost: a later move off SQLite needs a data-migration tool, not a config flip (K-09) | 01 R-063, 02 §5, 17 §6 |
-| T33 | If D4 confirms speaker detection survives E2EE via the RTP audio-level header extension: close K-18, drop the client-shared-levels fallback, and add "who is speaking, and when" to the metadata E2EE does not protect (K-11) | 10 §2, §6 |
+| T33 | If D4 confirms speaker detection survives E2EE via the RTP audio-level header extension: close K-18, drop the client-shared-levels fallback, and add "who is speaking, and when" to the metadata E2EE does not protect (K-11) **Closed (D4, 2026-10-29, §J D4-2): confirmed.** | 10 §2, §6 |
 | T34 | **Decided (§F): accepted.** Observability at the seams: emit `reconcile_repairs_total{kind}` and alert on a sustained non-zero rate (a reconciler silently masks a broken primary path, as in K-30); carry the request ID into bus events and handler logs | 05 §8, 14 §8 |
 
 ## C. Risk register
@@ -90,7 +90,7 @@ Likelihood (L) and impact (I): H/M/L.
 | K-15 | Browser codec/feature differences (AV1, screen audio) | M | L | Capability detection, codec preference list with VP8/H.264 fallback |
 | K-16 | Single developer bus factor / burnout | M | H | Prioritised milestones, finish voice+text first, defer extras |
 | K-17 | Routing remote audio through Web Audio (volume boost >100%) degrades echo cancellation | M | M | Keep playback on media elements by default; boost flagged as headphones-only; validate in spike D2 (09 §7) |
-| K-18 | LiveKit server-side active-speaker detection unavailable under E2EE, hurting speaking indicators | H | M | Client-computed levels shared via gateway/participant attributes; validate in spike D4 (10 §6). Possibly not a real risk: detection may read the RTP audio-level header extension, which frame encryption leaves in clear (D4, T33) |
+| K-18 | LiveKit server-side active-speaker detection unavailable under E2EE, hurting speaking indicators | H | M | Client-computed levels shared via gateway/participant attributes; validate in spike D4 (10 §6). Possibly not a real risk: detection may read the RTP audio-level header extension, which frame encryption leaves in clear (D4, T33) **Resolved by D4 (2026-10-29): not a risk.** |
 | K-19 | Several facts about LiveKit/DeepFilterNet in 08–10 come from memory, not the pinned versions | M | M | Mark as "(verify)", spike D1/D2/D4 before treating as fact; update docs after spikes |
 | K-20 | No global hold-to-talk in v1 (and no global shortcuts on some Wayland sessions); gamers may want it | H | M | Decided (18 §F): in-window PTT + global toggle-mute/deafen/leave + `tincan --toggle-mute` CLI; native hook is a v1.1 option (13 §4.2) |
 | K-21 | Fresh instance exposed before setup could be claimed by a stranger | L | H | One-time setup token printed to server logs/file (11 §1.4) |
@@ -117,10 +117,13 @@ Referenced elsewhere as D1 to D6.
 
 - **D1.** LiveKit self-hosted on a cheap VPS: measure CPU/egress for 1 publisher at 1080p30 → 5 viewers; confirm dynacast keeps publisher upload flat as viewers increase; verify (08) config values.
   - *Design review (§G):* does LiveKit itself refresh tokens for connected participants, so the app is never asked again? If so, "the app re-checks permissions on token refresh" (05 §6.2, 08 §4.4, 15 §4.4) is not a revocation backstop (K-29, T25).
+  - *Result (2026-10-29), done locally; VPS numbers outstanding.* LiveKit refreshes tokens itself (the app is not a revocation backstop); dynacast keeps publisher upload flat (1.57 / 1.55 / 1.51 Mbps for 1 / 3 / 5 viewers); SFU CPU about 3 to 4 % of a core. Details in §J D1-1 to D1-6.
 - **D2.** DeepFilterNet WASM worklet: CPU and latency on a low-end laptop; quality vs RNNoise vs browser NS on recorded samples; AEC behaviour with Web Audio playback (K-17); model licence check.
+  - *Result (2026-10-29), partly done.* The DeepFilterNet npm package fetches its model from a third-party CDN, so it is not shippable; RNNoise and GTCRN are self-contained. T16: ship RNNoise plus the browser fallback. CPU, latency, quality and AEC with Web Audio playback (K-17) are **not measured**: they need a real device and ears. §J D2-1 to D2-3.
 - **D3.** Electron `desktopCapturer` with audio on Windows/Linux; behaviour on Wayland and macOS.
 - **D4.** LiveKit E2EE + simulcast + dynacast (+ VP9/AV1 SVC) working together; active-speaker approach under E2EE (K-18).
   - *Design review (§G):* room SID semantics (a new SID per room instance after `emptyTimeout`), creating the room before minting the token, server-set room metadata for the epoch, and keyring index behaviour across sessions (K-31, T27). Whether active-speaker detection reads the RTP audio-level header extension, which frame encryption leaves in clear (K-18, T33).
+  - *Result (2026-10-29), done for VP8.* E2EE, 3-layer simulcast and dynacast work together; the server's active-speaker events are the same with and without E2EE (**T33 closed, K-18 is not a risk**); the room SID and metadata are stable and shared (**T27 confirmed**). VP9/AV1 SVC and keyring index behaviour across sessions were not tested. §J D4-1 to D4-4.
 - **D5.** Query-builder tooling (Kysely/Drizzle) on better-sqlite3 with FTS5. v1 is SQLite-only (T32), so dual-dialect migrations are no longer in scope.
   - *Design review (§G):* the Db port's async `transaction(fn)` must work on better-sqlite3 for the chosen builder (Kysely serialises through a mutex; Drizzle's better-sqlite3 transactions are reportedly synchronous only, confirm). Measure main-thread blocking for `VACUUM INTO`, `.backup()` and FTS queries on a ~4 GB fixture (K-32, T28).
   - *Result (2026-10-28), done.* Code in `spikes/d5-db/`, raw numbers in its `RESULTS.md`. Measured in Docker on a Ryzen 5800X with NVMe, capped at 2 CPUs and 2 GB; a cheap VPS will be slower, so rerun `src/bench/blocking.ts` there before quoting absolute numbers.
@@ -144,6 +147,7 @@ Referenced elsewhere as D1 to D6.
       - 17 M0: D5 and T1 done.
 - **D6.** TURN/TLS on 443 sharing a port/cert with Caddy (T3, T4); single-port UDP mux behaviour.
   - *Design review (§G):* whether LiveKit can reload TURN certificates without a restart (expected: no), and that the deferred reload sees active rooms correctly through `ListRooms` (K-34, T30). Loopback/`host-gateway` routing with LiveKit on host networking, `bind_addresses`, and LiveKit's signalling path prefix for narrowing the Caddy route (K-30, T26).
+  - *Result (2026-10-29), partly done.* `bind_addresses` binds only the HTTP port; single-port UDP works; certificates are read at start only (T30 confirmed). **Not done:** TURN reachability and TURN/TLS on a real host, and the Caddy route against a host-networked LiveKit, need the VPS. §J D6-1 to D6-4.
 
 ## E. Sign-off checklist
 
@@ -217,7 +221,7 @@ Pending your call: the product-feature candidates found in the audit (stream pre
 | T32 | **v1 ships SQLite, local storage and in-memory pub/sub.** Ports and contract tests stay; Postgres, Redis and S3 adapters are post-v1 | 00, 01, 02, 03, 04, 05, 06, 07, 14, 16, 17 |
 | T34 | **Accepted.** `reconcile_repairs_total` with an alert; request IDs carried through the bus | 04, 05, 14 |
 
-Still open: T33 (waits for spike D4).
+Still open: nothing. T33 was closed by spike D4 on 2026-10-29 (§J).
 
 ### UI design calls (2026-10-28)
 | Ref | Decision | Docs touched |
@@ -294,3 +298,65 @@ Facts learned while building text chat, and what was cut. Detail sits in the doc
 **Cut or deferred from M2 (to where it goes):** reactions and link previews (cut line 1; the modules stay out of the build) · moderation (kick, ban, timeout, server mute) and the audit log (M5; the permission bits, `authorizeAction` rules and a timeout path in `roles` exist and are tested) · OpenAPI output (17 §10) · `GET /search` `before`/`after` filters · `Range` requests on files · message retention and account deletion jobs · "mark as unread", emoji picker, quick switcher, shortcut list and the other screens listed as "not drawn yet" in `docs/design/README.md` · right-click menus (channel actions are in a **…** menu) and drag reordering (Move up/down instead) · a roving-tabindex tree for the channel list (plain links today) · a Playwright end-to-end test (16 §12) · `INSTANCE_UPDATE`, `MEMBER_REMOVE` and `SESSION_REPLACED` events · `appearance.density` is accepted as a setting but no UI uses it yet · moderators seeing "Message deleted by …" (W-03) · "Open in app" on the invite page (desktop, M3/M4) · the web client has only been exercised in one browser at one window size.
 
 **Done 2026-10-29:** first run on a real VPS with a domain (mkarl.io) and a Let's Encrypt certificate; you walked the M1 and M2 checklists there and confirmed. It found one bug: `tincan init` without `--email` wrote an empty `email` line that Caddy rejects (fixed in `a52a1d3`, with a test). **Still open:** voice ports on the host firewall (7881, UDP media range, 5349), a phone and other browsers, and a longer trial with real friends. One DB contract test failed once and passed on re-runs; watch for it (`packages/db/src/contract.ts`).
+
+## J. M3 build notes (2026-10-29)
+
+Spike results for D1, D2, D4 and D6 (raw output in `spikes/m3-voice/`), what they changed, and what M3 cut or left to you. Measured in Docker Desktop on a Ryzen 7 5800X; **not on the VPS**, so the absolute numbers are a floor. LiveKit **v1.13.10** (pinned in the generated compose file), livekit-client 2.23.0, Chromium 148 with fake devices.
+
+### Spike results
+
+| Ref | Result | Changes |
+|---|---|---|
+| D1-1 | **LiveKit refreshes tokens for connected participants itself.** A `refreshToken` message arrives at join and again after every `updateParticipant`; the refreshed token carries the *current* permissions (publish revoked → `canPublish:false`). The app is never asked. A token is only checked at connect and reconnect. | T25 stands: an app-side re-check on refresh is not a backstop, the reconciler is. Join tokens live 10 min (`voice.tokenTtlSecs`). 08 §4.4, 05 §6.2 |
+| D1-2 | `createRoom` is idempotent: a second call returns the same SID and keeps the metadata. After `empty_timeout` the room is deleted (`room_finished` webhook about 20 s after the last leave with `empty_timeout: 20`) and the next `createRoom` gives a **new SID**. | T27 confirmed (D4-3) |
+| D1-3 | A client that never completes WebRTC gets `participant_connection_aborted`, not `participant_left`. Webhook workers run in parallel, so events can be duplicated, late or reordered. | The presence store handles both names and has ordering rules (event id, session SID, tombstones) |
+| D1-4 | **Dynacast works and publisher upload is flat in the number of viewers.** 1080p30 simulcast (1080p and 540p, fake source): publisher upload 1.57 Mbps with 1 viewer, 1.55 with 3, 1.51 with 5; each viewer received about 1.07 Mbps. With no viewer both layers were inactive. With adaptive stream and 320 px tiles the 1080p layer stopped and upload fell to 0.46 Mbps. | G4 holds; 08 §5.1 confirmed |
+| D1-5 | LiveKit CPU: about 3 to 4 % of one core for 1 publisher at 1080p and 5 viewers (about 5.5 Mbps out), 2-CPU cap, browsers on the same machine. The fake video is low-complexity, so the bitrate stayed far under the 3.5 Mbps cap. | Rerun on the VPS with real content before quoting capacity (08 §13) |
+| D1-6 | Config keys verified against v1.13.10: `rtc.tcp_port`, `rtc.udp_port` (one port is a mux; the server logs `portUDP {Start:7882,End:0}`), `rtc.use_external_ip`, `rtc.node_ip`, `room.empty_timeout`, `room.departure_timeout`, `turn.*`, `webhook.api_key/urls`, `bind_addresses`, `prometheus.port` (`prometheus_port` is deprecated). `canPublishSources: []` in a grant means **all sources**, so the app sends `canPublish:false` for a listener. | 14 §2.2 corrected; `grantFor` |
+| D4-1 | **E2EE, 3-layer simulcast and dynacast work together** (VP8). Receivers with the key decode 720p; a late joiner with the key decodes; a client with the wrong key receives bytes but decodes no frames; replacing the key on both ends keeps media flowing, replacing it on the sender only stops decoding at the receiver. VP9/AV1 SVC was **not** tested. | Defaults T12/T17 can stay as drafted for VP8; SVC stays open (10, 08 §5.3) |
+| D4-2 | **Active-speaker detection survives E2EE.** The server sent `ActiveSpeakersChanged` for an E2EE publisher exactly as without E2EE (it reads the RTP audio-level extension, which frame encryption leaves in the clear). **T33 is closed and K-18 is not a risk: drop the client-shared-levels fallback; "who is speaking, and when" joins the metadata E2EE does not protect (K-11).** `participant.audioLevel` read 0 on the client in both runs at the sampling instant, so it is not a usable source. | 10 §2, §6; T33, K-18, K-11 |
+| D4-3 | **T27 confirmed.** The room SID and the room metadata are in the join response and identical for every participant; a late joiner derives the same key from secret and SID with no help from the app. The epoch in room metadata survives an app restart (the room lives in LiveKit). A SID changes only after the room was empty past `empty_timeout`, which is when a new key is wanted anyway. Not built here (E2EE is M5). | 10 §4.1 |
+| D4-4 | Audio bitrate on the wire: 77 kbps without E2EE, 48 kbps with it, same Opus settings (DTX and RED requested). Consistent with RED being switched off under E2EE; not proven. | Capacity numbers for E2EE rooms use 48 kbps (08 §5.5) |
+| D6-1 | **`bind_addresses` restricts only the HTTP port.** With `[127.0.0.1]`, 7880 is closed from another container but open on loopback; 7881 (ICE/TCP) and 5349 (TURN/TLS) stay open on all interfaces. With `[127.0.0.1, <gateway>]` both work. | T26 confirmed. The generated file binds loopback and the Docker host gateway (`172.17.0.1`; `--host-gateway-ip` changes it) |
+| D6-2 | **Single-port UDP mux works** (every client in D1 and D4 used 7882/udp). The TURN relay range defaults to 30000–40000/udp; clients that relay to the SFU on the same host should not need it open (to be confirmed on the VPS). | T4: one UDP rule (7882/udp), plus 7881/tcp and 5349/tcp |
+| D6-3 | **TURN certificates are read at start only.** Replacing the files did nothing; `SIGHUP` stopped the container; `docker restart` served the new certificate. `ListRooms` is available for the "no active room" check. | T30 confirmed. `tincan voice turn-reload` (below) |
+| D6-4 | With UDP blocked in the browser's network namespace, the client connected over ICE/TCP 7881. Relay-only did **not** connect in the Docker bridge emulation: a relay candidate was allocated but the SFU's checks to it went unanswered. | **Not conclusive about TURN.** Needs the real test on the VPS (Settings → Voice & audio → Test connection, from a network that blocks UDP) |
+| D2-1 | DeepFilterNet: the only npm package (`deepfilternet3-noise-filter`, Apache-2.0 OR MIT) is a loader that fetches the WASM and the model from `cdn.mezon.ai` at run time. That is a third-party host in the audio path with nothing to hash. A self-hosted DeepFilterNet needs a reproducible build of upstream with the model weights (licence of the weights still to be confirmed). | **Tier A is not shipped in M3.** The pipeline has the tier slot; the work is a WASM build in the repository |
+| D2-2 | RNNoise (BSD-3 via `@sapphi-red/web-noise-suppressor`, MIT, 152 kB WASM plus a 157 kB SIMD variant) and GTCRN (a small neural denoiser, 197 kB) ship inside that package and can be self-hosted. | **T16: ship RNNoise (tier B) as the default, browser noise suppression (C) as the fallback, Off (D).** GTCRN is a candidate for tier A, unevaluated |
+| D2-3 | **Not measured:** CPU and latency of the denoisers (offline rendering produced silence; a live context does not start without an audio device) and quality on recorded speech. | Needs your ears and a real machine: docs/qa/m3.md |
+
+### Facts learned while building
+
+| Ref | Note | Doc |
+|---|---|---|
+| M3-1 | The webhook path is `/api/v1/internal/livekit/webhook`: module routes live under `/api/v1`. Caddy now answers 404 for `/api/internal/*` **and** `/api/v1/internal/*` (the old rule alone would have left it open). `tincan doctor` checks both ends. | 05 §6, 14 §2.1 |
+| M3-2 | The Caddy CSP needs `'wasm-unsafe-eval'` in `script-src` or RNNoise cannot compile (the pipeline then falls back to the browser's suppression and says so). Not yet seen behind a real Caddy. | 14 §2.1 |
+| M3-3 | A zustand selector that returns a fresh `[]` loops forever (React error 185). The unit tests rendered no voice component; the media test caught it in a real browser. Component tests for the call view, dock and rows were added. | 12 |
+| M3-4 | **Existing bug fixed:** the web gateway client answered a `RECONNECT` op with `close(1001)`, which browsers refuse (`InvalidAccessError`), so the socket stayed open. Found by restarting the app mid-call. It now closes with 1000. | 07 §4 |
+| M3-5 | The server sends `VOICE_SERVER_DISCONNECT` *before* it removes the person from LiveKit, and the client waits 1.5 s for it after a LiveKit "removed", so the reason shown is ours ("You no longer have permission"), not LiveKit's generic one. | 07 §5 |
+| M3-6 | `voice` is on by default exactly when a `livekit:` section exists (`enabledByDefault` on the manifest); `modules.voice.enabled: false` turns it off. `livekit.apiUrl` (default `http://127.0.0.1:7880`) is where the server reaches the API; the generated `.env` points the container at `host.docker.internal:7880`, and the CLI on the host maps that name to loopback. | 04, 14 |
+| M3-7 | An instance deployed before M3 (mkarl.io) has no `TINCAN_LIVEKIT__API_URL` in `.env` and no `extra_hosts` on the `tincan` service. After updating the image the voice module turns on, finds nothing at `127.0.0.1:7880` inside the container, logs one warning and answers joins with `UNAVAILABLE`. The runbook lists the edits. | docs/qa/m3.md |
+| M3-8 | The media test runs 11 checks (join, Opus audio with loss under 5 %, server presence, mute, deafen, app restart mid-call, a 3 s network drop, SPEAK revoked and restored, CONNECT revoked, leave, no unexpected reconciler repairs) in about 45 s. On Windows, host Chrome could not connect to a LiveKit published through Docker Desktop (ICE failed), so the local runner puts everything in one network namespace (`tools/media-test/docker.sh`); CI uses host networking. | 16 §6 |
+
+### Built
+
+The `voice` module (rooms, tokens from permissions, signed webhook, presence, reconciler with repair counters at `GET /voice/status`, a private room for the connection test) and the channel settings `userLimit`, `bitrateKbps`, `videoAllowed`, `screenshareAllowed`; doctor voice checks and `tincan voice turn-reload`; a pinned LiveKit image, HTTP bound to loopback, optional TURN/TLS in `tincan init`; the web voice UI (sidebar presence, dock, call view, Voice & audio settings, connection test); audio pipeline v1 (browser AEC always on except Studio, RNNoise with a CPU guard and fallback, gate, gain, presets, mic test with A/B, push to talk in the window, per-person volume); the 3-person media test with a CI workflow; 34 server tests (grant table, hidden channel, limits, webhook races, reconciler repairs, fast path within 2 s) and 19 web tests.
+
+### Cut or deferred from M3
+
+| What | Where it goes |
+|---|---|
+| **Electron shell** (window, secure bridge, keychain, instance entry) | **Not built. Waiting for your decision: M3 or M4.** I recommend M4 (17 §3 listed it in M3; nothing in voice depends on it, and D3 is an M4 spike). |
+| Installers (unsigned), global shortcuts | M4, with Electron |
+| Camera, screenshare, viewer opt-in, stream audio volume, the sharer's viewer list | M4. Grants already include `camera` and `screen_share*`, and the channel switches exist |
+| E2EE (key service, rotation, UI) and the epoch in room metadata | M5. T27 is confirmed; nothing is stored yet |
+| Server mute, move, kick from voice | M5 (moderation). The permission bits and the `VOICE_SERVER_DISCONNECT` reasons exist |
+| Tier A denoiser (DeepFilterNet class) | Needs a self-built WASM and a weights-licence check, or an evaluation of GTCRN |
+| Noise-suppression strength slider, CPU and latency readout in settings, keybinds page, sensitivity meter with a threshold marker | Next UI pass |
+| Output-device switching through `setSinkId` | Implemented, checked by type only; browsers without it show a note |
+| Prometheus metrics for voice | The counters are at `GET /voice/status` and in `VoiceApi.stats()`; the `metrics` module exports them in M5 |
+| A TURN test that blocks UDP in a network namespace (16 §6) | Needs a Linux CI runner with iptables; the emulation here was inconclusive (D6-4) |
+
+### What I need from you (VPS, firewall, people)
+
+See the runbook in [qa/m3.md](qa/m3.md). In short: open **7881/tcp and 7882/udp** (and **5349/tcp and 3478/udp** if you want the relay) in the provider's firewall and the host's; add a second DNS name if you want TURN; update and restart; walk the checklist with another person on another network.

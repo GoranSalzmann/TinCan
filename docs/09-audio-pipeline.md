@@ -47,6 +47,8 @@ audio: {
 
 ## 3. Denoiser strategy
 
+> **As decided in M3 (18 §J D2, T16).** Tier A is not shipped: the only DeepFilterNet npm package fetches its model from a third-party CDN and there is no reproducible self-hosted build yet. Shipped: **B, RNNoise** (`@sapphi-red/web-noise-suppressor`, MIT; 152 kB WASM with a SIMD variant) as the default, **C, browser noise suppression** as the fallback when the WASM cannot load or the render capacity stays above 70 % for 5 updates, and **D, off**. GTCRN (197 kB, same package) is the candidate for tier A. CPU, latency and quality are not measured yet (docs/qa/m3.md, section D). The Caddy CSP needs `'wasm-unsafe-eval'`.
+
 | Tier | Engine | When | Notes |
 |---|---|---|---|
 | **A** | DeepFilterNet-class neural model, WASM/SIMD in an AudioWorklet | Default on capable machines | Best quality among open-source options. Operates on 48 kHz in ~10 ms hops (verify for the chosen model version). |

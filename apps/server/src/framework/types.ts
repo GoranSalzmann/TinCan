@@ -19,7 +19,10 @@ export interface AuthPort {
 }
 
 export interface LiveKitSettings {
+  /** Public signalling URL clients connect to (`wss://host/livekit`). */
   url: string;
+  /** Where this server reaches LiveKit's HTTP API (loopback or the Docker host gateway; never public, 18 T26). */
+  apiUrl: string;
   apiKey: string;
   apiSecret: string;
 }
@@ -147,6 +150,8 @@ export interface ModuleManifest<C = unknown, P extends PortName = PortName> {
   requiresPorts: readonly P[];
   /** Always on and not toggleable (core, accounts, roles, channels). */
   alwaysOn?: boolean;
+  /** Whether the module is on when `modules.<id>.enabled` is not set. Defaults to true. */
+  enabledByDefault?: (ports: ReadonlySet<PortName>) => boolean;
   /** The module's own `modules.<id>` section, without `enabled`. Unknown keys must be an error. */
   configSchema?: z.ZodType<C>;
   /** Owned tables and migrations, applied only while the module is enabled. */

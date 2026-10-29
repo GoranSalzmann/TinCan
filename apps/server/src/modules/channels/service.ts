@@ -8,6 +8,8 @@ import {
   type ChannelCreate,
   type ChannelKind,
   type ChannelPatch,
+  type ChannelSettings,
+  ChannelSettingsSchema,
 } from "@tincan/shared";
 import type { EventBus } from "../../framework/events.js";
 import type { GatewayRegistrar } from "../../framework/types.js";
@@ -34,10 +36,10 @@ const toRecord = (r: ChannelsTables["channel"]): ChannelRecord => ({
   settings: parseSettings(r.settings),
 });
 
-function parseSettings(raw: string): { slowmodeSecs?: number } {
+function parseSettings(raw: string): ChannelSettings {
   try {
-    const v = JSON.parse(raw) as { slowmodeSecs?: unknown };
-    return typeof v.slowmodeSecs === "number" ? { slowmodeSecs: v.slowmodeSecs } : {};
+    const parsed = ChannelSettingsSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }

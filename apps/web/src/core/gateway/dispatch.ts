@@ -4,6 +4,7 @@ import { shouldNotify, showNotification } from "../notifications.js";
 import { useChat } from "../state/chat.js";
 import { memberName, useCommunity } from "../state/community.js";
 import { useUi } from "../state/ui.js";
+import { useVoice } from "../voice/store.js";
 
 let selfId: string | null = null;
 export function setDispatchSelf(id: string | null): void {
@@ -14,6 +15,7 @@ export function setDispatchSelf(id: string | null): void {
 export function dispatchEvent(t: string, d: unknown): void {
   useCommunity.getState().apply(t, d);
   useChat.getState().apply(t, d);
+  useVoice.getState().apply(t, d);
   if (t === "READY") useUi.getState().bumpReady();
   if (t === "MESSAGE_CREATE") notify((d as { message: Message }).message);
 }

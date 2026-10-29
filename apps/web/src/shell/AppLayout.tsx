@@ -12,6 +12,7 @@ import { useChat } from "../core/state/chat.js";
 import { memberName, useCan, useCommunity } from "../core/state/community.js";
 import { useUi } from "../core/state/ui.js";
 import { ChannelList } from "../modules/channels/ChannelList.js";
+import { VoiceDock } from "../modules/voice/VoiceDock.js";
 import { MemberList } from "../modules/members/MemberList.js";
 // The settings panes are used rarely; they load when first opened.
 const SettingsLayer = lazy(() =>
@@ -329,6 +330,8 @@ export function AppLayout() {
           </Menu.Root>
 
           <ChannelList />
+
+          <VoiceDock />
 
           <div
             className="flex h-13 items-center gap-2 border-t border-border px-3"

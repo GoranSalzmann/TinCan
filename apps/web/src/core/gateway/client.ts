@@ -168,7 +168,7 @@ export class GatewayClient {
         this.#beat(socket);
         return;
       case Op.RECONNECT:
-        socket.close(CloseCode.GOING_AWAY, "server asked to reconnect");
+        socket.close(CloseCode.NORMAL, "server asked to reconnect"); // browsers refuse 1001 for close() (only 1000 and 3000–4999)
         return;
       case Op.INVALID_SESSION:
         // The server no longer has our session (or the replay window passed): start over with IDENTIFY.
