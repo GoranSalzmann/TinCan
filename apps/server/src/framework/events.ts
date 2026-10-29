@@ -14,6 +14,8 @@ export interface Events {
   "instance.updated": { name: string };
   /** A user became a member of the space (setup, registration). */
   "member.joined": { userId: string };
+  "message.created": { messageId: string; channelId: string; authorId: string };
+  "message.deleted": { messageId: string; channelId: string };
   "channel.created": { channelId: string };
   "channel.updated": { channelId: string };
   "channel.deleted": { channelId: string };
