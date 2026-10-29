@@ -28,6 +28,14 @@ export interface UploadsSettings {
   thumbnailSize: number;
 }
 
+/** Hard ceiling for one file: uploads are buffered in memory while they are checked and thumbnailed. */
+export const MAX_FILE_BYTES_CEILING = 512 * 1024 * 1024;
+
+export interface UploadLimits {
+  maxBytes: number;
+  userQuotaBytes: number;
+}
+
 export interface UploadsDeps {
   db: Db<UploadsTables>;
   storage: Storage;
@@ -63,6 +71,44 @@ export class UploadsService implements UploadsApi {
   }
 
   // ---- quota ---------------------------------------------------------------------------------
+
+  /** The limits in force now: the config values, or what the owner set at runtime. */
+  limits(): UploadLimits {
+    return { maxBytes: this.#d.settings.maxBytes, userQuotaBytes: this.#d.settings.userQuotaBytes };
+  }
+
+  /** Applies limits the owner saved earlier; call once at start-up. */
+  async loadStoredLimits(): Promise<void> {
+    const rows = await this.#d.db.query.selectFrom("upload_setting").select(["key", "value"]).execute();
+    for (const r of rows) {
+      if (r.key === "max_bytes") this.#d.settings.maxBytes = Math.min(r.value, MAX_FILE_BYTES_CEILING);
+      if (r.key === "user_quota_bytes") this.#d.settings.userQuotaBytes = r.value;
+    }
+  }
+
+  /** Changes the limits for the next request, without a restart, and keeps them across restarts. */
+  async updateLimits(patch: Partial<UploadLimits>): Promise<UploadLimits> {
+    const now = Date.now();
+    const entries: [string, number][] = [];
+    if (patch.maxBytes !== undefined) {
+      if (patch.maxBytes > MAX_FILE_BYTES_CEILING)
+        throw new AppError("VALIDATION_FAILED", "That file size limit is above the server's ceiling.", {
+          ceiling: MAX_FILE_BYTES_CEILING,
+        });
+      entries.push(["max_bytes", patch.maxBytes]);
+    }
+    if (patch.userQuotaBytes !== undefined) entries.push(["user_quota_bytes", patch.userQuotaBytes]);
+    for (const [key, value] of entries) {
+      await this.#d.db.query
+        .insertInto("upload_setting")
+        .values({ key, value, updated_at: now })
+        .onConflict((oc) => oc.column("key").doUpdateSet({ value, updated_at: now }))
+        .execute();
+    }
+    if (patch.maxBytes !== undefined) this.#d.settings.maxBytes = patch.maxBytes;
+    if (patch.userQuotaBytes !== undefined) this.#d.settings.userQuotaBytes = patch.userQuotaBytes;
+    return this.limits();
+  }
 
   async usage(userId: string): Promise<{ usedBytes: number; quotaBytes: number }> {
     const r = await this.#d.db.query

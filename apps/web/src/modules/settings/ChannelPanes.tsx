@@ -63,6 +63,7 @@ export function ServerPane() {
           </Button>
         </div>
       </form>
+      {owner ? <UploadLimitsCard /> : null}
       <p className="text-sm text-text-muted">
         {t("settings.server.source")}:{" "}
         <a href={caps?.server.sourceUrl} target="_blank" rel="noreferrer noopener">
@@ -70,6 +71,85 @@ export function ServerPane() {
         </a>
       </p>
     </section>
+  );
+}
+
+const MB = 1024 * 1024;
+const GB = 1024 * MB;
+
+/** The owner's file size and per-person upload limits; they apply to the next upload, no restart (18 §K). */
+function UploadLimitsCard() {
+  const t = useT();
+  const apply = useSession((s) => s.setUploadLimits);
+  const [ceiling, setCeiling] = useState<number | null>(null);
+  const [maxMb, setMaxMb] = useState("");
+  const [quotaGb, setQuotaGb] = useState("");
+
+  useEffect(() => {
+    void api
+      .uploadLimits()
+      .then((l) => {
+        setCeiling(l.ceilingBytes);
+        setMaxMb(String(+(l.maxBytes / MB).toFixed(2)));
+        setQuotaGb(String(+(l.userQuotaBytes / GB).toFixed(2)));
+      })
+      .catch(toastError);
+  }, []);
+
+  const maxBytes = Math.round(Number(maxMb) * MB);
+  const userQuotaBytes = Math.round(Number(quotaGb) * GB);
+  const maxError =
+    maxMb === "" || !Number.isFinite(maxBytes) || maxBytes < 1024
+      ? t("settings.uploads.invalid")
+      : ceiling !== null && maxBytes > ceiling
+        ? t("settings.uploads.aboveCeiling", { max: Math.floor(ceiling / MB) })
+        : null;
+  const quotaError =
+    quotaGb === "" || !Number.isFinite(userQuotaBytes) || userQuotaBytes < 0
+      ? t("settings.uploads.invalid")
+      : null;
+
+  return (
+    <form
+      className={card}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void api
+          .setUploadLimits({ maxBytes, userQuotaBytes })
+          .then((l) => {
+            apply({ maxBytes: l.maxBytes, userQuotaBytes: l.userQuotaBytes });
+            toast(t("settings.saved"));
+          })
+          .catch(toastError);
+      }}
+    >
+      <h3 className="m-0 text-lg">{t("settings.uploads")}</h3>
+      <Field
+        label={t("settings.uploads.maxFile")}
+        type="number"
+        min={0.001}
+        step="any"
+        value={maxMb}
+        onChange={(e) => setMaxMb(e.target.value)}
+        error={maxError}
+        hint={t("settings.uploads.maxFile.hint")}
+      />
+      <Field
+        label={t("settings.uploads.quota")}
+        type="number"
+        min={0}
+        step="any"
+        value={quotaGb}
+        onChange={(e) => setQuotaGb(e.target.value)}
+        error={quotaError}
+        hint={t("settings.uploads.quota.hint")}
+      />
+      <div>
+        <Button type="submit" disabled={maxError !== null || quotaError !== null || ceiling === null}>
+          {t("common.save")}
+        </Button>
+      </div>
+    </form>
   );
 }
 

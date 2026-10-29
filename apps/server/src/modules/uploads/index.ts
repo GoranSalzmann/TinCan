@@ -10,6 +10,8 @@ import {
   OwnAttachmentsQuerySchema,
   OwnAttachmentSchema,
   StorageUsageSchema,
+  UploadLimitsPatchSchema,
+  UploadLimitsSchema,
   UploadResultSchema,
 } from "@tincan/shared";
 import { StorageNotFoundError } from "@tincan/storage";
@@ -20,7 +22,7 @@ import type { RolesApi } from "../roles/api.js";
 import type { UploadsApi } from "./api.js";
 import { INLINE_IMAGE_TYPES } from "./images.js";
 import { uploadsMigrations, type UploadsTables } from "./schema.js";
-import { AVATAR_MAX_BYTES, UploadsService } from "./service.js";
+import { AVATAR_MAX_BYTES, MAX_FILE_BYTES_CEILING, UploadsService } from "./service.js";
 
 const ConfigSchema = z.strictObject({
   /** Largest single file (07 §3.7 "size limit from config"). */
@@ -66,11 +68,12 @@ export default defineModule({
       accounts,
       events: ctx.events,
       log: ctx.log,
-      settings: ctx.config,
+      settings: { ...ctx.config },
     });
+    await svc.loadStoredLimits();
 
     await ctx.http.register(multipart, {
-      limits: { fileSize: ctx.config.maxBytes, files: 1, fields: 4, parts: 6 },
+      limits: { fileSize: MAX_FILE_BYTES_CEILING, files: 1, fields: 4, parts: 6 },
     });
     const http = ctx.http.withTypeProvider<ZodTypeProvider>();
 
@@ -97,7 +100,7 @@ export default defineModule({
       "/uploads",
       { preHandler: ctx.http.authenticate, schema: { response: { 201: UploadResultSchema } } },
       async (req, reply) => {
-        const file = await readFile(req, ctx.config.maxBytes);
+        const file = await readFile(req, svc.limits().maxBytes);
         const a = await svc.upload(req.actor!.userId, file);
         return reply.status(201).send(a);
       },
@@ -222,11 +225,32 @@ export default defineModule({
       }
     });
 
-    ctx.capabilities.feature("uploads", {
-      maxBytes: ctx.config.maxBytes,
-      userQuotaBytes: ctx.config.userQuotaBytes,
-    });
-    ctx.capabilities.limit("uploadMaxBytes", ctx.config.maxBytes);
+    /** Publishes the limits in force, so clients see a change without a restart. */
+    const publishLimits = () => {
+      const { maxBytes, userQuotaBytes } = svc.limits();
+      ctx.capabilities.feature("uploads", { maxBytes, userQuotaBytes });
+      ctx.capabilities.limit("uploadMaxBytes", maxBytes);
+    };
+    publishLimits();
+
+    http.get(
+      "/admin/uploads",
+      { preHandler: ctx.http.requireOwner, schema: { response: { 200: UploadLimitsSchema } } },
+      () => ({ ...svc.limits(), ceilingBytes: MAX_FILE_BYTES_CEILING }),
+    );
+
+    http.patch(
+      "/admin/uploads",
+      {
+        preHandler: ctx.http.requireOwner,
+        schema: { body: UploadLimitsPatchSchema, response: { 200: UploadLimitsSchema } },
+      },
+      async (req) => {
+        await svc.updateLimits(req.body);
+        publishLimits();
+        return { ...svc.limits(), ceilingBytes: MAX_FILE_BYTES_CEILING };
+      },
+    );
 
     const api: UploadsApi = svc;
     ctx.api.provide("uploads", api);

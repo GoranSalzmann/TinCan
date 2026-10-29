@@ -22,11 +22,17 @@ export interface UploadsTables {
     created_at: number;
     deleted_at: number | null;
   };
+  /** Limits the owner changed at runtime; a missing key means the config value applies. */
+  upload_setting: {
+    key: string;
+    value: number;
+    updated_at: number;
+  };
 }
 
 export const uploadsMigrations: ModuleMigrations = {
   module: "uploads",
-  tables: ["attachment"],
+  tables: ["attachment", "upload_setting"],
   migrations: [
     {
       version: 1,
@@ -55,6 +61,18 @@ export const uploadsMigrations: ModuleMigrations = {
           .createIndex("attachment_uploader")
           .on("attachment")
           .columns(["uploader_id", "deleted_at"])
+          .execute();
+      },
+    },
+    {
+      version: 2,
+      name: "upload-settings",
+      async up(db) {
+        await db.schema
+          .createTable("upload_setting")
+          .addColumn("key", "text", (c) => c.primaryKey())
+          .addColumn("value", "integer", (c) => c.notNull())
+          .addColumn("updated_at", "integer", (c) => c.notNull())
           .execute();
       },
     },

@@ -15,6 +15,7 @@ const call = (token: string) => ({
   get: (path: string) => s.request("GET", `/api/v1${path}`, { token }),
   post: (path: string, body?: unknown) => s.request("POST", `/api/v1${path}`, { token, body }),
   put: (path: string, body?: unknown) => s.request("PUT", `/api/v1${path}`, { token, body }),
+  patch: (path: string, body?: unknown) => s.request("PATCH", `/api/v1${path}`, { token, body }),
   del: (path: string) => s.request("DELETE", `/api/v1${path}`, { token }),
 });
 
@@ -363,5 +364,37 @@ describe("module off", () => {
       body: { content: "x", attachmentIds: ["a".repeat(26)] },
     });
     expect(r.body.error.code).toBe("FEATURE_DISABLED");
+  });
+
+  it("lets the owner change the file size and quota limits at runtime, without a restart", async () => {
+    const big = Buffer.alloc(40 * 1024, 1);
+    expect((await upload(ann.token, big, "big.bin", "application/octet-stream")).status).toBe(201);
+
+    const lowered = await call(owner).patch("/admin/uploads", { maxBytes: 8192 });
+    expect(lowered.status).toBe(200);
+    expect(lowered.body.maxBytes).toBe(8192);
+    expect((await upload(ann.token, big, "big2.bin", "application/octet-stream")).status).toBe(413);
+    const caps = (await s.request("GET", "/api/v1/capabilities")).body;
+    expect(caps.features.uploads.maxBytes).toBe(8192);
+    expect(caps.limits.uploadMaxBytes).toBe(8192);
+
+    // Raise the file limit again; a 40 KiB file now fits, a second one does not fit the 50 KiB quota.
+    await call(owner).patch("/admin/uploads", { maxBytes: 64 * 1024, userQuotaBytes: 50 * 1024 });
+    const used = await call(ann.token).get("/users/@me/storage");
+    expect(used.body.quotaBytes).toBe(50 * 1024);
+    const again = await upload(ann.token, big, "again.bin", "application/octet-stream");
+    expect(again.status).toBe(413);
+    expect(again.body.error.code).toBe("QUOTA_EXCEEDED");
+  });
+
+  it("only the owner may read or change the limits, and the ceiling holds", async () => {
+    expect((await call(ann.token).get("/admin/uploads")).status).toBe(403);
+    expect((await call(ann.token).patch("/admin/uploads", { maxBytes: 4096 })).status).toBe(403);
+    const read = await call(owner).get("/admin/uploads");
+    expect(read.status).toBe(200);
+    expect(read.body.ceilingBytes).toBe(512 * 1024 * 1024);
+    expect((await call(owner).patch("/admin/uploads", { maxBytes: 513 * 1024 * 1024 })).status).toBe(400);
+    expect((await call(owner).patch("/admin/uploads", {})).status).toBe(400);
+    expect((await call(owner).patch("/admin/uploads", { maxBytes: 10 })).status).toBe(400);
   });
 });

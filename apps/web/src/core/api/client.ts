@@ -12,6 +12,7 @@ import {
   type Invite,
   type InviteCreate,
   type LoginResponse,
+  type UploadLimits,
   type Member,
   type Message,
   type MessageCreate,
@@ -160,6 +161,9 @@ export const api = {
   }) => request<LoginResponse>("POST", "/auth/setup", { body }),
   renameInstance: (name: string) =>
     request<{ name: string; ownerId: string | null }>("PATCH", "/admin/instance", { body: { name } }),
+  uploadLimits: () => request<UploadLimits>("GET", "/admin/uploads"),
+  setUploadLimits: (body: { maxBytes?: number; userQuotaBytes?: number }) =>
+    request<UploadLimits>("PATCH", "/admin/uploads", { body }),
   sessions: () => request<SessionInfo[]>("GET", "/auth/sessions"),
   revokeSession: (id: string) => request<void>("DELETE", `/auth/sessions/${encodeURIComponent(id)}`),
   changePassword: (currentPassword: string, newPassword: string) =>

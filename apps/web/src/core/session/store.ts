@@ -31,6 +31,8 @@ interface SessionState {
   setupCompleted: (user: User) => void;
   setWizardActive: (active: boolean) => void;
   setInstanceName: (name: string) => void;
+  /** The owner changed the upload limits: the composer's checks follow without a reload. */
+  setUploadLimits: (limits: { maxBytes: number; userQuotaBytes: number }) => void;
 }
 
 let gateway: GatewayClient | null = null;
@@ -160,6 +162,17 @@ export const useSession = create<SessionState>((set, get) => {
     setInstanceName(name) {
       const caps = get().capabilities;
       if (caps) set({ capabilities: { ...caps, server: { ...caps.server, name } } });
+    },
+    setUploadLimits({ maxBytes, userQuotaBytes }) {
+      const caps = get().capabilities;
+      if (!caps) return;
+      set({
+        capabilities: {
+          ...caps,
+          features: { ...caps.features, uploads: { maxBytes, userQuotaBytes } },
+          limits: { ...caps.limits, uploadMaxBytes: maxBytes },
+        },
+      });
     },
   };
 });

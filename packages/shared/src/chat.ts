@@ -142,6 +142,21 @@ export const OwnAttachmentsQuerySchema = z.object({
 });
 export const StorageUsageSchema = z.object({ usedBytes: z.number(), quotaBytes: z.number() });
 
+/** The owner's upload limits, changeable at runtime (`PATCH /admin/uploads`). */
+export const UploadLimitsSchema = z.object({
+  maxBytes: z.number(),
+  userQuotaBytes: z.number(),
+  /** What the server will never exceed for one file, whatever is set. */
+  ceilingBytes: z.number(),
+});
+export const UploadLimitsPatchSchema = z
+  .strictObject({
+    maxBytes: z.number().int().min(1024).optional(),
+    userQuotaBytes: z.number().int().min(0).optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: "Nothing to change." });
+export type UploadLimits = z.infer<typeof UploadLimitsSchema>;
+
 // ---- synced settings -------------------------------------------------------------------------
 
 export const SettingsSchema = z.record(z.string().max(80), z.unknown());

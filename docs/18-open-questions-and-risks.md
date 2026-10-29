@@ -360,3 +360,12 @@ The `voice` module (rooms, tokens from permissions, signed webhook, presence, re
 ### What I need from you (VPS, firewall, people)
 
 See the runbook in [qa/m3.md](qa/m3.md). In short: open **7881/tcp and 7882/udp** (and **5349/tcp and 3478/udp** if you want the relay) in the provider's firewall and the host's; add a second DNS name if you want TURN; update and restart; walk the checklist with another person on another network.
+
+## K. Runtime upload limits (2026-10-29)
+
+The owner can change the largest file and the per-person upload space in **Settings › Server › Uploads**, with no restart (`GET/PATCH /admin/uploads`, owner only). The values are stored in the `upload_setting` table (uploads migration 2) and override `uploads.maxBytes` / `uploads.userQuotaBytes` from the config file, which stay the starting values. `/capabilities` reports the values in force, so the composer's own size check follows without a reload.
+
+- **Ceiling.** One file is capped at 512 MiB whatever is set, because uploads are held in memory while they are checked and thumbnailed. Raise the ceiling only together with streaming uploads to disk.
+- **Lowering never deletes.** A smaller quota only blocks further uploads; existing files stay.
+- **Proxy.** Caddy has no request-size limit in the generated Caddyfile, so nothing else needs changing for larger files.
+- **Not covered by a test:** survival across a server restart (the test harness starts from an empty data directory). Checked by hand on mkarl.io, see the deploy notes below if that is run.
