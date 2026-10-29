@@ -5,3 +5,4 @@ export * from "./protocol.js";
 export * from "./capabilities.js";
 export * from "./accounts.js";
 export * from "./password-policy.js";
+export * from "./permissions.js";
