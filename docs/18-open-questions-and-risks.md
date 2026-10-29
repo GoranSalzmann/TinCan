@@ -368,4 +368,4 @@ The owner can change the largest file and the per-person upload space in **Setti
 - **Ceiling.** One file is capped at 512 MiB whatever is set, because uploads are held in memory while they are checked and thumbnailed. Raise the ceiling only together with streaming uploads to disk.
 - **Lowering never deletes.** A smaller quota only blocks further uploads; existing files stay.
 - **Proxy.** Caddy has no request-size limit in the generated Caddyfile, so nothing else needs changing for larger files.
-- **Not covered by a test:** survival across a server restart (the test harness starts from an empty data directory). Checked by hand on mkarl.io, see the deploy notes below if that is run.
+- **Not covered by a test:** survival across a server restart (the test harness starts from an empty data directory). Checked by hand on mkarl.io on 2026-10-29: 500 MB saved in the settings, the app container restarted, `/capabilities` still reported 500 MB.
