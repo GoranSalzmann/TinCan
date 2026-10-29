@@ -62,7 +62,7 @@ heartbeat/resume), web shell (auth gate, layout, theme, i18n scaffold), Docker
 compose with Caddy + app (+ LiveKit placeholder), `tincan init/doctor` v0.
 **Exit:** you can deploy to a VPS, create the owner, log in on web, see an
 empty layout; CI green; module boot matrix test exists.
-**Status (2026-10-28): built and confirmed by you.** CI green on `main`. Demo checklist in [qa/m1.md](qa/m1.md); cuts and deferrals in 18 §H. Not yet done: a run on a real VPS with a domain (needs you).
+**Status (2026-10-28): built and confirmed by you.** CI green on `main`. Demo checklist in [qa/m1.md](qa/m1.md); cuts and deferrals in 18 §H. First run on a real VPS (mkarl.io, Ubuntu + Docker, Let's Encrypt) done 2026-10-29; it found one bug (empty `email` in the generated Caddyfile), fixed in `a52a1d3`. Ports for voice (7881, UDP range, 5349) are still unopened and untested.
 
 ### M2. Text chat
 Channels/categories, roles + permission engine + overwrites, invites + register,
