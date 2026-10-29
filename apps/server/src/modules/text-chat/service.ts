@@ -574,8 +574,20 @@ export class TextChatService {
     return r !== undefined;
   }
 
-  async documents(afterId: string | null, limit: number): Promise<SearchDocument[]> {
+  async existingIds(ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
     const rows = await this.#d.db.query
+      .selectFrom("message")
+      .select("id")
+      .where("id", "in", [...ids])
+      .where("deleted_at", "is", null)
+      .execute();
+    return new Set(rows.map((r) => r.id));
+  }
+
+  async documents(afterId: string | null, limit: number, tx?: Db<unknown>): Promise<SearchDocument[]> {
+    const db = tx ? tx.as<TextChatTables>() : this.#d.db;
+    const rows = await db.query
       .selectFrom("message")
       .select(["id", "channel_id", "author_id", "content"])
       .where("deleted_at", "is", null)

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Db } from "@tincan/db";
 import type { Message } from "@tincan/shared";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the caller's transaction, narrowed here
+type AnyDb = Db<any>;
 
 export interface SearchDocument {
   id: string;
@@ -24,8 +28,13 @@ export interface TextChatApi {
   ): Promise<Map<string, number>>;
   /** True when the message exists in that channel and is not deleted. */
   messageExists(channelId: string, messageId: string): Promise<boolean>;
-  /** Live messages after `afterId` in ID order, for `search reindex`. */
-  documents(afterId: string | null, limit: number): Promise<SearchDocument[]>;
+  /**
+   * Live messages after `afterId` in ID order, for `search reindex`. Pass the caller's transaction to
+   * read inside it, so a document is never queued after a newer edit has already been indexed.
+   */
+  documents(afterId: string | null, limit: number, tx?: AnyDb): Promise<SearchDocument[]>;
+  /** The subset of `ids` that are live messages. */
+  existingIds(ids: readonly string[]): Promise<Set<string>>;
   /** The text that goes into the search index for a message. */
   searchText(content: string): string;
 }

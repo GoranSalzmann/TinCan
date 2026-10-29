@@ -14,6 +14,7 @@ import {
 } from "kysely";
 import { flatten, plan, runMigrations } from "./migrations.js";
 import type { Db, MigrateOptions, ModuleMigrations, PendingMigration } from "./port.js";
+import { ReadWorker } from "./read-worker.js";
 import { snapshotInWorker } from "./snapshot-worker.js";
 
 /**
@@ -95,6 +96,11 @@ class SqliteTx<T> implements Db<T> {
   snapshot(): Promise<void> {
     return Promise.reject(new Error("Db: snapshot() cannot run inside a transaction"));
   }
+  readOnly(): Promise<never[]> {
+    return Promise.reject(
+      new Error("Db: readOnly() runs on another connection; call it outside the transaction"),
+    );
+  }
   close(): Promise<void> {
     return Promise.reject(new Error("Db: close() cannot run inside a transaction"));
   }
@@ -109,6 +115,7 @@ class SqliteDb<T = unknown> implements Db<T> {
   #closed = false;
 
   readonly #raw: Database.Database;
+  #reader: ReadWorker | null = null;
 
   constructor(kysely: Kysely<T>, path: string, raw: Database.Database) {
     this.#kysely = kysely;
@@ -168,6 +175,13 @@ class SqliteDb<T = unknown> implements Db<T> {
     await snapshotInWorker(this.#path, destPath);
   }
 
+  readOnly<R = Record<string, unknown>>(statement: string, params: readonly unknown[] = []): Promise<R[]> {
+    if (this.#path === ":memory:")
+      return Promise.reject(new Error("Db: an in-memory database has no read worker"));
+    this.#reader ??= new ReadWorker(this.#path);
+    return this.#reader.query<R>(statement, params);
+  }
+
   async health(): Promise<void> {
     await this.#kysely.selectNoFrom((eb) => eb.val(1).as("ok")).execute();
   }
@@ -175,6 +189,7 @@ class SqliteDb<T = unknown> implements Db<T> {
   async close(): Promise<void> {
     if (this.#closed) return;
     this.#closed = true;
+    await this.#reader?.close();
     await this.#kysely.destroy();
     // Kysely only closes a database it has opened a connection on; close ours either way.
     if (this.#raw.open) this.#raw.close();

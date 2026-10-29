@@ -7,6 +7,7 @@ import { AppError } from "@tincan/shared";
 import { boot, createLogger } from "./boot.js";
 import { cliSetup, configCheck, moduleList, userCreate } from "./cli/admin.js";
 import { formatReport, runDoctor } from "./cli/doctor.js";
+import { permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
 import { runInit } from "./cli/init.js";
 import { ConfigError } from "./config/errors.js";
 import { loadConfig } from "./config/load.js";
@@ -23,6 +24,9 @@ Usage: tincan [admin] <command> [options]
   module list             Show enabled and disabled modules
   setup                   Create the owner from the command line (instead of the browser)
   user create             Add a member (the owner must exist)
+  user reset-password     Print a one-time password-reset code for a user (or --owner)
+  search reindex          Rebuild the search index from the messages, online
+  perms explain           Show how a member's permissions in a channel come about
   version
 
 Common options:
@@ -31,6 +35,8 @@ Common options:
 init:    --dir <dir> --domain <host> [--email <addr>] [--name <community>] [--http-port <n>] [--yes] [--force]
 setup:   --username <name> [--display-name <name>] [--instance-name <name>] [--password-stdin]
 user create: --username <name> [--display-name <name>] [--password-stdin]
+user reset-password: --username <name> | --owner
+perms explain: --user <username> --channel <name or id>
 doctor:  [--url <public url>]
 `;
 
@@ -58,6 +64,9 @@ async function main(argv: string[]): Promise<number> {
       "instance-name": { type: "string" },
       "password-stdin": { type: "boolean" },
       url: { type: "string" },
+      owner: { type: "boolean" },
+      user: { type: "string" },
+      channel: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -138,7 +147,36 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    case "search": {
+      if (sub !== "reindex") throw new Error("Usage: tincan search reindex");
+      console.log(await searchReindex(loadConfig(configPath(values.config))));
+      return 0;
+    }
+
+    case "perms": {
+      if (sub !== "explain" || !values.user || !values.channel)
+        throw new Error("Usage: tincan perms explain --user <username> --channel <name or id>");
+      console.log(
+        await permsExplain(loadConfig(configPath(values.config)), {
+          user: values.user,
+          channel: values.channel,
+        }),
+      );
+      return 0;
+    }
+
     case "user": {
+      if (sub === "reset-password") {
+        if (!values.owner && !values.username)
+          throw new Error("Usage: tincan user reset-password --username <name> | --owner");
+        console.log(
+          await resetPassword(loadConfig(configPath(values.config)), {
+            ...(values.username ? { username: values.username } : {}),
+            owner: values.owner ?? false,
+          }),
+        );
+        return 0;
+      }
       if (sub !== "create" || !values.username)
         throw new Error(
           "Usage: tincan user create --username <name> [--display-name <name>] [--password-stdin]",

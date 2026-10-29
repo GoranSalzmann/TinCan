@@ -85,7 +85,8 @@ export default defineModule({
       latestMessageIds: (ids) => svc.latestMessageIds(ids),
       mentionCounts: (u, r, e) => svc.mentionCounts(u, r, e),
       messageExists: (c, m) => svc.messageExists(c, m),
-      documents: (after, limit) => svc.documents(after, limit),
+      documents: (after, limit, tx) => svc.documents(after, limit, tx),
+      existingIds: (ids) => svc.existingIds(ids),
       searchText,
     };
     ctx.api.provide("text-chat", api);

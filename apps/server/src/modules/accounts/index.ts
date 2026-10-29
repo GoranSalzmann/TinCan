@@ -128,6 +128,15 @@ export default defineModule({
       async ownerId() {
         return (await spaceOf(db))?.ownerId ?? null;
       },
+      async userIdByUsername(username) {
+        const row = await db.query
+          .selectFrom("user")
+          .select("id")
+          .where("username", "=", username.toLowerCase())
+          .executeTakeFirst();
+        return row?.id ?? null;
+      },
+      issueResetCode: (userId) => svc.createResetCode(userId, null),
       listMembers: () => listMembers(db),
       getMember: (id) => getMember(db, id),
       memberCount: () => memberCount(db),

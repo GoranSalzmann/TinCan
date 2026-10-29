@@ -219,7 +219,10 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     gw.ringBufferEvents === undefined ? {} : { ringBufferEvents: gw.ringBufferEvents },
   );
   const outbox = new Outbox(ports.db, logger.child({ module: "outbox" }));
-  scheduler.every("outbox.drain", 1000, async () => void (await outbox.drain()), { jitter: 0 });
+  scheduler.every("outbox.drain", 1000, async () => void (await outbox.drain()), {
+    jitter: 0,
+    runOnStart: true,
+  });
   const security: SecurityState = { authenticator: null, gates: [] };
   const apis = new ApiMap();
 

@@ -62,6 +62,9 @@ export interface AccountsApi {
   /** The one space's ID, or null before setup. */
   spaceId(): Promise<string | null>;
   ownerId(): Promise<string | null>;
+  userIdByUsername(username: string): Promise<string | null>;
+  /** One-time password-reset code without an authorisation check: for the admin CLI, where being on the host is the authority (11 §1.6). */
+  issueResetCode(userId: string): Promise<{ code: string; expiresAt: Date }>;
   listMembers(): Promise<MemberRecord[]>;
   getMember(userId: string): Promise<MemberRecord | null>;
   memberCount(): Promise<number>;

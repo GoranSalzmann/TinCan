@@ -11,6 +11,7 @@ export const OWNER = { username: "mika", displayName: "Mika", password: "correct
 
 export interface TestServer {
   running: RunningApp;
+  config: CoreConfig;
   dir: string;
   url: string;
   wsUrl: string;
@@ -118,6 +119,7 @@ export async function startTestServer(
 
   const server: TestServer = {
     running,
+    config,
     dir,
     url,
     wsUrl,

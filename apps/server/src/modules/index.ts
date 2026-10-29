@@ -3,6 +3,7 @@ import type { AnyManifest } from "../framework/types.js";
 import accounts from "./accounts/index.js";
 import channels from "./channels/index.js";
 import core from "./core/index.js";
+import search from "./search/index.js";
 import uploads from "./uploads/index.js";
 import invites from "./invites/index.js";
 import readState from "./read-state/index.js";
@@ -22,4 +23,5 @@ export const ALL_MODULES: readonly AnyManifest[] = [
   readState,
   invites,
   uploads,
+  search,
 ];
