@@ -471,7 +471,6 @@
   "voice.call.title": "{name} · {count, plural, one {# person} other {# people}}",
   "voice.call.empty": "Nobody is here yet.",
   "voice.call.join": "Join voice",
-  "voice.call.back": "Back to text",
   "voice.call.notVoice": "This is not a voice channel.",
   "voice.volume.boosted": "{percent}% (boosted)",
   "voice.volume": "Volume for {name}",

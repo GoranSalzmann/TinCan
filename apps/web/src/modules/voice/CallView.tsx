@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ArrowLeft, Phone } from "lucide-react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Phone } from "lucide-react";
+import { Navigate, useParams } from "react-router-dom";
 import { useT } from "../../core/i18n/index.js";
 import { useCanIn, useCommunity } from "../../core/state/community.js";
 import { joinVoice, setPlaybackVolume } from "../../core/voice/actions.js";
@@ -24,7 +24,6 @@ export function CallView() {
 
   if (ready && (!channel || channel.type !== "voice")) return <Navigate to="/" replace />;
   if (!channel) return null;
-  const lastText = useCommunity.getState().channels.find((c) => c.type === "text");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -32,12 +31,6 @@ export function CallView() {
         <h1 className="m-0 min-w-0 flex-1 truncate text-lg font-semibold">
           <bdi>{t("voice.call.title", { name: channel.name, count: people.length })}</bdi>
         </h1>
-        {lastText ? (
-          <Link to={`/channels/${lastText.id}`} className="flex items-center gap-1 text-sm no-underline">
-            <ArrowLeft aria-hidden="true" size={14} />
-            {t("voice.call.back")}
-          </Link>
-        ) : null}
       </header>
       <div className="flex-1 overflow-y-auto p-4">
         {people.length === 0 ? <p className="text-text-muted">{t("voice.call.empty")}</p> : null}
