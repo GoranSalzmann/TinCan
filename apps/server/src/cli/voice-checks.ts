@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { existsSync } from "node:fs";
 import { connect as tcpConnect } from "node:net";
 import { connect as tlsConnect, type PeerCertificate } from "node:tls";
 import { lookup } from "node:dns/promises";
@@ -13,9 +14,14 @@ import type { CheckResult } from "./doctor.js";
  * they did prove and print the command to run from another machine (14 §3).
  */
 
-/** The compose file hands the app `host.docker.internal`; on the host that name is not resolvable, loopback is. */
-export function apiUrlOnHost(apiUrl: string): string {
-  return apiUrl.replace("://host.docker.internal", "://127.0.0.1");
+/** Inside the container `host.docker.internal` resolves (extra_hosts), so the URL is used as is; on the host loopback is the same server. */
+export function apiUrlOnHost(apiUrl: string, container: boolean = inContainer()): string {
+  return container ? apiUrl : apiUrl.replace("://host.docker.internal", "://127.0.0.1");
+}
+
+/** True inside a container (Docker creates /.dockerenv, Podman /run/.containerenv). */
+export function inContainer(exists: (p: string) => boolean = existsSync): boolean {
+  return exists("/.dockerenv") || exists("/run/.containerenv");
 }
 
 export function certDaysLeft(validTo: string, now = Date.now()): number {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import { resolveDataDir } from "./doctor.js";
-import { apiUrlOnHost, decideTurnReload } from "./voice-checks.js";
+import { apiUrlOnHost, decideTurnReload, inContainer } from "./voice-checks.js";
 
 describe("resolveDataDir", () => {
   const only =
@@ -51,7 +51,17 @@ describe("TURN certificate reload (18 T30)", () => {
 
 describe("apiUrlOnHost", () => {
   it("maps the container's host gateway name to loopback for the CLI on the host", () => {
-    expect(apiUrlOnHost("http://host.docker.internal:7880")).toBe("http://127.0.0.1:7880");
-    expect(apiUrlOnHost("http://10.0.0.5:7880")).toBe("http://10.0.0.5:7880");
+    expect(apiUrlOnHost("http://host.docker.internal:7880", false)).toBe("http://127.0.0.1:7880");
+    expect(apiUrlOnHost("http://10.0.0.5:7880", false)).toBe("http://10.0.0.5:7880");
+  });
+
+  it("keeps the configured URL inside a container, where the name resolves", () => {
+    expect(apiUrlOnHost("http://host.docker.internal:7880", true)).toBe("http://host.docker.internal:7880");
+  });
+
+  it("detects a container by its marker files", () => {
+    expect(inContainer((p) => p === "/.dockerenv")).toBe(true);
+    expect(inContainer((p) => p === "/run/.containerenv")).toBe(true);
+    expect(inContainer(() => false)).toBe(false);
   });
 });
