@@ -85,7 +85,7 @@ PTT in-window), connectivity diagnostics, TURN configured,
 **Exit:** friends can talk in voice channels from the web client with good audio;
 reconnect works; the 3-person media test passes in CI.
 **This is the dogfooding start.**
-**Status (2026-10-29): built; not yet confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: moved to M4 (your decision, 2026-10-29).** Needs from you: open the voice ports, walk [qa/m3.md](qa/m3.md) on the VPS with another person, listen to the mic test. Deployed on mkarl.io 2026-10-29 with 7881/tcp and 7882/udp open; no call made yet.
+**Status (2026-10-29): built, deployed on mkarl.io and confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: moved to M4 (your decision, 2026-10-29).** Fixed after your first real calls: right ear silent with RNNoise (`d8b5637`), per-person volume up to 300 % (`5f00fed`), local speaking ring (`dd77bc3`), "Back to text" removed (`ce11038`). Still open: TURN/TLS relay (needs a second DNS name and ports 5349/tcp and 3478/udp) and the test from a network that blocks UDP, a phone and other browsers, the spike D1 load numbers on the VPS, D4 on real hardware (closes T33). This is the dogfooding start.
 
 ### M4. Video, screenshare, desktop polish
 First: the minimal Electron shell (window, secure bridge, keychain, instance entry, installers unsigned).
