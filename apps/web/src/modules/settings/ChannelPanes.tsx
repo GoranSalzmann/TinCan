@@ -99,12 +99,12 @@ function VideoLimitsCard() {
   const cameraKbps = Math.round(Number(camera) * 1000);
   const shareKbps = Math.round(Number(share) * 1000);
   const cameraError =
-    camera === "" || !Number.isFinite(cameraKbps) || cameraKbps < 150 || cameraKbps > 8000
-      ? t("settings.video.range", { min: 0.15, max: 8 })
+    camera === "" || !Number.isFinite(cameraKbps) || cameraKbps < 150 || cameraKbps > 25_000
+      ? t("settings.video.range", { min: 0.15, max: 25 })
       : null;
   const shareError =
-    share === "" || !Number.isFinite(shareKbps) || shareKbps < 300 || shareKbps > 20_000
-      ? t("settings.video.range", { min: 0.3, max: 20 })
+    share === "" || !Number.isFinite(shareKbps) || shareKbps < 300 || shareKbps > 60_000
+      ? t("settings.video.range", { min: 0.3, max: 60 })
       : null;
 
   return (
@@ -123,7 +123,7 @@ function VideoLimitsCard() {
         label={t("settings.video.screenshare")}
         type="number"
         min={0.3}
-        max={20}
+        max={60}
         step="any"
         value={share}
         onChange={(e) => setShare(e.target.value)}
@@ -134,7 +134,7 @@ function VideoLimitsCard() {
         label={t("settings.video.camera")}
         type="number"
         min={0.15}
-        max={8}
+        max={25}
         step="any"
         value={camera}
         onChange={(e) => setCamera(e.target.value)}

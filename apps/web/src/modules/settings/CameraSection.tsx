@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useRef, useState } from "react";
-import { useT, type MessageKey } from "../../core/i18n/index.js";
+import { useT } from "../../core/i18n/index.js";
 import { applyCameraPrefs } from "../../core/voice/actions.js";
 import { useDevices } from "../../core/voice/devices.js";
-import { useVoice } from "../../core/voice/store.js";
-import { allowedByCap, CAMERA_PRESETS, uploadKbps, useVideoPrefs } from "../../core/voice/video.js";
+import { useVideoPrefs } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
-import { mbps } from "../voice/ShareDialog.js";
+import { QualityControls } from "../voice/QualityControls.js";
 
 /** Camera device, quality and auto-watch (W-21 video part, 08 §5.2). Changes apply live when the camera is on. */
 export function CameraSection() {
   const t = useT();
   const devices = useDevices();
   const { prefs, set } = useVideoPrefs();
-  const cap = useVoice((s) => s.caps.cameraKbps);
   const [preview, setPreview] = useState(false);
   const [failed, setFailed] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const select = "min-h-8 rounded-md border border-border-control bg-bg-input px-2";
-  const chosen = CAMERA_PRESETS.find((p) => p.id === prefs.cameraPreset) ?? CAMERA_PRESETS[1]!;
 
   const change = (patch: Partial<typeof prefs>) => {
-    const prev = { deviceId: prefs.cameraDeviceId, preset: prefs.cameraPreset };
+    const prev = prefs;
     set(patch);
     void applyCameraPrefs(prev);
   };
@@ -68,26 +65,8 @@ export function CameraSection() {
             </option>
           ))}
         </select>
-        <label htmlFor="cam-preset">{t("video.pane.preset")}</label>
-        <div className="flex flex-col gap-1">
-          <select
-            id="cam-preset"
-            className={select}
-            value={chosen.id}
-            onChange={(e) => change({ cameraPreset: e.target.value })}
-          >
-            {CAMERA_PRESETS.map((p) => (
-              <option key={p.id} value={p.id} disabled={!allowedByCap(p, cap)}>
-                {t(`video.preset.camera.${p.id}` as MessageKey)}
-                {allowedByCap(p, cap) ? "" : ` – ${t("video.preset.notAllowed")}`}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-text-muted">
-            {t("video.pane.upload", { mbps: mbps(uploadKbps(chosen)) })}
-          </span>
-        </div>
       </div>
+      <QualityControls source="camera" onChanged={(prev) => void applyCameraPrefs(prev)} />
       <label className="flex items-center gap-2">
         <input
           type="checkbox"

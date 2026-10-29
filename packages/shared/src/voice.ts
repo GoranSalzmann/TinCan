@@ -56,8 +56,8 @@ export type VoiceJoinResponse = z.infer<typeof VoiceJoinResponseSchema>;
 export const VideoLimitsSchema = z.object({ cameraMaxKbps: z.number(), screenshareMaxKbps: z.number() });
 export const VideoLimitsPatchSchema = z
   .strictObject({
-    cameraMaxKbps: z.number().int().min(150).max(8000).optional(),
-    screenshareMaxKbps: z.number().int().min(300).max(20_000).optional(),
+    cameraMaxKbps: z.number().int().min(150).max(25_000).optional(),
+    screenshareMaxKbps: z.number().int().min(300).max(60_000).optional(),
   })
   .refine((o) => Object.keys(o).length > 0, { message: "Nothing to change." });
 export type VideoLimits = z.infer<typeof VideoLimitsSchema>;

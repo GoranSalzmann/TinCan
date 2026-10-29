@@ -20,9 +20,11 @@ const ConfigSchema = z.strictObject({
   /** Join tokens only have to survive connecting; LiveKit refreshes them for a live session (D1). */
   tokenTtlSecs: z.number().int().min(30).max(3600).default(600),
   /** 08 §5.2: camera 720p30 top layer is 1.2-1.7 Mbps; the screen share cap is the Host's lever on egress (08 §5.5). */
-  camera: z.strictObject({ maxBitrateKbps: z.number().int().min(150).max(8000).default(1700) }).prefault({}),
+  camera: z
+    .strictObject({ maxBitrateKbps: z.number().int().min(150).max(25_000).default(1700) })
+    .prefault({}),
   screenshare: z
-    .strictObject({ maxBitrateKbps: z.number().int().min(300).max(20_000).default(6000) })
+    .strictObject({ maxBitrateKbps: z.number().int().min(300).max(60_000).default(6000) })
     .prefault({}),
   emptyTimeoutSecs: z.number().int().min(10).max(3600).default(60),
   departureTimeoutSecs: z.number().int().min(5).max(120).default(20),

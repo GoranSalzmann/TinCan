@@ -1,7 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
 import type { VoiceParticipant } from "@tincan/shared";
-import type { StreamQuality } from "./video.js";
+import type { StreamQuality, VideoCodecName } from "./video.js";
+
+/** What was asked of the encoder for a camera or a share (video.ts `resolveVideo`), kept for the UI. */
+export interface SpecInfo {
+  preset: string;
+  width: number;
+  height: number;
+  fps: number;
+  kbps: number;
+  wantedKbps: number;
+  uploadKbps: number;
+  codec: VideoCodecName;
+  cappedByServer: boolean;
+}
+
+/** What the browser really delivers and sends, from the track settings and the sender statistics (08 §5.2). */
+export interface ActualInfo {
+  captureWidth: number;
+  captureHeight: number;
+  captureFps: number;
+  sentWidth: number;
+  sentHeight: number;
+  sentFps: number;
+  /** `cpu`, `bandwidth` or `none` (RTCStats qualityLimitationReason). */
+  limit: string;
+}
 
 export type VoiceStatus = "idle" | "connecting" | "connected" | "reconnecting" | "failed";
 export type Quality = "excellent" | "good" | "poor" | "lost" | "unknown";
@@ -42,6 +67,8 @@ interface VoiceState {
   /** Video (M4). Stream keys are `userId:camera` and `userId:screen` (video.ts). */
   cameraOn: boolean;
   screenOn: boolean;
+  cameraSpec: SpecInfo | null;
+  actual: { camera: ActualInfo | null; screen: ActualInfo | null };
   /** What the server lets this person publish right now; follows permission changes mid-call. */
   canCamera: boolean;
   canScreen: boolean;
@@ -59,6 +86,7 @@ interface VoiceState {
     hint: "detail" | "motion";
     audio: boolean;
     surface: "monitor" | "window" | "browser" | null;
+    spec: SpecInfo | null;
   } | null;
   /** The one-time "the sharer can see that you're watching" notice (U15, W-14): shown for this person. */
   watchNotice: string | null;
@@ -83,6 +111,8 @@ const initial = {
   transport: null as "udp" | "tcp" | "relay" | null,
   cameraOn: false,
   screenOn: false,
+  cameraSpec: null as SpecInfo | null,
+  actual: { camera: null, screen: null } as VoiceState["actual"],
   canCamera: false,
   canScreen: false,
   watching: {} as Record<string, true>,

@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 import {
   allowedByCap,
+  autoKbps,
   CAMERA_PRESETS,
+  deriveLayers,
+  pickCodec,
+  resolveVideo,
+  sanitizeCustom,
+  widthOf,
   decodeWatching,
   encodeWatching,
   parseStreamKey,
@@ -62,5 +68,129 @@ describe("video state", () => {
     expect(s.watching).toEqual({});
     expect(s.cameraOn).toBe(false);
     expect(applyVoiceUpdate({}, { channelId: "c", userId: "u", joined: false })).toEqual({});
+  });
+});
+
+describe("custom resolution, frame rate and bitrate", () => {
+  const none = { vp9: false, av1Hardware: false };
+  const vp9 = { vp9: true, av1Hardware: false };
+
+  it("wants about what the presets use for the same size and rate", () => {
+    expect(autoKbps(1280, 720, 30)).toBe(1650); // camera preset 1700
+    expect(autoKbps(1920, 1080, 30)).toBe(3750); // screen preset 3500
+    expect(autoKbps(1920, 1080, 60)).toBe(6050); // screen preset 6000
+    expect(autoKbps(1280, 720, 15)).toBe(1000); // screen preset 1000
+    expect(autoKbps(widthOf(2160), 2160, 60)).toBeGreaterThan(autoKbps(widthOf(2160), 2160, 30));
+    expect(autoKbps(1920, 1080, 30, "vp9")).toBeLessThan(autoKbps(1920, 1080, 30));
+    expect(autoKbps(320, 180, 5)).toBeGreaterThanOrEqual(100);
+  });
+
+  it("keeps VP8 up to 1080p30 and uses a better codec above it only where the browser has one", () => {
+    expect(pickCodec(1080, 30, vp9)).toBe("vp8");
+    expect(pickCodec(1080, 60, vp9)).toBe("vp9");
+    expect(pickCodec(2160, 30, vp9)).toBe("vp9");
+    expect(pickCodec(1440, 30, none)).toBe("vp8");
+    expect(pickCodec(2160, 30, { vp9: true, av1Hardware: true })).toBe("av1");
+    expect(pickCodec(720, 60, { vp9: true, av1Hardware: true })).toBe("av1");
+  });
+
+  it("replaces stored values that are not offered, and fills in a missing custom setting", () => {
+    expect(sanitizeCustom(undefined, "screen")).toEqual({ height: 1080, fps: 30, bitrateKbps: null });
+    expect(sanitizeCustom({ height: 999, fps: 7, bitrateKbps: -4 }, "camera")).toEqual({
+      height: 720,
+      fps: 30,
+      bitrateKbps: null,
+    });
+    expect(sanitizeCustom({ height: 2160, fps: 60, bitrateKbps: 30_000.4 }, "screen")).toEqual({
+      height: 2160,
+      fps: 60,
+      bitrateKbps: 30_000,
+    });
+  });
+
+  it("leaves a preset as it was", () => {
+    const r = resolveVideo("screen", "standard", { height: 2160, fps: 60, bitrateKbps: null }, 6000)!;
+    expect(r.custom).toBe(false);
+    expect(r.preset).toBe(SCREEN_PRESETS[1]);
+    expect(r.codec).toBe("vp8");
+    expect(
+      resolveVideo("screen", "smooth", { height: 720, fps: 30, bitrateKbps: null }, 4000)!.preset.id,
+    ).toBe("standard");
+  });
+
+  it("uses the automatic bitrate for a custom setting that fits the cap", () => {
+    const r = resolveVideo("camera", "custom", { height: 1080, fps: 30, bitrateKbps: null }, 25_000, none)!;
+    expect(r.custom).toBe(true);
+    expect(r.kbps).toBe(r.wantedKbps);
+    expect(r.cappedByServer).toBe(false);
+    expect(r.preset).toMatchObject({ id: "custom", width: 1920, height: 1080, fps: 30 });
+  });
+
+  it("clamps to the cap, says so, and offers the highest resolution that fits", () => {
+    const r = resolveVideo("screen", "custom", { height: 2160, fps: 30, bitrateKbps: null }, 6000, none)!;
+    expect(r.kbps).toBe(6000);
+    expect(r.wantedKbps).toBe(14_950);
+    expect(r.cappedByServer).toBe(true);
+    expect(r.fitHeight).toBe(1080);
+    // Not capped when the cap is only a little under what is wanted.
+    expect(
+      resolveVideo("screen", "custom", { height: 1080, fps: 30, bitrateKbps: null }, 3500, none)!
+        .cappedByServer,
+    ).toBe(false);
+    // A manual value above the cap is also clamped; one below it is the person's choice.
+    const manual = resolveVideo(
+      "screen",
+      "custom",
+      { height: 1080, fps: 30, bitrateKbps: 9000 },
+      3000,
+      none,
+    )!;
+    expect(manual.kbps).toBe(3000);
+    const low = resolveVideo("screen", "custom", { height: 1080, fps: 30, bitrateKbps: 1000 }, 6000, none)!;
+    expect(low).toMatchObject({ kbps: 1000, lowByChoice: true, cappedByServer: false });
+    // Nothing fits: no suggestion.
+    expect(
+      resolveVideo("camera", "custom", { height: 360, fps: 60, bitrateKbps: null }, 150, none)!.fitHeight,
+    ).toBeNull();
+  });
+
+  it("warns for 4K and 60 fps", () => {
+    expect(
+      resolveVideo("screen", "custom", { height: 2160, fps: 30, bitrateKbps: null }, 60_000, none)!.heavy,
+    ).toBe(true);
+    expect(
+      resolveVideo("screen", "custom", { height: 1080, fps: 60, bitrateKbps: null }, 60_000, none)!.heavy,
+    ).toBe(true);
+    expect(
+      resolveVideo("screen", "custom", { height: 1080, fps: 30, bitrateKbps: null }, 60_000, none)!.heavy,
+    ).toBe(false);
+  });
+
+  it("derives lower layers, each smaller and cheaper than the one above", () => {
+    const cam = resolveVideo(
+      "camera",
+      "custom",
+      { height: 1080, fps: 60, bitrateKbps: null },
+      25_000,
+      none,
+    )!.preset;
+    expect(cam.layers.map((l) => l.height)).toEqual([270, 540]); // smallest first
+    expect(cam.layers.map((l) => l.fps)).toEqual([15, 30]);
+    expect(cam.layers[1]!.kbps).toBeLessThan(cam.kbps);
+    expect(cam.layers[0]!.kbps).toBeLessThan(cam.layers[1]!.kbps);
+    expect(deriveLayers("camera", 640, 360, 30, 600).map((l) => l.height)).toEqual([180]);
+    expect(deriveLayers("screen", 1280, 720, 15, 1000)).toEqual([]);
+    expect(deriveLayers("screen", 1920, 1080, 30, 3500).map((l) => l.height)).toEqual([540]);
+    expect(deriveLayers("screen", 3840, 2160, 30, 15_000).map((l) => l.height)).toEqual([540, 1080]);
+  });
+
+  it("publishes a scalable codec as one encoding, so the upload is the top bitrate", () => {
+    const svc = resolveVideo("screen", "custom", { height: 2160, fps: 30, bitrateKbps: null }, 60_000, vp9)!;
+    expect(svc.codec).toBe("vp9");
+    expect(svc.preset.svc).toBe(true);
+    expect(svc.preset.layers).toEqual([]);
+    expect(uploadKbps(svc.preset)).toBe(svc.kbps);
+    const sim = resolveVideo("screen", "custom", { height: 1080, fps: 30, bitrateKbps: null }, 60_000, vp9)!;
+    expect(uploadKbps(sim.preset)).toBeGreaterThan(sim.kbps);
   });
 });

@@ -129,6 +129,10 @@ Camera: 720p@30 default (≈1.2–1.7 Mbps top layer) with 3 simulcast layers
 (720/360/180), because camera tiles are often small. Camera and screen both
 active add up; the UI shows the estimated upload.
 
+#### Custom setting (camera and screen share)
+
+Next to the presets, **Custom** offers resolution (360p, 480p, 720p, 1080p, 1440p, 2160p/4K at 16:9), frame rate (5, 10, 15, 24, 30, 60) and bitrate. Choosing a preset fills the controls; editing a control switches to Custom with the values shown. The bitrate is **Auto for this resolution and frame rate** unless a value is typed: about 0.06 bit per pixel at 30 fps, a little less per pixel as the rate rises (`autoKbps`: 720p30 1.65 Mbit/s, 1080p30 3.75, 1080p60 6.05, 1440p30 6.65, 2160p30 14.95, 2160p60 24.2, before the codec factor below). The effective bitrate is `min(chosen, cap)`, where the cap is the lower of the server's and the channel's (the join response carries the result). **The caps may be set up to 60 Mbit/s (screen share) and 25 Mbit/s (camera)**; the defaults stay at 6 and 1.7. When the setting wants more than the cap the UI says "Capped to X Mbit/s by the server or channel, expect blockiness" and offers the highest resolution that fits at the same frame rate. Lower simulcast layers are derived: half and quarter size at 30 and 15 fps at most, each at no more than half and a quarter of the top bitrate (cameras from 360p; screen shares get a half layer from 1080p and a quarter layer at 4K). The sharing bar shows what was asked for and, from the track settings and the sender statistics, what the browser captures and what the encoder sends.
+
 ### 5.3 Codec choice
 | Codec | Use | Notes |
 |---|---|---|
@@ -136,6 +140,8 @@ active add up; the UI shows the estimated upload.
 | H.264 | Hardware encode on many laptops; good compatibility | Simulcast + hardware encode varies; offer as option |
 | VP9 | Better quality per bit, SVC (scalable) in Chromium | CPU heavier; try for screenshare when both ends support |
 | AV1 | Best compression, screen-content tools | Encode cost high; hardware encode only on newer GPUs; opt-in "experimental" |
+> **As built in M4 follow-up.** Presets and any custom setting up to 1080p30 stay on **VP8 simulcast**. A custom setting above that (1440p and 4K, or above 30 fps) uses **VP9 as one scalable encoding** (the SDK's default `L3T3_KEY`, the SFU and dynacast handle its spatial layers like simulcast layers), or **AV1 only where `MediaCapabilities.encodingInfo` reports hardware encoding**; the SDK's default backup codec policy publishes a VP8 stream for a viewer that cannot decode the primary codec. Bitrates for VP9 are 0.75 and for AV1 0.65 of the VP8 figure. The SDK forces `contentHint: motion` for screen shares with a scalable codec, so "Text and detail" has no effect on them. See 18 §K.
+
 Strategy: `videoCodec: vp8` with `backupCodec` for broad compatibility in v1;
 codec preference configurable per Host; revisit VP9/AV1 SVC after spike D4 (E2EE + SVC interplay).
 
@@ -218,6 +224,8 @@ Permission changes during a call are applied with `updateParticipant`
 { "bitrateKbps": 40, "userLimit": 25, "videoAllowed": true,
   "screenshareAllowed": true, "maxScreenshareKbps": 6000, "e2ee": "inherit" }
 ```
+`maxScreenshareKbps` is 300 to 60 000 and only lowers the server-wide `voice.screenshare.maxBitrateKbps` (300 to 60 000, default 6000); `voice.camera.maxBitrateKbps` is 150 to 25 000 (default 1700).
+
 `e2ee`: `inherit` (module default) | `required` | `off`. Changing E2EE setting
 while people are connected forces a rejoin (10).
 

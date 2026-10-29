@@ -587,6 +587,20 @@ describe("camera and screen share (M4, 08 §5.2, §8)", () => {
     expect((await join()).screenshareMaxKbps).toBe(6000);
   });
 
+  it("allows caps for 4K: up to 60 Mbit/s for a screen share and 25 for a camera, and no more", async () => {
+    const ann = await s.register("ann");
+    const set = (body: unknown) => api(owner).patch("/admin/voice", body);
+    expect((await set({ cameraMaxKbps: 25_000, screenshareMaxKbps: 60_000 })).status).toBe(200);
+    expect((await set({ screenshareMaxKbps: 60_001 })).status).toBe(400);
+    expect((await set({ cameraMaxKbps: 25_001 })).status).toBe(400);
+    await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 60_000 } });
+    expect(
+      (await api(owner).patch(`/channels/${lounge}`, { settings: { maxScreenshareKbps: 60_001 } })).status,
+    ).toBe(400);
+    const video = (await api(ann.token).post(`/voice/channels/${lounge}/join`)).body.publishDefaults.video;
+    expect(video).toEqual({ cameraMaxKbps: 25_000, screenshareMaxKbps: 60_000 });
+  });
+
   it("lets the owner change the server-wide video caps at runtime", async () => {
     const ann = await s.register("ann");
     const join = async () =>

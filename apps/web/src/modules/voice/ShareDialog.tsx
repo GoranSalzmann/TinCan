@@ -3,20 +3,13 @@ import { useState } from "react";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { startScreenShare, updateScreenShare } from "../../core/voice/actions.js";
 import { useVoice } from "../../core/voice/store.js";
-import {
-  allowedByCap,
-  resolvePreset,
-  SCREEN_PRESETS,
-  uploadKbps,
-  useVideoPrefs,
-  type ContentHint,
-} from "../../core/voice/video.js";
+import { useVideoPrefs, type ContentHint } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
 import { Modal } from "../../ui/Dialog.js";
 import { toastError } from "../../ui/toast.js";
+import { QualityControls, mbit } from "./QualityControls.js";
 
-/** Megabits with one decimal for the estimate: "about 4 Mbps up, however many people watch" (W-13, W-16). */
-export const mbps = (kbps: number): string => (Math.round(kbps / 100) / 10).toString();
+export const mbps = mbit;
 
 /**
  * Web screen share (W-16) and, while live, "Change stream settings" (W-13). The browser shows its own picker after
@@ -32,17 +25,15 @@ export function ShareDialog({
   const t = useT();
   const live = useVoice((s) => s.screenOn);
   const liveAudio = useVoice((s) => s.share?.audio ?? false);
-  const cap = useVoice((s) => s.caps.screenKbps);
   const prefs = useVideoPrefs((s) => s.prefs);
   const setPrefs = useVideoPrefs((s) => s.set);
   const [busy, setBusy] = useState(false);
-  const chosen = resolvePreset("screen", prefs.screenPreset, cap) ?? SCREEN_PRESETS[0]!;
   const hints: ContentHint[] = ["detail", "motion"];
 
   const go = async () => {
     setBusy(true);
     try {
-      const o = { preset: chosen.id, hint: prefs.contentHint };
+      const o = { hint: prefs.contentHint };
       if (live) await updateScreenShare(o);
       else await startScreenShare({ ...o, audio: prefs.shareAudio });
       onOpenChange(false);
@@ -66,26 +57,7 @@ export function ShareDialog({
           void go();
         }}
       >
-        <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
-          <legend className="mb-1 font-medium">{t("video.quality")}</legend>
-          {SCREEN_PRESETS.map((p) => {
-            const ok = allowedByCap(p, cap);
-            return (
-              <label key={p.id} className={`flex items-center gap-2 ${ok ? "" : "text-text-disabled"}`}>
-                <input
-                  type="radio"
-                  name="screen-preset"
-                  value={p.id}
-                  checked={chosen.id === p.id}
-                  disabled={!ok}
-                  onChange={() => setPrefs({ screenPreset: p.id })}
-                />
-                {t(`video.preset.screen.${p.id}` as MessageKey)}
-                {ok ? null : <span className="text-sm">{t("video.preset.notAllowed")}</span>}
-              </label>
-            );
-          })}
-        </fieldset>
+        <QualityControls source="screen" />
         <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
           <legend className="mb-1 font-medium">{t("video.hint")}</legend>
           {hints.map((h) => (
@@ -118,9 +90,6 @@ export function ShareDialog({
             <p className="m-0 text-sm text-text-muted">{t("video.share.browserNote")}</p>
           </>
         )}
-        <p className="m-0 text-sm text-text-muted">
-          {t("video.share.estimate", { mbps: mbps(uploadKbps(chosen)) })}
-        </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}

@@ -89,7 +89,7 @@ export const ChannelSettingsSchema = z.object({
   videoAllowed: z.boolean().optional(),
   screenshareAllowed: z.boolean().optional(),
   /** Screen share cap in kbit/s for this channel; never above the server's own cap (08 §5.2). */
-  maxScreenshareKbps: z.number().int().min(300).max(20_000).nullish(),
+  maxScreenshareKbps: z.number().int().min(300).max(60_000).nullish(),
 });
 
 export type ChannelSettings = z.infer<typeof ChannelSettingsSchema>;

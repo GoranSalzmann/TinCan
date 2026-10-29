@@ -19,14 +19,15 @@ import { request } from "../api/client.js";
 import { sendCommand, useSession } from "../session/store.js";
 import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
-import { useVoice, type Quality, type VoiceNotice } from "./store.js";
+import { useVoice, type ActualInfo, type Quality, type SpecInfo, type VoiceNotice } from "./store.js";
 import { clampVolume, limiterFor, loadVolumes, saveVolumes } from "./volume.js";
 import { autoThreshold, NoiseFloor, PushToTalk, rms, VoiceActivity } from "./transmit.js";
 import {
   encodeWatching,
   markWatchNoticeSeen,
   parseStreamKey,
-  resolvePreset,
+  detectCodecSupport,
+  resolveVideo,
   streamKey,
   useVideoPrefs,
   viewersFrom,
@@ -34,7 +35,9 @@ import {
   WATCHING_ATTRIBUTE,
   type StreamQuality,
   type StreamSource,
-  type VideoPreset,
+  type Resolved,
+  type VideoPrefs,
+  uploadKbps,
 } from "./video.js";
 import type { VoiceJoinResponse } from "@tincan/shared";
 
@@ -51,15 +54,21 @@ const streamSourceOf = (s: Track.Source): StreamSource | null =>
   s === Track.Source.Camera ? "camera" : s === Track.Source.ScreenShare ? "screen" : null;
 
 /** Publish options for a preset: simulcast layers below the top one, and the top layer's cap (08 §5.2). */
-function publishOptionsFor(source: StreamSource, p: VideoPreset): TrackPublishOptions {
+function publishOptionsFor(source: StreamSource, r: Resolved): TrackPublishOptions {
+  const p = r.preset;
   const encoding = { maxBitrate: p.kbps * 1000, maxFramerate: p.fps };
   const layers = p.layers.map((l) => new LkVideoPreset(l.width, l.height, l.kbps * 1000, l.fps));
+  // Presets stay on VP8 with simulcast. A custom setting above 1080p30 uses VP9 (or hardware AV1) as one scalable
+  // encoding, whose spatial layers the SFU and dynacast handle like simulcast; the SDK adds a VP8 backup for viewers
+  // that cannot decode it. For these codecs the simulcast layer list has no effect.
+  const codec: TrackPublishOptions = r.codec === "vp8" ? {} : { videoCodec: r.codec, simulcast: true };
   return source === "camera"
-    ? { simulcast: layers.length > 0, videoEncoding: encoding, videoSimulcastLayers: layers }
+    ? { simulcast: layers.length > 0, videoEncoding: encoding, videoSimulcastLayers: layers, ...codec }
     : {
         simulcast: layers.length > 0,
         screenShareEncoding: encoding,
         screenShareSimulcastLayers: layers,
+        ...codec,
         // Stream audio is stereo and music-like: no DTX or RED, higher bitrate (08 §6).
         forceStereo: true,
         dtx: false,
@@ -617,13 +626,17 @@ class VoiceManager {
     const st = useVoice.getState();
     if (!room) return;
     if (!on) {
-      await room.localParticipant.setCameraEnabled(false).catch(() => undefined);
-      st.patch({ cameraOn: false });
+      // setCameraEnabled(false) only mutes the track, and turning it on again would reuse the old capture and encoding:
+      // a changed preset, resolution or codec would never apply. Unpublish and stop it for real.
+      const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      if (pub?.track) await room.localParticipant.unpublishTrack(pub.track, true).catch(() => undefined);
+      st.patch({ cameraOn: false, cameraSpec: null });
       return;
     }
     const prefs = useVideoPrefs.getState().prefs;
-    const preset = resolvePreset("camera", prefs.cameraPreset, st.caps.cameraKbps);
-    if (!preset) return void st.patch({ notice: "camera_failed" });
+    const r = await this.#resolve("camera");
+    if (!r) return void st.patch({ notice: "camera_failed" });
+    const preset = r.preset;
     try {
       await room.localParticipant.setCameraEnabled(
         true,
@@ -632,9 +645,10 @@ class VoiceManager {
           deviceId: prefs.cameraDeviceId ? { ideal: prefs.cameraDeviceId } : undefined,
           resolution: { width: preset.width, height: preset.height, frameRate: preset.fps },
         },
-        publishOptionsFor("camera", preset),
+        publishOptionsFor("camera", r),
       );
-      useVoice.getState().patch({ cameraOn: true });
+      useVoice.getState().patch({ cameraOn: true, cameraSpec: specInfo(r) });
+      this.#startActualPoll();
     } catch (err) {
       const name = (err as DOMException).name;
       useVoice.getState().patch({
@@ -650,14 +664,17 @@ class VoiceManager {
   }
 
   /** Changing the camera or its preset while on: switch the device in place, republish for a new preset. */
-  async applyCameraPrefs(prev: { deviceId: string | null; preset: string }): Promise<void> {
+  async applyCameraPrefs(prev: VideoPrefs): Promise<void> {
     const room = this.#room;
     if (!room || !useVoice.getState().cameraOn) return;
     const prefs = useVideoPrefs.getState().prefs;
-    if (prefs.cameraPreset !== prev.preset) {
+    const quality = (p: VideoPrefs) =>
+      p.cameraPreset === "custom" ? JSON.stringify(p.cameraCustom) : p.cameraPreset;
+    // A new resolution, rate, bitrate or codec needs a new capture and a new encoder: republish.
+    if (prefs.cameraPreset !== prev.cameraPreset || quality(prefs) !== quality(prev)) {
       await this.setCamera(false);
       await this.setCamera(true);
-    } else if (prefs.cameraDeviceId && prefs.cameraDeviceId !== prev.deviceId) {
+    } else if (prefs.cameraDeviceId && prefs.cameraDeviceId !== prev.cameraDeviceId) {
       await room.switchActiveDevice("videoinput", prefs.cameraDeviceId).catch(() => undefined);
     }
   }
@@ -667,12 +684,13 @@ class VoiceManager {
    * available where the browser offers it: tab audio in Chromium, system audio on Windows and ChromeOS, none in
    * Firefox or Safari (docs/18 §K).
    */
-  async startScreenShare(o: { preset: string; hint: "detail" | "motion"; audio: boolean }): Promise<void> {
+  async startScreenShare(o: { hint: "detail" | "motion"; audio: boolean }): Promise<void> {
     const room = this.#room;
     const st = useVoice.getState();
     if (!room) return;
-    const preset = resolvePreset("screen", o.preset, st.caps.screenKbps);
-    if (!preset) return void st.patch({ notice: "screen_failed" });
+    const r = await this.#resolve("screen");
+    if (!r) return void st.patch({ notice: "screen_failed" });
+    const preset = r.preset;
     try {
       await room.localParticipant.setScreenShareEnabled(
         true,
@@ -687,9 +705,10 @@ class VoiceManager {
           systemAudio: "include",
           suppressLocalAudioPlayback: true,
         },
-        publishOptionsFor("screen", preset),
+        publishOptionsFor("screen", r),
       );
-      this.#noteLocalShare(preset.id, o.hint);
+      this.#noteLocalShare(r, o.hint);
+      this.#startActualPoll();
     } catch (err) {
       const name = (err as DOMException).name;
       if (name === "NotAllowedError" || name === "AbortError") return; // the person cancelled the picker
@@ -703,13 +722,16 @@ class VoiceManager {
   }
 
   /** Quality and optimisation while live, within the cap; the picker is not shown again (W-13). Audio is fixed at start. */
-  async updateScreenShare(o: { preset: string; hint: "detail" | "motion" }): Promise<void> {
+  async updateScreenShare(o: { hint: "detail" | "motion" }): Promise<void> {
     const room = this.#room;
     const track = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
     const st = useVoice.getState();
     if (!room || !track) return;
-    const preset = resolvePreset("screen", o.preset, st.caps.screenKbps);
-    if (!preset) return;
+    // The codec was chosen when the share started and cannot change without a new capture: only size, rate, bitrate and
+    // hint move. The simulcast ratios (1, 1/2, 1/4) stay, so the lower layers follow a new capture size by themselves.
+    const r = await this.#resolve("screen", st.share?.spec?.codec);
+    if (!r) return;
+    const preset = r.preset;
     track.mediaStreamTrack.contentHint = o.hint;
     await track.mediaStreamTrack
       .applyConstraints({
@@ -729,10 +751,67 @@ class VoiceManager {
       });
       await sender.setParameters(params).catch(() => undefined);
     }
-    this.#noteLocalShare(preset.id, o.hint);
+    this.#noteLocalShare(r, o.hint);
   }
 
-  #noteLocalShare(presetId: string, hint: "detail" | "motion"): void {
+  /** The chosen preset or custom setting for a source, within the cap, with the codec this browser can use. */
+  async #resolve(source: StreamSource, keepCodec?: string): Promise<Resolved | null> {
+    const prefs = useVideoPrefs.getState().prefs;
+    const caps = useVoice.getState().caps;
+    const support = await detectCodecSupport();
+    const r = resolveVideo(
+      source,
+      source === "camera" ? prefs.cameraPreset : prefs.screenPreset,
+      source === "camera" ? prefs.cameraCustom : prefs.screenCustom,
+      source === "camera" ? caps.cameraKbps : caps.screenKbps,
+      keepCodec === "vp8" ? { vp9: false, av1Hardware: false } : support,
+    );
+    return r;
+  }
+
+  #actualTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Every 2 s while something is published: what the browser captures and what the encoder sends (requested vs actual). */
+  #startActualPoll(): void {
+    if (this.#actualTimer) return;
+    const read = async (src: Track.Source): Promise<ActualInfo | null> => {
+      const track = this.#room?.localParticipant.getTrackPublication(src)?.videoTrack;
+      if (!track) return null;
+      const s = track.mediaStreamTrack.getSettings();
+      const sent = (await track.getSenderStats().catch(() => []))
+        .filter((x) => x.frameWidth > 0)
+        .sort((a, b) => b.frameWidth - a.frameWidth)[0];
+      return {
+        captureWidth: s.width ?? 0,
+        captureHeight: s.height ?? 0,
+        captureFps: Math.round(s.frameRate ?? 0),
+        sentWidth: sent?.frameWidth ?? 0,
+        sentHeight: sent?.frameHeight ?? 0,
+        sentFps: Math.round(sent?.framesPerSecond ?? 0),
+        limit: sent?.qualityLimitationReason ?? "none",
+      };
+    };
+    this.#actualTimer = setInterval(() => {
+      const st = useVoice.getState();
+      if (!st.cameraOn && !st.screenOn) {
+        clearInterval(this.#actualTimer!);
+        this.#actualTimer = null;
+        st.patch({ actual: { camera: null, screen: null } });
+        return;
+      }
+      void Promise.all([
+        st.cameraOn ? read(Track.Source.Camera) : null,
+        st.screenOn ? read(Track.Source.ScreenShare) : null,
+      ]).then(([camera, screen]) => {
+        const next = { camera, screen };
+        if (JSON.stringify(next) !== JSON.stringify(useVoice.getState().actual))
+          useVoice.getState().patch({ actual: next });
+      });
+    }, 2000);
+  }
+
+  #noteLocalShare(r: Resolved, hint: "detail" | "motion"): void {
+    const presetId = r.preset.id;
     const lp = this.#room?.localParticipant;
     const video = lp?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
     const surface = video?.mediaStreamTrack.getSettings()?.displaySurface;
@@ -743,6 +822,7 @@ class VoiceManager {
         hint,
         audio: !!lp?.getTrackPublication(Track.Source.ScreenShareAudio),
         surface: surface === "monitor" || surface === "window" || surface === "browser" ? surface : null,
+        spec: specInfo(r),
       },
     });
   }
@@ -919,10 +999,24 @@ const captureKey = (p: AudioPrefs) => ({
   c: p.autoGain,
 });
 
+const specInfo = (r: Resolved): SpecInfo => ({
+  preset: r.preset.id,
+  width: r.preset.width,
+  height: r.preset.height,
+  fps: r.preset.fps,
+  kbps: r.kbps,
+  wantedKbps: r.wantedKbps,
+  uploadKbps: uploadKbps(r.preset),
+  codec: r.codec,
+  cappedByServer: r.cappedByServer,
+});
+
 /** Video state that belongs to one call. */
 const VIDEO_RESET = {
   cameraOn: false,
   screenOn: false,
+  cameraSpec: null,
+  actual: { camera: null, screen: null },
   canCamera: false,
   canScreen: false,
   watching: {},

@@ -6,14 +6,7 @@ import { useSession } from "../../core/session/store.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
 import { stopScreenShare, toggleCamera } from "../../core/voice/actions.js";
 import { useVoice } from "../../core/voice/store.js";
-import {
-  resolvePreset,
-  SCREEN_PRESETS,
-  CAMERA_PRESETS,
-  streamKey,
-  uploadKbps,
-  useVideoPrefs,
-} from "../../core/voice/video.js";
+import { streamKey } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
 import { ShareDialog, mbps } from "./ShareDialog.js";
 
@@ -28,10 +21,10 @@ export function SharingBar() {
   const screenOn = useVoice((s) => s.screenOn);
   const cameraOn = useVoice((s) => s.cameraOn);
   const share = useVoice((s) => s.share);
-  const caps = useVoice((s) => s.caps);
+  const cameraSpec = useVoice((s) => s.cameraSpec);
+  const actual = useVoice((s) => s.actual);
   const viewers = useVoice((s) => s.viewers);
   const members = useCommunity((s) => s.members);
-  const prefs = useVideoPrefs((s) => s.prefs);
   const [open, setOpen] = useState(false);
   const [change, setChange] = useState(false);
   if (!screenOn && !cameraOn) return null;
@@ -39,10 +32,8 @@ export function SharingBar() {
   const names = (key: string) =>
     (viewers[key] ?? []).filter((id) => id !== self).map((id) => memberName(members[id], id));
   const watchers = [...new Set([...names(streamKey(self, "screen")), ...names(streamKey(self, "camera"))])];
-  const screen =
-    resolvePreset("screen", share?.preset ?? prefs.screenPreset, caps.screenKbps) ?? SCREEN_PRESETS[0]!;
-  const camera = resolvePreset("camera", prefs.cameraPreset, caps.cameraKbps) ?? CAMERA_PRESETS[0]!;
-  const upload = (screenOn ? uploadKbps(screen) : 0) + (cameraOn ? uploadKbps(camera) : 0);
+  const upload =
+    (screenOn ? (share?.spec?.uploadKbps ?? 0) : 0) + (cameraOn ? (cameraSpec?.uploadKbps ?? 0) : 0);
   const summary =
     watchers.length === 0
       ? t("video.bar.nobody")
@@ -113,6 +104,37 @@ export function SharingBar() {
           </Button>
         )}
       </span>
+      <div className="flex basis-full flex-col gap-0.5 text-xs text-text-muted" data-testid="video-readout">
+        {(
+          [
+            ["screen", screenOn ? share?.spec : null, actual.screen],
+            ["camera", cameraOn ? cameraSpec : null, actual.camera],
+          ] as const
+        ).map(([kind, spec, a]) =>
+          spec ? (
+            <p key={kind} className="m-0">
+              <strong>{t(`video.bar.${kind}.label` as MessageKey)}:</strong>{" "}
+              {t("video.bar.requested", {
+                width: spec.width,
+                height: spec.height,
+                fps: spec.fps,
+                mbps: mbps(spec.kbps),
+                codec: spec.codec.toUpperCase(),
+              })}
+              {a
+                ? `. ${t(a.sentFps > 0 ? "video.bar.actual" : "video.bar.idle", { cw: a.captureWidth, ch: a.captureHeight, cf: a.captureFps, sw: a.sentWidth, sh: a.sentHeight, sf: a.sentFps })}`
+                : ""}
+              {a &&
+              (a.captureHeight < spec.height * 0.95 || (a.captureFps > 0 && a.captureFps < spec.fps * 0.8))
+                ? ` ${t("video.bar.less")}`
+                : ""}
+              {a && (a.limit === "cpu" || a.limit === "bandwidth")
+                ? ` ${t(`video.bar.limit.${a.limit}` as MessageKey)}`
+                : ""}
+            </p>
+          ) : null,
+        )}
+      </div>
       <ShareDialog open={change} onOpenChange={setChange} />
     </section>
   );

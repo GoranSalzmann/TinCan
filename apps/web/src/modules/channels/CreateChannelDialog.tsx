@@ -144,7 +144,7 @@ export function CreateChannelDialog({
                 hint={t("channel.voice.shareCap.hint")}
                 type="number"
                 min={0.3}
-                max={20}
+                max={60}
                 step="any"
                 value={shareMbps}
                 onChange={(e) => setShareMbps(e.target.value)}

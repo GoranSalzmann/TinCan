@@ -211,19 +211,22 @@ const displayMediaShim = `(() => {
   const md = navigator.mediaDevices;
   if (!md) return;
   md.getDisplayMedia = async (c) => {
+    const v = (c && c.video) || {};
+    const num = (x, d) => (typeof x === 'number' ? x : (x && (x.ideal || x.exact || x.max)) || d);
+    const W = num(v.width, 1920), H = num(v.height, 1080), F = num(v.frameRate, 30);
     const cv = document.createElement('canvas');
-    cv.width = 1920; cv.height = 1080;
+    cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
     let n = 0;
     setInterval(() => {
       n++;
       g.fillStyle = 'hsl(' + ((n * 3) % 360) + ' 70% 40%)';
-      g.fillRect(0, 0, 1920, 1080);
+      g.fillRect(0, 0, W, H);
       g.fillStyle = '#fff';
-      g.font = '64px monospace';
-      for (let i = 0; i < 12; i++) g.fillText('Tin Can screen ' + n + ' ' + 'x'.repeat(i * 3), 40 + ((n * 7 + i * 50) % 600), 90 * i + 80);
-    }, 33);
-    const stream = cv.captureStream(30);
+      g.font = Math.round(64 * H / 1080) + 'px monospace';
+      for (let i = 0; i < 12; i++) g.fillText('Tin Can screen ' + n + ' ' + 'x'.repeat(i * 3), (40 + ((n * 7 + i * 50) % 600)) * W / 1920, (90 * i + 80) * H / 1080);
+    }, 1000 / F);
+    const stream = cv.captureStream(F);
     if (c && c.audio) {
       const a = await md.getUserMedia({ audio: true });
       a.getAudioTracks().forEach((t) => stream.addTrack(t));
@@ -337,10 +340,13 @@ const inbound = (p: Page) => p.evaluate<Inbound>(INBOUND);
 const VIDEO_STATS = `(async () => {
   const out = { inbound: [], outbound: [] };
   for (const pc of window.__pcs) {
-    (await pc.getStats()).forEach((s) => {
+    const report = await pc.getStats();
+    const codecs = new Map();
+    report.forEach((s) => { if (s.type === 'codec') codecs.set(s.id, s.mimeType); });
+    report.forEach((s) => {
       if (s.kind !== 'video') return;
       if (s.type === 'inbound-rtp') out.inbound.push({ bytes: s.bytesReceived || 0, frames: s.framesDecoded || 0, width: s.frameWidth || 0, height: s.frameHeight || 0 });
-      if (s.type === 'outbound-rtp') out.outbound.push({ rid: s.rid || '', bytes: s.bytesSent || 0, width: s.frameWidth || 0, active: s.active !== false });
+      if (s.type === 'outbound-rtp') out.outbound.push({ rid: s.rid || '', bytes: s.bytesSent || 0, width: s.frameWidth || 0, active: s.active !== false, codec: codecs.get(s.codecId) || '' });
     });
   }
   return out;
@@ -348,7 +354,7 @@ const VIDEO_STATS = `(async () => {
 
 interface VideoStats {
   inbound: { bytes: number; frames: number; width: number; height: number }[];
-  outbound: { rid: string; bytes: number; width: number; active: boolean }[];
+  outbound: { rid: string; bytes: number; width: number; active: boolean; codec: string }[];
 }
 const videoStats = (p: Page) => p.evaluate<VideoStats>(VIDEO_STATS);
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -404,6 +410,8 @@ async function main(): Promise<number> {
       displayName: "Mika",
       password: PASSWORD,
     });
+    // Caps apply from the next join; presets stay far below them, custom 1440p and 2160p need the room.
+    await api("PATCH", "/admin/voice", owner.token, { cameraMaxKbps: 12_000, screenshareMaxKbps: 40_000 });
     const ids: Record<string, string> = {};
     for (const n of ["ann", "bo", "cy"]) {
       const r = await api<{ user: { id: string } }>("POST", "/auth/register", undefined, {
@@ -829,6 +837,144 @@ async function main(): Promise<number> {
         );
       },
     );
+
+    // ---- custom resolution, frame rate and bitrate ------------------------------------------------------
+
+    const setPrefs = (p: Page, patch: object) =>
+      p.evaluate(`window.__tincanVideoPrefs.getState().set(${JSON.stringify(patch)})`);
+    const codecsSent = async (p: Page) => (await videoStats(p)).outbound.map((o) => o.codec).filter(Boolean);
+    const topWidth = async (p: Page) => Math.max(0, ...(await videoStats(p)).outbound.map((o) => o.width));
+
+    // Chromium's fake camera cannot deliver more than 1280×720, so this step also proves the readout: the person asked
+    // for 1440p, the browser captured less, and the bar says so.
+    await step(
+      "a custom 1440p30 camera is sent as VP9 and the bar shows asked against delivered",
+      async () => {
+        await setPrefs(ann.page, {
+          cameraPreset: "custom",
+          cameraCustom: { height: 1440, fps: 30, bitrateKbps: null },
+        });
+        await controls(ann.page).getByRole("button", { name: "Turn camera on" }).click();
+        await until(
+          "camera on the server",
+          async () => (await sourcesOf(ids.ann!)).includes("camera"),
+          15_000,
+        );
+        await bo.page.getByRole("button", { name: "Watch camera" }).click();
+        await vm(bo.page, `setStreamQuality("${camKey}", "high")`);
+        await until(
+          "the picture arrives",
+          async () => (await videoStats(bo.page)).inbound.some((i) => i.width >= 1200 && i.frames > 10),
+          25_000,
+        );
+        const codecs = await codecsSent(ann.page);
+        if (!codecs.some((c) => /vp9/i.test(c))) throw new Error(`sent ${codecs.join(",")}, expected VP9`);
+        const bar = ann.page.getByTestId("video-readout");
+        await bar.getByText(/Asked for 2560×1440 at 30 fps/).waitFor();
+        await bar.getByText(/VP9/).waitFor();
+        await bar.getByText(/Captured 1280×720/).waitFor({ timeout: 10_000 });
+        await bar.getByText(/Your browser delivers less than asked for/).waitFor();
+      },
+    );
+
+    await step(
+      "custom 1440p30 camera: upload stays flat as viewers rise and stops with none (VP9 layers, G4)",
+      async () => {
+        await vm(cy.page, `watch("${ids.ann}", "camera")`);
+        await vm(cy.page, `setStreamQuality("${camKey}", "high")`);
+        await until(
+          "cy video",
+          async () => (await videoStats(cy.page)).inbound.some((i) => i.frames > 10),
+          25_000,
+        );
+        await sleep(4000);
+        const two = await uploadKbps(ann.page, 5000);
+        await vm(cy.page, `unwatch("${ids.ann}", "camera")`);
+        await sleep(4000);
+        const one = await uploadKbps(ann.page, 5000);
+        console.log(
+          `    1440p30 VP9 upload with 1 viewer ${one.toFixed(0)} kbps, with 2 viewers ${two.toFixed(0)} kbps`,
+        );
+        if (one < 150) throw new Error(`too little video to measure: ${one.toFixed(0)} kbps`);
+        if (two > one * 1.3)
+          throw new Error(`upload grew with viewers: ${one.toFixed(0)} → ${two.toFixed(0)} kbps`);
+        await vm(bo.page, `unwatch("${ids.ann}", "camera")`);
+        await sleep(8000);
+        const none = await uploadKbps(ann.page, 4000);
+        console.log(`    1440p30 VP9 upload with no viewer ${none.toFixed(0)} kbps`);
+        if (none > one * 0.25) throw new Error(`dynacast did not stop the layers: ${none.toFixed(0)} kbps`);
+        await controls(ann.page).getByRole("button", { name: "Turn camera off" }).click();
+        await setPrefs(ann.page, { cameraPreset: "standard" });
+      },
+    );
+
+    await step(
+      "a custom 1080p60 screen share shows what was asked for against what the browser delivers",
+      async () => {
+        await setPrefs(cy.page, {
+          screenPreset: "custom",
+          screenCustom: { height: 1080, fps: 60, bitrateKbps: null },
+        });
+        await controls(cy.page).getByRole("button", { name: "Share screen" }).click();
+        const dialog = cy.page.getByRole("dialog", { name: "Share your screen" });
+        await dialog.getByRole("radio", { name: "Custom" }).waitFor();
+        if (!(await dialog.getByRole("radio", { name: "Custom" }).isChecked()))
+          throw new Error("Custom is not selected");
+        await dialog.getByRole("button", { name: "Continue" }).click();
+        await until(
+          "screen on the server",
+          async () => (await sourcesOf(ids.cy!)).includes("screen_share"),
+          20_000,
+        );
+        const readout = cy.page.getByTestId("video-readout");
+        await readout.getByText(/Asked for 1920×1080 at 60 fps/).waitFor({ timeout: 10_000 });
+        await readout
+          .getByText(/Captured 1920×1080 at \d+ fps, sending 1920×1080/)
+          .waitFor({ timeout: 15_000 });
+        const codecs = await codecsSent(cy.page);
+        if (!codecs.some((c) => /vp9/i.test(c)))
+          throw new Error(`sent ${codecs.join(",")}, expected VP9 above 30 fps`);
+        await ann.page.getByRole("button", { name: "Watch stream" }).click();
+        await until(
+          "frames",
+          async () => (await videoStats(ann.page)).inbound.some((i) => i.frames > 10 && i.width >= 1900),
+          25_000,
+        );
+        await ann.page.getByRole("button", { name: "Stop watching" }).click();
+        await controls(cy.page).getByRole("button", { name: "Stop sharing screen" }).click();
+      },
+    );
+
+    await step("a custom 2160p screen share is captured, sent and received at 3840×2160", async () => {
+      await setPrefs(cy.page, {
+        screenPreset: "custom",
+        screenCustom: { height: 2160, fps: 15, bitrateKbps: null },
+      });
+      await controls(cy.page).getByRole("button", { name: "Share screen" }).click();
+      const dialog = cy.page.getByRole("dialog", { name: "Share your screen" });
+      await dialog.getByText(/needs a fast computer/).waitFor();
+      await dialog.getByRole("button", { name: "Continue" }).click();
+      await until(
+        "screen on the server",
+        async () => (await sourcesOf(ids.cy!)).includes("screen_share"),
+        20_000,
+      );
+      await cy.page
+        .getByTestId("video-readout")
+        .getByText(/Asked for 3840×2160 at 15 fps/)
+        .waitFor({ timeout: 10_000 });
+      await until("a 3840 wide picture is sent", async () => (await topWidth(cy.page)) >= 3800, 30_000);
+      await ann.page.getByRole("button", { name: "Watch stream" }).click();
+      await vm(ann.page, `setStreamQuality("${screenKey}", "high")`);
+      await until(
+        "4K frames",
+        async () => (await videoStats(ann.page)).inbound.some((i) => i.frames > 5 && i.width >= 3800),
+        40_000,
+      );
+      await ann.page.getByRole("button", { name: "Stop watching" }).click();
+      await controls(cy.page).getByRole("button", { name: "Stop sharing screen" }).click();
+      await setPrefs(cy.page, { screenPreset: "standard" });
+    });
 
     await step("taking CONNECT away removes the person from the call within seconds", async () => {
       const t0 = Date.now();
