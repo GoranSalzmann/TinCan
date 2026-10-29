@@ -220,6 +220,16 @@ Written by a use case inside its own transaction; drained in ID order by the cor
 
 100 users, 200 messages/user/day, ~300 bytes average: ~6 MB/day of message data, ~2 GB/year. SQLite handles this comfortably. FTS roughly doubles message storage. Spike D5 measured the whole database: 3.38M messages of ~280 characters came to 4.0 GB, about 1.2 KB per message. That splits into the `message` table and its indexes (2.0 GB), FTS5 (1.75 GB, of which 1.26 GB is FTS5's own copy of the text) and `search_doc` (0.26 GB). At this estimate's 7.3M messages a year, that is about 8.5 GB/year, twice the 4 GB the first sentence implies, because IDs, indexes and the FTS copy cost more than the text itself. Attachments dominate; plan storage by upload limits.
 
+## 10. As built in M2
+
+- `channel_overwrite` is owned by `roles` and has **no foreign key** to `channel` (`channels` depends on `roles`, not the reverse); deleting a channel removes its rows through `RolesApi` in the same transaction. Overwrite `allow`/`deny` are stored as decimal text and masked to the channel-scoped bits (0–14) when applied.
+- `member_role` has `space_id` and references `user` and `role` (cascade). A partial unique index allows one `is_default` role per space.
+- `message_mention.target_type` is `user`, `role` or `everyone` (`target_id = 'everyone'`). Own messages are not counted in a user's mention count. Nonces are not stored: the 5-minute idempotency window lives in the `kv` (`nonce:<user>:<nonce>`).
+- `attachment` gained `channel_id` (copied when attached, so file access needs no other module) and `has_thumb`; thumbnails are stored at `<key>.thumb`. Avatars are not attachments: `avatar/<userId>-<hash>.webp` in storage, with the name in `user.avatar_key`.
+- `search_doc` and the FTS5 table as in §3.9; the FTS5 shadow tables (`message_fts_data`, `_idx`, `_content`, `_docsize`, `_config`) are declared in the module's table list so the boot matrix can prove a disabled module leaves nothing behind.
+- `read_state` references `user` and `channel` (cascade). `invite_use` references `invite` and `user` (cascade).
+- Not created yet: `ban`, `reaction`, `audit_log`, `identity`.
+
 ## Open items
 - Bitset width: permissions may exceed 53 bits? Use BigInt strings (11).
 - Custom emoji, stickers: deferred.
