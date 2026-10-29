@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSettingsParams } from "./params.js";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { PERM, namesOf, type Member, type PermissionName, type Role } from "@tincan/shared";
 import { api } from "../../core/api/client.js";
@@ -73,7 +74,7 @@ export function RolesPane() {
   const roles = useCommunity((s) => s.roles);
   const myPerms = useCommunity((s) => s.permissions);
   const canManage = useCan("MANAGE_ROLES");
-  const { id } = useParams();
+  const { id } = useSettingsParams();
   const navigate = useNavigate();
   const selected = roles.find((r) => r.id === id) ?? null;
   const ordered = [...roles].sort((a, b) => b.position - a.position);
@@ -327,7 +328,7 @@ export function MembersPane() {
   const roles = useCommunity((s) => s.roles).filter((r) => !r.isDefault);
   const canRoles = useCan("MANAGE_ROLES");
   const canReset = useCan("MANAGE_INSTANCE");
-  const { id } = useParams();
+  const { id } = useSettingsParams();
   const navigate = useNavigate();
   const [filter, setFilter] = useState("");
   const [code, setCode] = useState<{ userId: string; code: string; expiresAt: string } | null>(null);

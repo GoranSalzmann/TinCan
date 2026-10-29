@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useSettingsParams } from "./params.js";
 import { Hash, Volume2 } from "lucide-react";
 import type { Channel, Invite, Overwrite } from "@tincan/shared";
 import { api } from "../../core/api/client.js";
@@ -237,7 +238,7 @@ export function ChannelsPane() {
   const channels = useCommunity((s) => s.channels);
   const categories = useCommunity((s) => s.categories);
   const canManage = useCan("MANAGE_CHANNELS");
-  const { id } = useParams();
+  const { id } = useSettingsParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<{ edit?: Channel } | null>(null);
   const [catName, setCatName] = useState("");

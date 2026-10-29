@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
-import { Navigate, NavLink, useNavigate, useParams } from "react-router-dom";
+import { Navigate, NavLink, useNavigate } from "react-router-dom";
+import { useSettingsParams } from "./params.js";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { useSession } from "../../core/session/store.js";
 import { useCan, useCommunity } from "../../core/state/community.js";
@@ -16,7 +17,7 @@ import { AccountPane, AppearancePane, NotificationsPane, StoragePane } from "./U
 export function SettingsLayer() {
   const t = useT();
   const navigate = useNavigate();
-  const { section = "account" } = useParams();
+  const { section } = useSettingsParams();
   const uploads = useSession((s) => !!s.capabilities?.features.uploads);
   const invitesOn = useSession((s) => !!s.capabilities?.features.invites);
   const owner = useSession((s) => s.user?.isInstanceOwner ?? false);

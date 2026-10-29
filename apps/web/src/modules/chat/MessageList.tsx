@@ -100,6 +100,18 @@ export function MessageList({
     [messages, pending, dividerId],
   );
 
+  /** Rows are measured after they render, so the end moves: keep following it for a moment, unless the reader scrolled away. */
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    for (const delay of [16, 50, 120, 250, 500]) {
+      setTimeout(() => {
+        if (atBottomRef.current && scrollRef.current === el) el.scrollTop = el.scrollHeight;
+      }, delay);
+    }
+  }, []);
+
   const virt = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
@@ -107,6 +119,9 @@ export function MessageList({
     overscan: 8,
     getItemKey: (i) => rows[i]?.key ?? i,
   });
+
+  // Positions are managed here (prepend anchor, live edge); the library's own size-change adjustments fought them.
+  virt.shouldAdjustScrollPositionOnItemSizeChange = () => false;
 
   // ---- first paint of a channel: load, then sit at the bottom ----
   const justOpened = useRef(true);
@@ -129,10 +144,10 @@ export function MessageList({
 
   useLayoutEffect(() => {
     if (justOpened.current && rows.length > 0) {
-      virt.scrollToIndex(rows.length - 1, { align: "end" });
+      scrollToBottom();
       justOpened.current = false;
     }
-  }, [rows.length, virt]);
+  }, [rows.length, scrollToBottom]);
 
   // ---- keep following the live edge; preserve position when older pages arrive ----
   const anchor = useRef<{ key: string; offset: number } | null>(null);
@@ -149,9 +164,8 @@ export function MessageList({
       anchor.current = null;
       return;
     }
-    if (grew && atBottomRef.current && !justOpened.current)
-      virt.scrollToIndex(rows.length - 1, { align: "end" });
-  }, [rows, virt]);
+    if (grew && atBottomRef.current && !justOpened.current) scrollToBottom();
+  }, [rows, virt, scrollToBottom]);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -290,7 +304,7 @@ export function MessageList({
         <Button
           onClick={() => {
             if (win.hasNewer) void jumpToLatest(channelId);
-            else virt.scrollToIndex(rows.length - 1, { align: "end" });
+            else scrollToBottom();
             atBottomRef.current = true;
             setAtBottom(true);
           }}
