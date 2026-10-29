@@ -173,7 +173,8 @@ async function expectConsistent(s: TestServer, enabled: Set<string>) {
       ok: boolean;
       error?: { code: string };
     };
-    if (enabled.has(owner)) expect(res.ok, cmd).toBe(true);
+    // A real module may reject the empty args this probe sends; what matters is that it ran.
+    if (enabled.has(owner)) expect(res.error?.code ?? "ok", cmd).not.toBe("FEATURE_DISABLED");
     else expect(res.error?.code, cmd).toBe("FEATURE_DISABLED");
   }
   sock.close();

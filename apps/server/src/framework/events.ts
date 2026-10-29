@@ -16,6 +16,7 @@ export interface Events {
   "member.joined": { userId: string };
   "message.created": { messageId: string; channelId: string; authorId: string };
   "message.deleted": { messageId: string; channelId: string };
+  "attachment.removed": { attachmentId: string; messageId: string | null; channelId: string | null };
   "channel.created": { channelId: string };
   "channel.updated": { channelId: string };
   "channel.deleted": { channelId: string };

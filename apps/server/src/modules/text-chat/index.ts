@@ -57,6 +57,12 @@ export default defineModule({
     });
 
     registerTextRoutes(ctx.http, svc);
+    // "File removed" shows up in place on everyone's screen (design U16).
+    ctx.events.on("attachment.removed", async ({ messageId, channelId }) => {
+      if (!messageId || !channelId) return;
+      const [message] = await svc.getMessages([messageId]);
+      if (message) ctx.gateway.dispatchToChannel(channelId, "MESSAGE_UPDATE", { message });
+    });
     ctx.gateway.onCommand("typing.start", async (args, { actor }) => {
       const parsed = TypingStartArgsSchema.safeParse(args);
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", "typing.start needs a channelId.");

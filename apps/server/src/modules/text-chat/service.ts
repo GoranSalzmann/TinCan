@@ -9,6 +9,7 @@ import {
   MENTION_USER_RE,
   has,
   newId,
+  type Attachment,
   type Message,
   type PermissionName,
 } from "@tincan/shared";
@@ -153,7 +154,9 @@ export class TextChatService {
       .select(["message_id", "target_type", "target_id"])
       .where("message_id", "in", ids)
       .execute();
-    const attachments = this.#d.uploads ? await this.#d.uploads.forMessages(ids) : new Map();
+    const attachments = this.#d.uploads
+      ? await this.#d.uploads.forMessages(ids)
+      : new Map<string, Attachment[]>();
     const replyById = new Map(replies.map((r) => [r.id, r]));
 
     return rows.map((r) => {

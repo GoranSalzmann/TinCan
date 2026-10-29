@@ -110,7 +110,9 @@ export async function createHttpApp(opts: HttpOptions): Promise<FastifyInstance>
   app.addHook("onSend", async (req, reply) => {
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "no-referrer");
-    if (req.url.startsWith("/api/")) reply.header("Cache-Control", "no-store");
+    // Routes that serve immutable files set their own policy.
+    if (req.url.startsWith("/api/") && !reply.hasHeader("Cache-Control"))
+      reply.header("Cache-Control", "no-store");
   });
 
   app.setNotFoundHandler((req, reply) => {

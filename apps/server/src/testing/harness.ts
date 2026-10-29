@@ -34,6 +34,8 @@ export interface TestUser {
 
 export interface ReqOptions {
   body?: unknown;
+  /** Multipart upload; the content type (with boundary) is set by fetch. */
+  form?: FormData;
   token?: string;
   cookie?: string;
   headers?: Record<string, string>;
@@ -42,6 +44,8 @@ export interface ReqOptions {
 export interface TestResponse {
   status: number;
   body: any;
+  /** Raw response bytes, for file downloads. */
+  bytes: Buffer;
   headers: Headers;
   setCookie: string | null;
 }
@@ -92,17 +96,20 @@ export async function startTestServer(
 
   const request: TestServer["request"] = async (method, path, o = {}) => {
     const headers: Record<string, string> = { ...o.headers };
-    if (o.body !== undefined) headers["content-type"] = "application/json";
+    if (o.body !== undefined && !o.form) headers["content-type"] = "application/json";
     if (o.token) headers.authorization = `Bearer ${o.token}`;
     if (o.cookie) headers.cookie = o.cookie;
     const res = await fetch(url + path, {
       method,
       headers,
-      ...(o.body !== undefined ? { body: JSON.stringify(o.body) } : {}),
+      ...(o.form ? { body: o.form } : o.body !== undefined ? { body: JSON.stringify(o.body) } : {}),
     });
-    const text = await res.text();
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const isJson = (res.headers.get("content-type") ?? "").includes("json");
+    const text = isJson ? bytes.toString("utf8") : "";
     return {
       status: res.status,
+      bytes,
       body: text ? (JSON.parse(text) as unknown) : null,
       headers: res.headers,
       setCookie: res.headers.get("set-cookie"),
