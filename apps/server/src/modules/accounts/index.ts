@@ -103,7 +103,7 @@ export default defineModule({
           isInstanceOwner: user.isInstanceOwner,
         },
         instance,
-        presence: presence.snapshot(),
+        presence: { ...presence.snapshot(), [actor.userId]: presence.statusIfConnected(actor.userId) },
         settings: prefs,
       };
     });
@@ -131,6 +131,7 @@ export default defineModule({
       listMembers: () => listMembers(db),
       getMember: (id) => getMember(db, id),
       memberCount: () => memberCount(db),
+      instanceName: async () => (await svc.getInstance()).name,
       async setNickname(userId, nickname) {
         await db.query.updateTable("member").set({ nickname }).where("user_id", "=", userId).execute();
       },

@@ -34,6 +34,12 @@ export class Presence {
     return chosen === "invisible" ? "offline" : chosen;
   }
 
+  /** What `userId` will show as once their socket is attached (READY is built just before that). */
+  statusIfConnected(userId: string): PresenceStatus {
+    const chosen = this.#chosen.get(userId) ?? "online";
+    return chosen === "invisible" ? "offline" : chosen;
+  }
+
   snapshot(): Record<string, PresenceStatus> {
     const out: Record<string, PresenceStatus> = {};
     for (const id of this.#gw.onlineUserIds()) {

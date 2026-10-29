@@ -65,6 +65,7 @@ export interface AccountsApi {
   listMembers(): Promise<MemberRecord[]>;
   getMember(userId: string): Promise<MemberRecord | null>;
   memberCount(): Promise<number>;
+  instanceName(): Promise<string>;
   setNickname(userId: string, nickname: string | null): Promise<void>;
   /** Sets or clears the avatar key and tells connected clients. */
   setAvatarKey(userId: string, key: string | null): Promise<void>;
