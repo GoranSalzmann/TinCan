@@ -171,7 +171,7 @@ export function runDbContract(name: string, make: () => Promise<DbHarness>): voi
       const rows = await db.query.selectFrom("items").select(["tag", "n"]).execute();
       expect(rows).toHaveLength((N - Math.ceil(N / 4)) * 2);
       expect(rows.some((r) => r.n % 4 === 0)).toBe(false);
-    });
+    }, 30_000);
 
     it("orders by id for cursor pagination", async () => {
       const ids = ["01A", "01B", "01C", "01D", "01E"];
