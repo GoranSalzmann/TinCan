@@ -68,6 +68,7 @@ export class GatewayClient {
   #awaitingAck = false;
   #retry: unknown;
   #generation = 0;
+  #commandId = 0;
 
   constructor(options: GatewayOptions) {
     this.#o = options;
@@ -81,6 +82,13 @@ export class GatewayClient {
   }
   get lastSeq(): number {
     return this.#lastSeq;
+  }
+
+  /** Sends a gateway command (07 §4.6) such as typing.start; dropped silently while not connected. */
+  command(cmd: string, args: unknown): void {
+    const s = this.#socket;
+    if (!s || s.readyState !== OPEN || this.#state !== "ready") return;
+    s.send(JSON.stringify({ op: Op.COMMAND, d: { cmd, args, id: ++this.#commandId } }));
   }
 
   connect(): void {

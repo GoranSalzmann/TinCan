@@ -200,6 +200,27 @@ export function runDbContract(name: string, make: () => Promise<DbHarness>): voi
       expect(existsSync(dest)).toBe(true);
       expect(existsSync(`${dest}.tmp-${process.pid}`)).toBe(false);
     });
+
+    it("reads committed rows on the worker connection, with bound parameters, and refuses writes", async (ctx) => {
+      if (!h.scratchDir) return ctx.skip();
+      await db.query.insertInto("items").values({ id: "r1", tag: "worker", n: 1 }).execute();
+      const rows = await db.readOnly<{ id: string }>("SELECT id FROM items WHERE tag = ?", ["worker"]);
+      expect(rows).toEqual([{ id: "r1" }]);
+      // Rows committed after the worker started are visible to its next statement (WAL).
+      await db.query.insertInto("items").values({ id: "r2", tag: "worker-2", n: 2 }).execute();
+      expect(
+        (await db.readOnly("SELECT id FROM items WHERE tag LIKE ? ORDER BY id", ["worker%"])).length,
+      ).toBe(2);
+      await expect(db.readOnly("DELETE FROM items")).rejects.toThrow(/returns rows/);
+      // A bad statement fails that call only; the worker keeps serving.
+      await expect(db.readOnly("SELEC nonsense")).rejects.toThrow();
+      expect((await db.readOnly("SELECT 1 AS one"))[0]).toEqual({ one: 1 });
+    });
+
+    it("refuses readOnly() inside a transaction", async (ctx) => {
+      if (!h.scratchDir) return ctx.skip();
+      await expect(db.transaction((tx) => tx.readOnly("SELECT 1"))).rejects.toThrow();
+    });
   });
 
   describe(`db migrations contract: ${name}`, () => {

@@ -11,6 +11,7 @@ export const OWNER = { username: "mika", displayName: "Mika", password: "correct
 
 export interface TestServer {
   running: RunningApp;
+  config: CoreConfig;
   dir: string;
   url: string;
   wsUrl: string;
@@ -18,14 +19,24 @@ export interface TestServer {
   request(method: string, path: string, opts?: ReqOptions): Promise<TestResponse>;
   /** Creates the owner through the real setup flow and returns its session token. */
   setupOwner(): Promise<string>;
+  /** Registers a member through the real endpoint (the harness config allows open signup) and returns their login. */
+  register(username: string, opts?: { displayName?: string; inviteCode?: string }): Promise<TestUser>;
   /** Clears the per-IP login counter first, so suites that log in often are not throttled; pass `keepLimits` to test throttling. */
   login(username: string, password: string, opts?: { keepLimits?: boolean }): Promise<TestResponse>;
   connect(query?: string, headers?: Record<string, string>): TestSocket;
   close(): Promise<void>;
 }
 
+export interface TestUser {
+  id: string;
+  username: string;
+  token: string;
+}
+
 export interface ReqOptions {
   body?: unknown;
+  /** Multipart upload; the content type (with boundary) is set by fetch. */
+  form?: FormData;
   token?: string;
   cookie?: string;
   headers?: Record<string, string>;
@@ -33,8 +44,9 @@ export interface ReqOptions {
 
 export interface TestResponse {
   status: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tests poke at arbitrary JSON
   body: any;
+  /** Raw response bytes, for file downloads. */
+  bytes: Buffer;
   headers: Headers;
   setCookie: string | null;
 }
@@ -71,7 +83,7 @@ export async function startTestServer(
     },
     server: { host: "127.0.0.1", port: 0 },
     log: { level: "silent" },
-    modules: { accounts: { argon2: { memoryKiB: 1024, timeCost: 1, parallelism: 1 } } },
+    modules: { accounts: { signup: "open", argon2: { memoryKiB: 1024, timeCost: 1, parallelism: 1 } } },
     ...opts.config,
   };
   const config: CoreConfig = parseCoreConfig(raw);
@@ -85,17 +97,20 @@ export async function startTestServer(
 
   const request: TestServer["request"] = async (method, path, o = {}) => {
     const headers: Record<string, string> = { ...o.headers };
-    if (o.body !== undefined) headers["content-type"] = "application/json";
+    if (o.body !== undefined && !o.form) headers["content-type"] = "application/json";
     if (o.token) headers.authorization = `Bearer ${o.token}`;
     if (o.cookie) headers.cookie = o.cookie;
     const res = await fetch(url + path, {
       method,
       headers,
-      ...(o.body !== undefined ? { body: JSON.stringify(o.body) } : {}),
+      ...(o.form ? { body: o.form } : o.body !== undefined ? { body: JSON.stringify(o.body) } : {}),
     });
-    const text = await res.text();
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const isJson = (res.headers.get("content-type") ?? "").includes("json");
+    const text = isJson ? bytes.toString("utf8") : "";
     return {
       status: res.status,
+      bytes,
       body: text ? (JSON.parse(text) as unknown) : null,
       headers: res.headers,
       setCookie: res.headers.get("set-cookie"),
@@ -104,6 +119,7 @@ export async function startTestServer(
 
   const server: TestServer = {
     running,
+    config,
     dir,
     url,
     wsUrl,
@@ -115,6 +131,20 @@ export async function startTestServer(
       });
       if (res.status !== 200) throw new Error(`setup failed: ${res.status} ${JSON.stringify(res.body)}`);
       return (res.body as { token: string }).token;
+    },
+    async register(username, o = {}) {
+      await running.ports.pubsub.kv.del("rl:register:ip:127.0.0.1");
+      const res = await request("POST", "/api/v1/auth/register", {
+        body: {
+          username,
+          displayName: o.displayName ?? username,
+          password: OWNER.password,
+          ...(o.inviteCode ? { inviteCode: o.inviteCode } : {}),
+        },
+      });
+      if (res.status !== 200) throw new Error(`register failed: ${res.status} ${JSON.stringify(res.body)}`);
+      const body = res.body as { token: string; user: { id: string } };
+      return { id: body.user.id, username, token: body.token };
     },
     async login(username, password, opts = {}) {
       if (!opts.keepLimits) await running.ports.pubsub.kv.del("rl:login:ip:127.0.0.1");

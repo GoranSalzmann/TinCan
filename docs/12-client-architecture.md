@@ -50,6 +50,15 @@ A module exports `ClientModule` (04 §10). The shell loads
 
 > **As built in M1.** The shell has the auth gate, the setup wizard, login and the empty layout; slots, the client module registry and the stores of §5 arrive with the first feature module (M2). Colour tokens are in `apps/web/src/theme/tokens.ts` (not `packages/ui`, which waits until a second consumer exists); `theme.test.ts` checks them against the style guide table and every contrast pairing, and the generated CSS is checked for staleness. The web session is a cookie plus gateway ticket (11 §1.2). The main bundle is about 515 kB because the shared zod schemas ship to the browser; split it when the voice chunk is added.
 
+> **As built in M2.**
+> - **State.** Three Zustand stores under `core/state/`: `community` (channels, roles, members, presence, permissions, synced settings), `chat` (message windows, pending sends, typing, read state) and `ui` (selected channel, window focus). `core/gateway/dispatch.ts` feeds them from the gateway; the window logic (`window.ts`: merge, prepend, around, live edge, edit last-writer-wins, unread, mentions) is pure and tested. A new READY after a non-resumable reconnect makes the open channel refetch its latest page and keep what is loaded.
+> - **Message list.** TanStack Virtual with dynamic row heights; date separators, a "New" divider fixed at the read position when the channel opened, grouping by author within 7 minutes. Older pages keep the scroll position through an anchor row; the live edge is followed (and left alone once the reader scrolls up); `around=` loads for jumps.
+> - **Rendering.** `modules/chat/markdown.tsx` parses a small subset into React elements, never HTML; only http, https and mailto links; a link whose text looks like another address, or whose host is an IDN, asks first.
+> - **Composer.** Mentions are shown as `@Name` and sent as tokens (`mentions.ts`); drafts per channel in `localStorage`; uploads with XHR progress; slowmode countdown; typing over the gateway every 3 s.
+> - **Notifications.** `notifications.ts` decides from the synced rules (default, per channel, timed mute) and the page title carries `(n)`; Web Push is not in v1.
+> - **Settings** is a lazily loaded full-screen layer (design U9): account, appearance, notifications, storage, and, by permission, server, channels (with the overwrite editor), roles, members (with "what can this member do?") and invites. There is no `packages/ui` and no client module registry yet; the shell imports the M2 modules directly (a registry earns its keep when voice lands).
+> - Bundle: main chunk 659 kB (205 kB gzip) before voice; the settings layer is a separate 35 kB chunk.
+
 ### 3.1 Slots (extension points the shell renders)
 `sidebarSection`, `channelView(type)`, `channelHeaderAction`, `toolbarButton`,
 `userPanelWidget`, `settingsPane`, `messageDecorator`, `messageActions`,

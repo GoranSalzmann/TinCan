@@ -136,11 +136,11 @@ describe("auth gate", () => {
   it("shows the empty layout to a logged-in user", async () => {
     fakeServer({ setupRequired: false, loggedIn: true });
     renderApp("/login");
-    expect(await screen.findByRole("heading", { name: "Welcome to Tin Can" })).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Your account" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Channels" })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Members" })).toBeInTheDocument();
-    expect(screen.getByText("No channels yet")).toBeInTheDocument();
+    expect(screen.getByText("Nothing here yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Skip to main content" })).toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe("login", () => {
     await user.type(await screen.findByLabelText("Username"), "mika");
     await user.type(screen.getByLabelText("Password"), "right password here");
     await user.click(screen.getByRole("button", { name: "Log in" }));
-    expect(await screen.findByRole("heading", { name: "Welcome to Tin Can" })).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Your account" })).toBeInTheDocument();
   });
 
   it("shows one generic message for a wrong password", async () => {
@@ -219,7 +219,7 @@ describe("login", () => {
   it("logs out from the account menu", async () => {
     fakeServer({ setupRequired: false, loggedIn: true });
     renderApp("/");
-    await screen.findByRole("heading", { name: "Welcome to Tin Can" });
+    await screen.findByRole("group", { name: "Your account" });
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(await screen.findByRole("menuitem", { name: "Log out" }));
@@ -272,7 +272,7 @@ describe("first-run setup (W-30)", () => {
     expect(screen.getByText("Not set up yet. Voice arrives in a later version.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Finish" }));
 
-    expect(await screen.findByRole("heading", { name: "Welcome to Friends of Tin" })).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Your account" })).toBeInTheDocument();
     expect(server.name).toBe("Friends of Tin");
   });
 });

@@ -49,6 +49,12 @@ export interface Db<T = unknown> {
   pendingMigrations(modules: ModuleMigrations[]): Promise<PendingMigration[]>;
   /** Consistent copy of the database at `destPath`, taken on a worker thread (05 §3.1, 06 §7). */
   snapshot(destPath: string): Promise<void>;
+  /**
+   * Runs one read-only statement on the DB worker thread's own connection (05 §3.1). For search and
+   * other queries that must not block the event loop. Parameters are bound, never interpolated.
+   * Not available for in-memory databases.
+   */
+  readOnly<R = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<R[]>;
   /** Resolves if the database answers a trivial query. */
   health(): Promise<void>;
   close(): Promise<void>;

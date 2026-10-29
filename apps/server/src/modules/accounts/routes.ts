@@ -10,7 +10,13 @@ import {
   InstancePatchSchema,
   LoginRequestSchema,
   LoginResponseSchema,
+  ProfilePatchSchema,
+  RegisterRequestSchema,
+  ResetRedeemRequestSchema,
+  ResetTokenResponseSchema,
   SESSION_COOKIE,
+  SettingsPatchSchema,
+  SettingsSchema,
   SessionInfoSchema,
   SetupRequestSchema,
   SetupVerifyRequestSchema,
@@ -19,6 +25,7 @@ import {
 import { clearedCookie, sessionCookie } from "../../http/cookies.js";
 import { extractToken } from "../../http/app.js";
 import type { AccountsService, ClientMeta, SessionResult } from "./service.js";
+import type { UserSettings } from "./settings.js";
 
 const meta = (req: FastifyRequest): ClientMeta => ({
   ip: req.ip,
@@ -34,6 +41,9 @@ const clientNameOf = (req: FastifyRequest, given?: string): string => {
 
 export interface RouteDeps {
   secureCookie: boolean;
+  settings: UserSettings;
+  /** Tells the user's other devices that a synced preference changed. */
+  notifyUser: (userId: string, t: string, d: unknown) => void;
 }
 
 export function registerAccountRoutes(app: FastifyInstance, svc: AccountsService, deps: RouteDeps): void {
@@ -61,6 +71,33 @@ export function registerAccountRoutes(app: FastifyInstance, svc: AccountsService
     "/auth/setup",
     { schema: { body: SetupRequestSchema, response: { 200: LoginResponseSchema } } },
     async (req, reply) => startSession(reply, await svc.setup(req.body, meta(req), clientNameOf(req))),
+  );
+
+  // ---- registration and recovery (11 §1.5, §1.6) ----
+  http.post(
+    "/auth/register",
+    { schema: { body: RegisterRequestSchema, response: { 200: LoginResponseSchema } } },
+    async (req, reply) => startSession(reply, await svc.register(req.body, meta(req), clientNameOf(req))),
+  );
+
+  http.post("/auth/reset", { schema: { body: ResetRedeemRequestSchema } }, async (req, reply) => {
+    await svc.redeemResetCode(req.body.code, req.body.newPassword, req.ip);
+    return reply.status(204).send();
+  });
+
+  http.post(
+    "/admin/users/:id/reset-token",
+    {
+      preHandler: app.authenticate,
+      schema: {
+        params: z.object({ id: z.string().min(1).max(64) }),
+        response: { 200: ResetTokenResponseSchema },
+      },
+    },
+    async (req) => {
+      const { code, expiresAt } = await svc.issueResetCode(req.actor!.userId, req.params.id);
+      return { code, expiresAt: expiresAt.toISOString() };
+    },
   );
 
   // ---- login and sessions ----
@@ -119,6 +156,37 @@ export function registerAccountRoutes(app: FastifyInstance, svc: AccountsService
       const user = await svc.getUser(req.actor!.userId);
       if (!user) throw new AppError("NOT_FOUND", "No such user.");
       return user;
+    },
+  );
+
+  http.patch(
+    "/users/@me",
+    {
+      preHandler: app.authenticate,
+      schema: { body: ProfilePatchSchema, response: { 200: UserSchema } },
+    },
+    async (req) => svc.patchProfile(req.actor!.userId, req.body),
+  );
+
+  // ---- synced preferences (06 user_setting, 07 §3.3) ----
+  http.get(
+    "/users/@me/settings",
+    { preHandler: app.authenticate, schema: { response: { 200: SettingsSchema } } },
+    async (req) => deps.settings.get(req.actor!.userId),
+  );
+
+  http.patch(
+    "/users/@me/settings",
+    {
+      preHandler: app.authenticate,
+      schema: { body: SettingsPatchSchema, response: { 200: SettingsSchema } },
+    },
+    async (req) => {
+      const changed = await deps.settings.patch(req.actor!.userId, req.body);
+      // Cleared keys travel as null so the other device drops them too.
+      const wire = Object.fromEntries(Object.keys(req.body).map((k) => [k, changed[k] ?? null]));
+      deps.notifyUser(req.actor!.userId, "USER_SETTINGS_UPDATE", { settings: wire });
+      return deps.settings.get(req.actor!.userId);
     },
   );
 

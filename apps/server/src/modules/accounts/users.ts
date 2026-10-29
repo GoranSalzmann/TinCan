@@ -60,12 +60,30 @@ export async function countUsers(db: Db<AccountsTables>): Promise<number> {
   return Number(r.n);
 }
 
-/** Creates the owner, the one space and the owner's membership (11 §1.4). Roles and channels join in M2. */
+export async function insertMember(
+  tx: Db<AccountsTables>,
+  input: { spaceId: string; userId: string; invitedBy?: string | null },
+  now = Date.now(),
+): Promise<void> {
+  await tx.query
+    .insertInto("member")
+    .values({
+      space_id: input.spaceId,
+      user_id: input.userId,
+      joined_at: now,
+      nickname: null,
+      timeout_until: null,
+      invited_by: input.invitedBy ?? null,
+    })
+    .execute();
+}
+
+/** Creates the owner, the one space and the owner's membership (11 §1.4). Roles and channels seed through join hooks. */
 export async function createOwnerAndSpace(
   tx: Db<AccountsTables>,
   input: { username: string; displayName: string; passwordHash: string; instanceName: string },
   now = Date.now(),
-): Promise<UserRow> {
+): Promise<{ owner: UserRow; spaceId: string }> {
   const owner = await insertUser(tx, { ...input, isOwner: true }, now);
   const spaceId = newId(now);
   await tx.query
@@ -78,16 +96,6 @@ export async function createOwnerAndSpace(
       owner_user_id: owner.id,
     })
     .execute();
-  await tx.query
-    .insertInto("member")
-    .values({
-      space_id: spaceId,
-      user_id: owner.id,
-      joined_at: now,
-      nickname: null,
-      timeout_until: null,
-      invited_by: null,
-    })
-    .execute();
-  return owner;
+  await insertMember(tx, { spaceId, userId: owner.id }, now);
+  return { owner, spaceId };
 }

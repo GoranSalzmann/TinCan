@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../core/api/client.js";
 import { useT } from "../core/i18n/index.js";
 import { useSession } from "../core/session/store.js";
@@ -81,6 +81,9 @@ export function LoginPage() {
             {t("login.submit")}
           </Button>
         </div>
+        <p className="text-sm text-text-muted">
+          {t("login.haveReset")} <Link to="/reset">{t("login.useReset")}</Link>
+        </p>
         {error ? <Banner tone="error">{error}</Banner> : null}
         {limited ? <Banner tone="warning">{t("login.rateLimited", { seconds: secondsLeft })}</Banner> : null}
       </form>

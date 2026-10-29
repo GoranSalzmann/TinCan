@@ -45,11 +45,28 @@ export interface AccountsTables {
     timeout_until: number | null;
     invited_by: string | null;
   };
+  /** Admin-issued one-time reset codes (11 §1.6). The code is stored only as a SHA-256 hash. */
+  password_reset: {
+    id: string;
+    user_id: string;
+    code_hash: string;
+    created_by: string | null;
+    created_at: number;
+    expires_at: number;
+    used_at: number | null;
+  };
+  /** Synced per-user preferences (06 §3.1): last writer wins. */
+  user_setting: {
+    user_id: string;
+    key: string;
+    value: string;
+    updated_at: number;
+  };
 }
 
 export const accountsMigrations: ModuleMigrations = {
   module: "accounts",
-  tables: ["user", "session", "space", "member"],
+  tables: ["user", "session", "space", "member", "password_reset", "user_setting"],
   migrations: [
     {
       version: 1,
@@ -111,6 +128,32 @@ export const accountsMigrations: ModuleMigrations = {
           .addColumn("timeout_until", "integer")
           .addColumn("invited_by", "text")
           .addPrimaryKeyConstraint("member_pk", ["space_id", "user_id"])
+          .execute();
+      },
+    },
+    {
+      version: 2,
+      name: "password reset codes, synced user settings",
+      async up(db) {
+        await db.schema
+          .createTable("password_reset")
+          .addColumn("id", "text", (c) => c.primaryKey())
+          .addColumn("user_id", "text", (c) => c.notNull().references("user.id").onDelete("cascade"))
+          .addColumn("code_hash", "text", (c) => c.notNull().unique())
+          .addColumn("created_by", "text")
+          .addColumn("created_at", "integer", (c) => c.notNull())
+          .addColumn("expires_at", "integer", (c) => c.notNull())
+          .addColumn("used_at", "integer")
+          .execute();
+        await db.schema.createIndex("password_reset_user").on("password_reset").column("user_id").execute();
+
+        await db.schema
+          .createTable("user_setting")
+          .addColumn("user_id", "text", (c) => c.notNull().references("user.id").onDelete("cascade"))
+          .addColumn("key", "text", (c) => c.notNull())
+          .addColumn("value", "text", (c) => c.notNull())
+          .addColumn("updated_at", "integer", (c) => c.notNull())
+          .addPrimaryKeyConstraint("user_setting_pk", ["user_id", "key"])
           .execute();
       },
     },

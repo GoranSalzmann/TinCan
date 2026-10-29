@@ -309,7 +309,9 @@ describe("owner-only endpoints", () => {
     ownerToken = (await s.login("mika", "another long password")).body.token as string;
     const modules = await s.request("GET", "/api/v1/admin/modules", { token: ownerToken });
     expect(modules.status).toBe(200);
-    expect(modules.body.modules.map((m: { id: string }) => m.id)).toEqual(["core", "accounts"]);
+    expect(modules.body.modules.map((m: { id: string }) => m.id)).toEqual(
+      expect.arrayContaining(["core", "accounts", "roles", "channels"]),
+    );
 
     const db = s.running.ports.db;
     await db.transaction(async (tx) => {

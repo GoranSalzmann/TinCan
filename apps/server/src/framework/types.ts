@@ -8,6 +8,7 @@ import type { Storage } from "@tincan/storage";
 import type { CoreConfig } from "../config/schema.js";
 import type { EventBus } from "./events.js";
 import type { JobScheduler } from "./jobs.js";
+import type { OutboxRegistrar } from "./outbox.js";
 
 export type PortName = "db" | "storage" | "pubsub" | "auth" | "livekit";
 
@@ -69,7 +70,18 @@ export interface GatewayRegistrar {
   /** Adds fields to the READY payload (channels, roles … arrive with their modules). */
   contributeReady(fn: (actor: Actor) => Promise<Record<string, unknown>> | Record<string, unknown>): void;
   dispatchToUser(userId: string, t: string, d: unknown): void;
+  dispatchToUsers(userIds: Iterable<string>, t: string, d: unknown): void;
   dispatchToAll(t: string, d: unknown): void;
+  /** Delivers only to sessions whose user can currently see the channel (05 §5). */
+  dispatchToChannel(channelId: string, t: string, d: unknown, exceptUserId?: string): void;
+  /** `roles` supplies the visibility set a new gateway session starts with. */
+  provideChannelAccess(fn: (userId: string) => Promise<ReadonlySet<string>> | ReadonlySet<string>): void;
+  /** Replaces the visibility set of all of a user's live sessions. */
+  setChannelAccess(userId: string, channels: ReadonlySet<string>): void;
+  isOnline(userId: string): boolean;
+  onlineUserIds(): string[];
+  /** Fires when a user's first socket attaches or the last one has been gone for a few seconds. */
+  onPresenceChange(fn: (userId: string, online: boolean) => void): void;
 }
 
 export interface InstanceInfo {
@@ -114,6 +126,7 @@ export interface ModuleContext<C = unknown, P extends PortName = PortName> {
   readonly capabilities: CapabilityRegistrar;
   readonly security: SecurityRegistrar;
   readonly jobs: JobScheduler;
+  readonly outbox: OutboxRegistrar;
   readonly api: ApiRegistry;
   readonly log: Logger;
 }

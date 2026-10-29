@@ -12,6 +12,16 @@ export interface Events {
   "user.disabled": { userId: string };
   "session.revoked": { userId: string; sessionId: string };
   "instance.updated": { name: string };
+  /** A user became a member of the space (setup, registration). */
+  "member.joined": { userId: string };
+  "message.created": { messageId: string; channelId: string; authorId: string };
+  "message.deleted": { messageId: string; channelId: string };
+  "attachment.removed": { attachmentId: string; messageId: string | null; channelId: string | null };
+  "channel.created": { channelId: string };
+  "channel.updated": { channelId: string };
+  "channel.deleted": { channelId: string };
+  /** Anything that can change what someone may do: roles, role assignment, overwrites, channels, timeouts. */
+  "permissions.changed": { userIds: string[] | "all"; channelId?: string };
 }
 
 export type EventName = keyof Events;
