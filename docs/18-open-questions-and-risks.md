@@ -346,8 +346,8 @@ The `voice` module (rooms, tokens from permissions, signed webhook, presence, re
 
 | What | Where it goes |
 |---|---|
-| **Electron shell** (window, secure bridge, keychain, instance entry) | **Not built. Waiting for your decision: M3 or M4.** I recommend M4 (17 §3 listed it in M3; nothing in voice depends on it, and D3 is an M4 spike). |
-| Installers (unsigned), global shortcuts | M4, with Electron |
+| **Electron shell** (window, secure bridge, keychain, instance entry) | **Not built. Decided 2026-10-29: its own milestone, M6 (Desktop), after hardening.** D3 moves with it. |
+| Installers (unsigned), global shortcuts | M6, with Electron |
 | Camera, screenshare, viewer opt-in, stream audio volume, the sharer's viewer list | M4. Grants already include `camera` and `screen_share*`, and the channel switches exist |
 | E2EE (key service, rotation, UI) and the epoch in room metadata | M5. T27 is confirmed; nothing is stored yet |
 | Server mute, move, kick from voice | M5 (moderation). The permission bits and the `VOICE_SERVER_DISCONNECT` reasons exist |

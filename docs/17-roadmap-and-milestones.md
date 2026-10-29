@@ -17,8 +17,8 @@ exist to compare milestones, not to promise dates.
 ## 2. Milestone overview
 
 ```
- M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video+Desktop ─▶ M5 Hardening ─▶ M6 Beta ─▶ v1.0
-   (S–M)        (M)           (L)        (L)           (XL)               (L)            (M)
+ M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video ─▶ M5 Hardening ─▶ M6 Desktop ─▶ M7 Beta ─▶ v1.0
+   (S–M)        (M)           (L)        (L)         (L)           (L)             (L)          (M)
 ```
 
 | # | Milestone | Size | Outcome |
@@ -27,9 +27,10 @@ exist to compare milestones, not to promise dates.
 | M1 | Skeleton | M | Repo, CI, module loader, config, accounts, setup flow, web shell, compose stack |
 | M2 | Text chat | L | Channels, messages, realtime, roles/permissions, invites, uploads, unread, search |
 | M3 | Voice (web) | L | Voice channels, presence, audio pipeline v1, device settings, TURN, doctor |
-| M4 | Video, screenshare & desktop polish | XL | Camera, screenshare presets, viewer opt-in, global mute shortcuts, tray, installers, updater |
+| M4 | Video & screenshare (web) | L | Camera, screenshare presets, viewer opt-in, stream view, quality controls |
 | M5 | Hardening & ops | L | E2EE, moderation, audit, backups, metrics, security review, load tests |
-| M6 | Beta | M | Wider testers, bug burn-down, docs complete, signing/notarisation |
+| M6 | Desktop (Electron) | L | Shell, keychain, source picker + system audio, global shortcuts, tray, installers, updater, signing/notarisation |
+| M7 | Beta | M | Wider testers, bug burn-down, docs complete |
 | v1.0 | Release | S | Tagged release, installers, images, announce |
 
 Rough total: 5–8 months for one full-time developer (wide uncertainty); a
@@ -81,20 +82,18 @@ and permission reconciliation),
 voice channels UI with sidebar presence, voice manager + device manager, audio
 pipeline v1 (browser AEC + DeepFilterNet tier + fallback, presets, mic test,
 PTT in-window), connectivity diagnostics, TURN configured,
-`doctor` network checks, staging deployment. (The minimal Electron shell moved to M4, decided 2026-10-29.)
+`doctor` network checks, staging deployment. (The minimal Electron shell moved out, to its own milestone M6 Desktop, decided 2026-10-29.)
 **Exit:** friends can talk in voice channels from the web client with good audio;
 reconnect works; the 3-person media test passes in CI.
 **This is the dogfooding start.**
-**Status (2026-10-29): built, deployed on mkarl.io and confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: moved to M4 (your decision, 2026-10-29).** Fixed after your first real calls: right ear silent with RNNoise (`d8b5637`), per-person volume up to 300 % (`5f00fed`), local speaking ring (`dd77bc3`), "Back to text" removed (`ce11038`). Still open: TURN/TLS relay (needs a second DNS name and ports 5349/tcp and 3478/udp) and the test from a network that blocks UDP, a phone and other browsers, the spike D1 load numbers on the VPS, D4 on real hardware (closes T33). This is the dogfooding start.
+**Status (2026-10-29): built, deployed on mkarl.io and confirmed by you.** Spikes D1, D4 and D6 run locally, D2 only partly (18 §D, §J). Web voice, the audio pipeline, the connection test, `doctor` network checks and the 3-person media test are in. **Electron shell: moved to its own milestone, M6 Desktop (your decision, 2026-10-29).** Fixed after your first real calls: right ear silent with RNNoise (`d8b5637`), per-person volume up to 300 % (`5f00fed`), local speaking ring (`dd77bc3`), "Back to text" removed (`ce11038`). Still open: TURN/TLS relay (needs a second DNS name and ports 5349/tcp and 3478/udp) and the test from a network that blocks UDP, a phone and other browsers, the spike D1 load numbers on the VPS, D4 on real hardware (closes T33). This is the dogfooding start.
 
-### M4. Video, screenshare, desktop polish
-First: the minimal Electron shell (window, secure bridge, keychain, instance entry, installers unsigned).
+### M4. Video and screenshare (web)
 Camera + screenshare with presets, simulcast/dynacast, viewer opt-in/stream view,
-quality controls, sharer viewer list, stream-audio volume, desktop source picker + system audio per OS, global mute/deafen/leave shortcuts and CLI commands,
-tray/badges/notifications/autostart, deep links, pop-out/PiP, auto-update,
-signing + notarisation pipeline, Linux packaging, Wayland support work, upload
-independence test in CI (G4).
-**Exit:** the success criteria in 01 §8 are demonstrable end to end on all three OSes.
+quality controls, sharer viewer list, stream-audio volume (browser capture; screenshare
+audio where the browser offers it), permission bits and token grants, upload
+independence test in CI (G4). Desktop work moved to M6 (your decision, 2026-10-29).
+**Exit:** camera and screenshare work end to end in the web client in current Chrome/Edge and Firefox; the media test covers publish and subscribe.
 
 ### M5. Hardening & operations
 Voice E2EE + rotation + UI, moderation (kick/ban/timeout/server-mute/move) and
@@ -103,7 +102,14 @@ rate-limit tuning, security review pass (15 §9), load/soak tests, a11y pass,
 performance pass, upgrade/rollback rehearsal, docs (admin guide, user guide).
 **Exit:** security checklist S-01…S-15 verified; restore tested; known gaps documented.
 
-### M6. Beta
+### M6. Desktop (Electron)
+The minimal Electron shell (window, secure bridge, keychain, instance entry, Authorization header injection T31,
+unsigned installers), desktop source picker + system audio per OS, global mute/deafen/leave shortcuts and CLI commands,
+tray/badges/notifications/autostart, deep links, pop-out/PiP, auto-update,
+signing + notarisation pipeline, Linux packaging, Wayland support work. Starts with spike D3.
+**Exit:** the success criteria in 01 §8 are demonstrable end to end on all three OSes.
+
+### M7. Beta
 Invite a wider set of testers (other hosts, not only your friends), collect
 issues, burn down P0/P1, finalise installers, release notes, website/README,
 `SECURITY.md`, CONTRIBUTING (DCO), issue templates, example deployments for common providers.
@@ -117,13 +123,13 @@ Tag, publish images/installers/checksums/SBOM, announce.
 ```
 M0 (D1,D6) ─▶ M3 voice networking
 M0 (D2)    ─▶ M3 audio pipeline
-M0 (D3)    ─▶ M4 desktop capture/PTT
+M0 (D3)    ─▶ M6 desktop capture/PTT
 M0 (D4)    ─▶ M5 E2EE
 M1 skeleton ─▶ everything
 M2 permissions ─▶ M3 token grants ─▶ M5 moderation
-M3 voice ─▶ M4 video/screenshare ─▶ M5 E2EE
+M3 voice ─▶ M4 video/screenshare ─▶ M5 E2EE ─▶ M6 desktop ─▶ M7 beta
 ```
-Critical path: M0 → M1 → M2(permissions) → M3 → M4. Text chat polish items can
+Critical path: M0 → M1 → M2(permissions) → M3 → M4 → M5 → M6 → M7. Text chat polish items can
 run parallel to voice work if a second contributor appears.
 
 ## 5. Staffing assumptions & parallelism
@@ -181,9 +187,9 @@ basics, docs.
 
 | Risk | Effect | Mitigation |
 |---|---|---|
-| Screen capture / PTT platform quirks (K-05, K-06) | M4 overruns | Spike D3 early; ship documented limitations |
+| Screen capture / PTT platform quirks (K-05, K-06) | M6 overruns | Spike D3 early; ship documented limitations |
 | Audio quality tuning is open-ended | M3 slips | Time-box: ship default presets, tune later via settings |
-| Code-signing/notarisation setup friction (K-14) | M4/M6 delays | Start accounts/certs in M1; unsigned dev builds meanwhile |
+| Code-signing/notarisation setup friction (K-14) | M6/M7 delays | Start accounts/certs in M1; unsigned dev builds meanwhile |
 | Scope creep from modularity | Everything | Follow cut lines; module interfaces only when two implementations exist |
 | Single-developer burnout (K-16) | Stall | Dogfood milestone M3, small wins, publish progress |
 | Upstream changes in LiveKit/Electron | Rework | Pin versions; schedule dependency-upgrade windows between milestones |
@@ -206,7 +212,7 @@ basics, docs.
 | Architecture docs (this set, kept current) | Contributors | continuous |
 | Operations runbook, security guide | Hosts | M5 |
 | API reference (OpenAPI) | Contributors | M2 |
-| CONTRIBUTING, code of conduct, SECURITY.md | Community | M6 |
+| CONTRIBUTING, code of conduct, SECURITY.md | Community | M7 |
 
 ## 11. Sign-off checklist for starting M0
 
