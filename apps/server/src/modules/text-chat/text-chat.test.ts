@@ -387,7 +387,13 @@ describe("typing", () => {
 describe("module off", () => {
   it("leaves no routes behind when text-chat is disabled", async () => {
     const off = await startTestServer({
-      config: { modules: { "text-chat": { enabled: false }, "read-state": { enabled: false } } },
+      config: {
+        modules: {
+          "text-chat": { enabled: false },
+          "read-state": { enabled: false },
+          search: { enabled: false },
+        },
+      },
     });
     try {
       const token = await off.setupOwner();
