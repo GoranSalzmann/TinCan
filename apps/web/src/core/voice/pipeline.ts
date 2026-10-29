@@ -48,7 +48,7 @@ export async function createPipeline(prefs: AudioPrefs): Promise<Pipeline> {
   const gain = ctx.createGain();
   gain.gain.value = dbToGain(prefs.inputGainDb);
   const analyser = ctx.createAnalyser();
-  analyser.fftSize = 1024;
+  analyser.fftSize = 4096;
   // One channel end to end. Browsers often hand over a microphone that declares two channels; RNNoise processes channel 0
   // only, so the second would come out silent, and a two-channel track is published as stereo: heard in the left ear only.
   const mono = ctx.createGain();

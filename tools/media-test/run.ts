@@ -10,7 +10,7 @@
  * Chromium: the one Playwright installed, or CHROMIUM_CHANNEL=chrome|msedge, or CHROMIUM_PATH.
  */
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
@@ -141,6 +141,48 @@ async function api<T = unknown>(method: string, path: string, token?: string, bo
   return (text ? JSON.parse(text) : null) as T;
 }
 
+// ---- a speech-like microphone ----------------------------------------------------------------------
+
+/**
+ * A 16 s loop of 48 kHz mono 16-bit audio: 12 s of "syllables" (0.25 s of harmonics around 140 Hz at about −42 dBFS rms, 80 ms
+ * gaps), then 4 s of near silence. Quiet and gappy like talking, unlike the full-scale beep of Chromium's default fake device.
+ */
+export function speechWav(): Buffer {
+  const rate = 48_000;
+  const n = rate * 16;
+  const pcm = Buffer.alloc(n * 2);
+  let seed = 1;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    let v = 0;
+    if (t < 12) {
+      const phase = t % 0.33;
+      if (phase < 0.25) {
+        const env = Math.sin((Math.PI * phase) / 0.25);
+        for (let h = 1; h <= 8; h++) v += (Math.sin(2 * Math.PI * 140 * h * t) / h) * env;
+        v *= 0.012;
+      }
+    }
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    v += ((seed / 2 ** 32) * 2 - 1) * 0.0005;
+    pcm.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(v * 32767))), i * 2);
+  }
+  const head = Buffer.alloc(44);
+  head.write("RIFF", 0);
+  head.writeUInt32LE(36 + pcm.length, 4);
+  head.write("WAVEfmt ", 8);
+  head.writeUInt32LE(16, 16);
+  head.writeUInt16LE(1, 20);
+  head.writeUInt16LE(1, 22);
+  head.writeUInt32LE(rate, 24);
+  head.writeUInt32LE(rate * 2, 28);
+  head.writeUInt16LE(2, 32);
+  head.writeUInt16LE(16, 34);
+  head.write("data", 36);
+  head.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([head, pcm]);
+}
+
 // ---- browsers --------------------------------------------------------------------------------------
 
 interface Client {
@@ -158,7 +200,7 @@ const trackPeerConnections = `(() => {
   window.RTCPeerConnection = Wrapped;
 })()`;
 
-async function launch(): Promise<Browser> {
+async function launch(extraArgs: string[] = []): Promise<Browser> {
   return chromium.launch({
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
     ...(process.env.CHROMIUM_CHANNEL ? { channel: process.env.CHROMIUM_CHANNEL } : {}),
@@ -167,14 +209,16 @@ async function launch(): Promise<Browser> {
       "--use-fake-ui-for-media-stream",
       "--autoplay-policy=no-user-gesture-required",
       "--no-sandbox",
+      ...extraArgs,
     ],
   });
 }
 
-async function client(browser: Browser, name: string): Promise<Client> {
+async function client(browser: Browser, name: string, initScripts: string[] = []): Promise<Client> {
   const ctx = await browser.newContext({ permissions: ["microphone"], baseURL: WEB });
   await ctx.addInitScript({ content: trackPeerConnections });
   await ctx.addInitScript({ content: `localStorage.setItem('tincan.debug', '1')` });
+  for (const content of initScripts) await ctx.addInitScript({ content });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log(`  [${name}] page error: ${e.message}`));
   page.on("console", (m) => {
@@ -492,6 +536,43 @@ async function main(): Promise<number> {
           Object.keys((await api<{ voice: object }>("GET", "/voice/state", owner.token)).voice).length === 0,
         10_000,
       );
+    });
+
+    await step("the local speaking ring follows the outgoing voice, not single moments", async () => {
+      // A fourth person on a speech-like fake microphone: 12 s of syllables, 4 s of silence, repeating.
+      const wav = join(dir, "speech.wav");
+      writeFileSync(wav, speechWav());
+      const speechBrowser = await launch([`--use-file-for-fake-audio-capture=${wav}`]);
+      try {
+        await api("POST", "/auth/register", undefined, {
+          username: "dee",
+          displayName: "dee",
+          password: PASSWORD,
+        });
+        // A quiet microphone with no automatic gain and no denoiser: what comes out of the pipeline is what the mic delivers.
+        const quietMic = `localStorage.setItem('tincan.audio.v1', JSON.stringify({ preset: 'natural', noiseTier: 'browser', autoGain: false }))`;
+        const dee = await client(speechBrowser, "dee", [quietMic]);
+        await dee.page.getByRole("link", { name: /Join voice channel Lounge/ }).click();
+        await dock(dee.page).getByText("Voice connected").waitFor({ timeout: 20_000 });
+        await sleep(2000);
+        const samples = await dee.page.evaluate<number[]>(`(async () => {
+          const out = [];
+          const end = Date.now() + 16000;
+          while (Date.now() < end) {
+            out.push(document.querySelector('li[aria-label="dee is speaking"]') ? 1 : 0);
+            await new Promise((r) => setTimeout(r, 40));
+          }
+          return out;
+        })()`);
+        const on = samples.reduce((a, b) => a + b, 0) / samples.length;
+        const flips = samples.filter((v, i) => i > 0 && v !== samples[i - 1]).length;
+        // Ideal: on for 12 of 16 s (75 %) with two changes. Tolerate a hold time at the end and a late start.
+        if (on < 0.55 || on > 0.92)
+          throw new Error(`ring was on ${(on * 100).toFixed(0)} % of the time (expected about 75 %)`);
+        if (flips > 8) throw new Error(`ring changed ${flips} times in 16 s (expected about 2)`);
+      } finally {
+        await speechBrowser.close();
+      }
     });
 
     await step("the reconciler counted nothing it should not have needed to repair", async () => {

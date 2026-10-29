@@ -73,12 +73,17 @@ export class PushToTalk {
 export class VoiceActivity {
   #speaking = false;
   #lastAbove = 0;
-  readonly #threshold: number;
+  #threshold: number;
   readonly #hangMs: number;
 
-  constructor(threshold: number, hangMs = 250) {
+  constructor(threshold: number, hangMs = 400) {
     this.#threshold = threshold;
     this.#hangMs = hangMs;
+  }
+
+  /** The automatic sensitivity follows the room's noise floor, so the threshold moves while the gate is in use. */
+  setThreshold(threshold: number): void {
+    this.#threshold = threshold;
   }
 
   /** Feed a level 0…1 with a timestamp; returns whether the person is speaking now. */
@@ -93,9 +98,31 @@ export class VoiceActivity {
   }
 }
 
-/** Automatic sensitivity: a bit above the noise floor, never below a minimum (W-21 "Set automatically"). */
+/**
+ * Automatic sensitivity (W-21 "Set automatically"): 10 dB above the noise floor, never below −50 dBFS (so a quiet room's hiss
+ * cannot trigger it) and never above 0.5. Levels here are linear RMS, 0…1.
+ */
 export function autoThreshold(noiseFloor: number): number {
-  return Math.min(0.5, Math.max(0.02, noiseFloor * 3 + 0.01));
+  return Math.min(0.5, Math.max(0.003, noiseFloor * 3.2));
+}
+
+/**
+ * Tracks the noise floor of a level signal: it falls to a quiet moment at once (a gap between two words is enough) and
+ * rises only slowly, so continuous speech does not drag the floor up to the speech level and switch itself off.
+ */
+export class NoiseFloor {
+  #floor: number;
+  readonly #rise: number;
+
+  constructor(initial = 0.002, risePerSecond = 1.1, tickMs = 40) {
+    this.#floor = initial;
+    this.#rise = risePerSecond ** (tickMs / 1000);
+  }
+
+  update(level: number): number {
+    this.#floor = level < this.#floor ? level : Math.min(level, this.#floor * this.#rise);
+    return Math.max(this.#floor, 0.0003);
+  }
 }
 
 /** RMS of a float time-domain buffer, 0…1. */

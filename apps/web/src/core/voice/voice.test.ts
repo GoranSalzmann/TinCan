@@ -11,7 +11,7 @@ import {
   type AudioPrefs,
 } from "./prefs.js";
 import { applyVoiceUpdate } from "./store.js";
-import { autoThreshold, dbToGain, PushToTalk, rms, VoiceActivity } from "./transmit.js";
+import { autoThreshold, dbToGain, NoiseFloor, PushToTalk, rms, VoiceActivity } from "./transmit.js";
 
 const person = (userId: string): VoiceParticipant => ({
   userId,
@@ -124,10 +124,37 @@ describe("voice activity", () => {
     expect(v.update(0.01, 400)).toBe(false);
   });
 
-  it("derives an automatic threshold above the noise floor within sane bounds", () => {
-    expect(autoThreshold(0)).toBeCloseTo(0.02);
-    expect(autoThreshold(0.05)).toBeGreaterThan(0.05);
+  it("derives an automatic threshold above the noise floor, never below -50 dBFS", () => {
+    expect(autoThreshold(0)).toBeCloseTo(0.003);
+    expect(autoThreshold(0.01)).toBeCloseTo(0.032);
     expect(autoThreshold(5)).toBe(0.5);
+  });
+
+  it("follows quiet speech at -30 dBFS with word gaps, as one stretch of speaking", () => {
+    // Regression: a fixed threshold of about -35 dBFS switched the local ring on only for split seconds.
+    const noise = new NoiseFloor();
+    const vad = new VoiceActivity(autoThreshold(0.002));
+    const speechRms = 0.03; // -30 dBFS
+    const states: boolean[] = [];
+    for (let tick = 0; tick < 300; tick++) {
+      const now = tick * 40;
+      const inWordGap = tick % 8 === 7; // an 80 ms gap after each 0.25 s syllable
+      const level = inWordGap ? 0.0008 : speechRms;
+      vad.setThreshold(autoThreshold(noise.update(level)));
+      states.push(vad.update(level, now));
+    }
+    expect(states.slice(5).every(Boolean)).toBe(true); // on through all the gaps
+    for (let tick = 300; tick < 330; tick++) {
+      vad.setThreshold(autoThreshold(noise.update(0.0008)));
+      states.push(vad.update(0.0008, tick * 40));
+    }
+    expect(states.at(-1)).toBe(false); // and off after the hold time
+  });
+
+  it("does not let 10 s of unbroken speech drag the noise floor up to the speech level", () => {
+    const noise = new NoiseFloor();
+    for (let i = 0; i < 25 * 10; i++) noise.update(0.03); // 10 s without a single pause
+    expect(autoThreshold(noise.update(0.03))).toBeLessThan(0.05);
   });
 
   it("measures level and converts gain", () => {

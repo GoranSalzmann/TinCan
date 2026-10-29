@@ -16,7 +16,7 @@ import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
 import { useVoice, type Quality, type VoiceNotice } from "./store.js";
 import { clampVolume, limiterFor, loadVolumes, saveVolumes } from "./volume.js";
-import { autoThreshold, PushToTalk, rms, VoiceActivity } from "./transmit.js";
+import { autoThreshold, NoiseFloor, PushToTalk, rms, VoiceActivity } from "./transmit.js";
 import type { VoiceJoinResponse } from "@tincan/shared";
 
 /** `TrackSource.MICROPHONE` in LiveKit's protocol enum, which livekit-client does not re-export. */
@@ -335,26 +335,24 @@ class VoiceManager {
     const pipeline = this.#pipeline;
     const self = useSession.getState().user?.id;
     if (!pipeline || !self) return;
+    // The window (4096 samples, 85 ms) is longer than the tick, so no stretch of the published signal is skipped.
     const buf = new Float32Array(pipeline.analyser.fftSize);
-    let floor = 0.02;
-    let vad: VoiceActivity | null = null;
-    let vadFor: number | null | undefined;
+    const noise = new NoiseFloor();
+    const vad = new VoiceActivity(autoThreshold(0.002));
     this.#meter = setInterval(() => {
       pipeline.analyser.getFloatTimeDomainData(buf);
-      const level = Math.min(1, rms(buf) * 4);
-      floor = Math.min(floor * 1.002 + 0.00001, Math.max(0.005, level)); // slowly rising minimum
+      const raw = rms(buf);
+      const level = Math.min(1, raw * 4);
       const prefs = useAudioPrefs.getState().prefs;
-      if (!vad || vadFor !== prefs.vadThreshold) {
-        vad = new VoiceActivity(prefs.vadThreshold ?? autoThreshold(floor));
-        vadFor = prefs.vadThreshold;
-      }
+      vad.setThreshold(prefs.vadThreshold ?? autoThreshold(noise.update(raw)));
+      if (prefs.vadThreshold !== null) noise.update(raw);
       const s = useVoice.getState();
       const sending = !s.muted && (prefs.transmitMode === "vad" || s.transmitting);
-      const speaking = sending && vad.update(level, Date.now());
+      const speaking = vad.update(raw, Date.now()) && sending;
       if (s.speaking[self] !== speaking || Math.abs(s.localLevel - level) > 0.02) {
         useVoice.getState().patch({ localLevel: level, speaking: { ...s.speaking, [self]: speaking } });
       }
-    }, 80);
+    }, 40);
   }
 
   async #rebuildPipeline(prefs: AudioPrefs): Promise<void> {
@@ -426,7 +424,8 @@ class VoiceManager {
       const self = useSession.getState().user?.id;
       const local = self ? useVoice.getState().speaking[self] : undefined;
       const next: Record<string, boolean> = Object.fromEntries(speakers.map((s) => [s.identity, true]));
-      if (self && local) next[self] = true; // the local indicator is immediate; the server's follows (08 §6)
+      // Our own ring comes from our own analyser on the published signal only: the server's list lags and would flip it.
+      if (self) next[self] = local === true;
       useVoice.getState().patch({ speaking: next });
     });
     room.on(RoomEvent.ConnectionQualityChanged, (q, participant) => {
