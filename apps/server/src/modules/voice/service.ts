@@ -28,6 +28,9 @@ export interface VoiceSettings {
   defaultUserLimit: number;
   audioBitrateKbps: number;
   tokenTtlSecs: number;
+  /** Server-wide caps for the top video layer (08 §5.2); a channel can only lower the screen share one. */
+  camera: { maxBitrateKbps: number };
+  screenshare: { maxBitrateKbps: number };
   emptyTimeoutSecs: number;
   departureTimeoutSecs: number;
   joinRate: { max: number; windowSecs: number };
@@ -127,6 +130,15 @@ export class VoiceService {
     return ch.settings.userLimit ?? this.#d.settings.defaultUserLimit;
   }
 
+  /** Top-layer caps in kbit/s. Advisory: LiveKit cannot enforce a publisher's bitrate, so a modified client could exceed it. */
+  videoCaps(ch: ChannelRecord): { cameraMaxKbps: number; screenshareMaxKbps: number } {
+    const g = this.#d.settings;
+    return {
+      cameraMaxKbps: g.camera.maxBitrateKbps,
+      screenshareMaxKbps: Math.min(ch.settings.maxScreenshareKbps ?? Infinity, g.screenshare.maxBitrateKbps),
+    };
+  }
+
   async join(userId: string, channelId: string): Promise<VoiceJoinResponse> {
     const ch = await this.#voiceChannel(userId, channelId);
     await this.#d.roles.assert(userId, "CONNECT", channelId);
@@ -183,6 +195,7 @@ export class VoiceService {
         dtx: true,
         red: true,
         sources: permission.sources,
+        video: this.videoCaps(ch),
       },
       userLimit: limit,
     };
