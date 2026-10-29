@@ -190,6 +190,28 @@ async function client(browser: Browser, name: string): Promise<Client> {
 }
 
 /** Total inbound audio over all peer connections of a page: bytes, packets and decoded energy. */
+/** Energy per output channel of everything a page plays from the call, over `ms`: both ears must carry the voices. */
+const CHANNELS = (ms: number) => `(async () => {
+  const ctx = new AudioContext();
+  const taps = [];
+  for (const el of document.querySelectorAll("audio[data-tincan-voice]")) {
+    if (!el.srcObject) continue;
+    const src = ctx.createMediaStreamSource(el.srcObject);
+    const split = ctx.createChannelSplitter(2);
+    src.connect(split);
+    taps.push([0, 1].map((i) => { const an = ctx.createAnalyser(); an.fftSize = 2048; split.connect(an, i); return an; }));
+  }
+  const energy = [0, 0];
+  const buf = new Float32Array(2048);
+  const end = Date.now() + ${ms};
+  while (Date.now() < end) {
+    for (const pair of taps) pair.forEach((an, i) => { an.getFloatTimeDomainData(buf); for (const v of buf) energy[i] += v * v; });
+    await new Promise((r) => setTimeout(r, 40));
+  }
+  await ctx.close();
+  return { left: energy[0], right: energy[1], sources: taps.length };
+})()`;
+
 const INBOUND = `(async () => {
   const out = { bytes: 0, energy: 0, codecs: [], lost: 0, packets: 0 };
   for (const pc of window.__pcs) {
@@ -390,12 +412,27 @@ async function main(): Promise<number> {
         await until("microphone revoked", async () => !(await micOf(ids.cy!)), 8000);
         await api("DELETE", `/channels/${lounge}/overwrites/member/${ids.cy}`, owner.token);
         await until("microphone published again", () => micOf(ids.cy!), 10_000);
+        // The republished track needs a moment before its packets reach bo: poll instead of one fixed window.
         const a = await inbound(bo.page);
-        await sleep(3000);
-        const b = await inbound(bo.page);
-        if (b.bytes - a.bytes < 2000) throw new Error("no audio after the right to speak came back");
+        await until(
+          "audio after the right to speak came back",
+          async () => (await inbound(bo.page)).bytes - a.bytes >= 2000,
+          12_000,
+        );
       },
     );
+
+    await step("what is heard is centred: left and right carry the same voice", async () => {
+      // Regression: RNNoise wrote only output channel 0, so a stereo-declared microphone came out left-only.
+      for (const c of all) {
+        const e = await c.page.evaluate<{ left: number; right: number; sources: number }>(CHANNELS(3000));
+        if (e.sources < 2) throw new Error(`${c.name} plays ${e.sources} remote sources`);
+        if (e.left + e.right === 0) throw new Error(`${c.name} heard nothing`);
+        const ratio = Math.min(e.left, e.right) / Math.max(e.left, e.right);
+        if (ratio < 0.5)
+          throw new Error(`${c.name}: left ${e.left.toFixed(3)} vs right ${e.right.toFixed(3)}`);
+      }
+    });
 
     await step("taking CONNECT away removes the person from the call within seconds", async () => {
       const t0 = Date.now();
