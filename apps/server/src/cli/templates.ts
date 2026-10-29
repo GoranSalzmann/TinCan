@@ -14,6 +14,10 @@ export interface InitValues {
   instanceSecret: string;
   livekitKey: string;
   livekitSecret: string;
+  /** Name Caddy gets a certificate for and LiveKit's TURN/TLS serves; null leaves TURN off (14 §2.3). */
+  turnDomain: string | null;
+  /** The Docker host gateway: LiveKit's HTTP port also listens here so Caddy and the app can reach it (18 T26). */
+  hostGatewayIp: string;
   uid: number;
   gid: number;
   /** Relative path from the output directory to the repository, when building images from source. */
@@ -26,6 +30,7 @@ export function envFile(v: InitValues): string {
 TINCAN_SECURITY__INSTANCE_SECRET=${v.instanceSecret}
 TINCAN_INSTANCE__PUBLIC_URL=${v.publicUrl}
 TINCAN_LIVEKIT__URL=${v.insecureHttp ? "ws" : "wss"}://${v.domain}${v.insecureHttp ? `:${v.httpPort}` : ""}/livekit
+TINCAN_LIVEKIT__API_URL=http://host.docker.internal:7880
 TINCAN_LIVEKIT__API_KEY=${v.livekitKey}
 TINCAN_LIVEKIT__API_SECRET=${v.livekitSecret}
 
@@ -33,6 +38,7 @@ TINCAN_LIVEKIT__API_SECRET=${v.livekitSecret}
 DOMAIN=${v.domain}
 ACME_EMAIL=${v.acmeEmail}
 HTTP_PORT=${v.httpPort}
+TURN_DOMAIN=${v.turnDomain ?? ""}
 HOST_UID=${v.uid}
 HOST_GID=${v.gid}
 `;
@@ -86,6 +92,9 @@ ${build("server")}    image: ${v.image}-server
     # LiveKit (host networking) posts webhooks here; Caddy reaches the app over the compose network (14 §2).
     ports:
       - "127.0.0.1:3000:3000"
+    # The app reaches LiveKit's API through the Docker host gateway (18 T26).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -118,15 +127,18 @@ ${build("web")}    image: ${v.image}-web
       - caddy-data:/data
       - caddy-config:/config
 
-  # Not used by M1 (no voice module yet). Start it with: docker compose --profile voice up -d
+  # Voice. Start it with: docker compose --profile voice up -d
+  # The version is pinned: the tested one is part of each Tin Can release (14 §7, 18 K-03).
   livekit:
     profiles: [voice]
-    image: livekit/livekit-server # pin a version before enabling (spike D1, 18 K-03)
+    image: ${LIVEKIT_IMAGE}
     restart: unless-stopped
     network_mode: host
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
+      # Caddy's certificates, read-only, for TURN/TLS. LiveKit loads them at start only (18 D6, T30).
+      - caddy-data:/caddy:ro
 
 volumes:
   caddy-data:
@@ -136,7 +148,8 @@ volumes:
 
 export function caddyfile(v: InitValues): string {
   const routes = `	encode zstd gzip
-	handle /api/internal/* {
+	@internal path /api/internal/* /api/v1/internal/*
+	handle @internal {
 		respond 404
 	}
 	handle /api/* {
@@ -157,6 +170,15 @@ export function caddyfile(v: InitValues): string {
 		try_files {path} /index.html
 		file_server
 	}`;
+  // The TURN name only exists so Caddy obtains a certificate for it; LiveKit reads the files from the volume.
+  const turnSite =
+    v.turnDomain && !v.insecureHttp
+      ? `
+{$TURN_DOMAIN} {
+	respond 404
+}
+`
+      : "";
   const scheme = v.insecureHttp ? "ws" : "wss";
   // Scripts and styles only from self; Radix positions popovers with inline style attributes, hence style-src-attr.
   const csp = `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ${scheme}://{hostport}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
@@ -189,21 +211,48 @@ ${acme}{$DOMAIN} {
 ${routes}
 ${headers}
 }
-`;
+${turnSite}`;
 }
 
+/** The LiveKit image every generated compose file uses; bumped together with the release (14 §7). */
+export const LIVEKIT_IMAGE = "livekit/livekit-server:v1.13.10";
+
+const CADDY_CERTS = "/caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory";
+
 export function livekitFile(v: InitValues): string {
-  return `# LiveKit configuration (14 §2.2). Unused until the voice milestone; keys come from .env. (verify) in spike D1/D6.
+  const certs = v.turnDomain ? `${CADDY_CERTS}/${v.turnDomain}/${v.turnDomain}` : "";
+  const turn = v.turnDomain
+    ? `turn:
+  enabled: true
+  domain: ${v.turnDomain}
+  tls_port: 5349
+  udp_port: 3478
+  cert_file: ${certs}.crt
+  key_file: ${certs}.key`
+    : `# TURN is off until a second DNS name points at this machine and Caddy has a certificate for it (14 §2.3).
+# Re-run \`tincan init --turn-domain turn.${v.domain}\` in a new directory to see the lines to add:
+turn:
+  enabled: false`;
+  return `# LiveKit configuration (14 §2.2), checked against ${LIVEKIT_IMAGE} in spikes D1 and D6.
 port: 7880
+# The HTTP port (signalling and the admin API) listens on loopback and the Docker host gateway only. The media ports
+# below are not affected by this setting (D6). Keep 7880 closed in the host firewall as well (T26).
+bind_addresses:
+  - 127.0.0.1
+  - ${v.hostGatewayIp}
 rtc:
   tcp_port: 7881
-  udp_port: 7882
+  udp_port: 7882 # one UDP port for all media (18 T4): one firewall rule
   use_external_ip: true
+room:
+  empty_timeout: 60
+  departure_timeout: 20
+${turn}
 keys:
   ${v.livekitKey}: ${v.livekitSecret}
 webhook:
   api_key: ${v.livekitKey}
   urls:
-    - http://127.0.0.1:3000/api/internal/livekit/webhook
+    - http://127.0.0.1:3000/api/v1/internal/livekit/webhook
 `;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { ChannelKind } from "@tincan/shared";
+import type { ChannelKind, ChannelSettings } from "@tincan/shared";
 
 export interface ChannelRecord {
   id: string;
@@ -10,7 +10,7 @@ export interface ChannelRecord {
   position: number;
   createdAt: number;
   archivedAt: number | null;
-  settings: { slowmodeSecs?: number };
+  settings: ChannelSettings;
 }
 
 /** What `channels` offers other modules (04 §5). */

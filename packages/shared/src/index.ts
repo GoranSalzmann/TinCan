@@ -8,3 +8,4 @@ export * from "./password-policy.js";
 export * from "./permissions.js";
 export * from "./community.js";
 export * from "./chat.js";
+export * from "./voice.js";

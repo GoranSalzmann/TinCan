@@ -83,7 +83,14 @@ export const ChannelTypeSchema = z.enum(["text", "voice"]);
 export const ChannelSettingsSchema = z.object({
   /** Seconds a member must wait between messages; 0 or absent is off. */
   slowmodeSecs: z.number().int().min(0).max(21_600).optional(),
+  /** Voice channels (08 §9): maximum people at once (1–99) and the audio bitrate cap in kbit/s. */
+  userLimit: z.number().int().min(1).max(99).optional(),
+  bitrateKbps: z.number().int().min(8).max(128).optional(),
+  videoAllowed: z.boolean().optional(),
+  screenshareAllowed: z.boolean().optional(),
 });
+
+export type ChannelSettings = z.infer<typeof ChannelSettingsSchema>;
 
 export const ChannelSchema = z.object({
   id: z.string(),

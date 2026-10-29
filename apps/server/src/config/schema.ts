@@ -43,8 +43,17 @@ export const CoreConfigSchema = z.strictObject({
       auth: z.strictObject({ kinds: z.array(z.literal("local")).min(1) }).prefault({ kinds: ["local"] }),
     })
     .prefault({}),
-  /** Read but not used until the voice modules arrive (M3). */
-  livekit: z.strictObject({ url: z.string(), apiKey: z.string(), apiSecret: z.string() }).optional(),
+  /** The voice server (08, 14 §2). Without it the voice module stays off. */
+  livekit: z
+    .strictObject({
+      /** Public signalling URL handed to clients, e.g. wss://chat.example.com/livekit. */
+      url: z.string(),
+      /** Internal HTTP URL of the LiveKit API; the compose file reaches the host-networked server through the Docker host gateway. */
+      apiUrl: z.string().default("http://127.0.0.1:7880"),
+      apiKey: z.string(),
+      apiSecret: z.string(),
+    })
+    .optional(),
   log: z
     .strictObject({
       level: z.enum(["trace", "debug", "info", "warn", "error", "silent"]).default("info"),

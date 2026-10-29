@@ -62,7 +62,7 @@ export function resolveModules(input: ResolveInput): ResolvedModules {
         });
       }
       enabled.add(m.id);
-    } else if (flag !== false) {
+    } else if (flag === true || (flag === undefined && (m.enabledByDefault?.(ports) ?? true))) {
       enabled.add(m.id);
     }
   }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -9,6 +10,7 @@ import { cliSetup, configCheck, moduleList, userCreate } from "./cli/admin.js";
 import { formatReport, runDoctor } from "./cli/doctor.js";
 import { permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
 import { runInit } from "./cli/init.js";
+import { turnReloadReport } from "./cli/voice-checks.js";
 import { ConfigError } from "./config/errors.js";
 import { loadConfig } from "./config/load.js";
 import { VERSION } from "./version.js";
@@ -26,18 +28,20 @@ Usage: tincan [admin] <command> [options]
   user create             Add a member (the owner must exist)
   user reset-password     Print a one-time password-reset code for a user (or --owner)
   search reindex          Rebuild the search index from the messages, online
+  voice turn-reload       Restart LiveKit for a renewed TURN certificate when no call is running
   perms explain           Show how a member's permissions in a channel come about
   version
 
 Common options:
   --config <file>         Configuration file (default: $TINCAN_CONFIG or ./config.yaml)
 
-init:    --dir <dir> --domain <host> [--email <addr>] [--name <community>] [--http-port <n>] [--yes] [--force]
+init:    --dir <dir> --domain <host> [--email <addr>] [--name <community>] [--http-port <n>] [--turn-domain <name>] [--host-gateway-ip <ip>] [--yes] [--force]
 setup:   --username <name> [--display-name <name>] [--instance-name <name>] [--password-stdin]
 user create: --username <name> [--display-name <name>] [--password-stdin]
 user reset-password: --username <name> | --owner
 perms explain: --user <username> --channel <name or id>
-doctor:  [--url <public url>]
+doctor:  [--url <public url>] [--turn-domain <name>]
+voice turn-reload: --turn-domain <name> [--apply]
 `;
 
 function configPath(given: string | undefined): string | undefined {
@@ -57,8 +61,11 @@ async function main(argv: string[]): Promise<number> {
       email: { type: "string" },
       name: { type: "string" },
       "http-port": { type: "string" },
+      "turn-domain": { type: "string" },
+      "host-gateway-ip": { type: "string" },
       yes: { type: "boolean", short: "y" },
       force: { type: "boolean" },
+      apply: { type: "boolean" },
       username: { type: "string" },
       "display-name": { type: "string" },
       "instance-name": { type: "string" },
@@ -90,6 +97,8 @@ async function main(argv: string[]): Promise<number> {
         ...(values.email ? { email: values.email } : {}),
         ...(values.name ? { name: values.name } : {}),
         ...(values["http-port"] ? { httpPort: Number(values["http-port"]) } : {}),
+        ...(values["turn-domain"] ? { turnDomain: values["turn-domain"] } : {}),
+        ...(values["host-gateway-ip"] ? { hostGatewayIp: values["host-gateway-ip"] } : {}),
       });
       console.log(lines.join("\n"));
       return 0;
@@ -127,6 +136,7 @@ async function main(argv: string[]): Promise<number> {
       const path = configPath(values.config);
       const results = await runDoctor(config, {
         ...(values.url ? { url: values.url } : {}),
+        ...(values["turn-domain"] ? { turnDomain: values["turn-domain"] } : {}),
         ...(path ? { configDir: dirname(resolve(path)) } : {}),
       });
       console.log(formatReport(results));
@@ -144,6 +154,29 @@ async function main(argv: string[]): Promise<number> {
           passwordStdin: values["password-stdin"] ?? false,
         }),
       );
+      return 0;
+    }
+
+    case "voice": {
+      if (sub !== "turn-reload")
+        throw new Error("usage: tincan voice turn-reload --turn-domain <name> [--apply]");
+      const domain = values["turn-domain"] ?? process.env.TURN_DOMAIN;
+      if (!domain) throw new Error("--turn-domain <name> is required");
+      const config = loadConfig(configPath(values.config));
+      const report = await turnReloadReport(config, domain);
+      console.log(report.lines.join("\n"));
+      if (report.decision === "restart") {
+        if (!values.apply) {
+          console.log("Run again with --apply to restart LiveKit now (this drops any call in progress).");
+        } else {
+          const path = configPath(values.config);
+          const r = spawnSync("docker", ["compose", "restart", "livekit"], {
+            cwd: path ? dirname(resolve(path)) : ".",
+            stdio: "inherit",
+          });
+          return r.status ?? 1;
+        }
+      }
       return 0;
     }
 

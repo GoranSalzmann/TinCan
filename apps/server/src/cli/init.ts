@@ -14,6 +14,10 @@ export interface InitOptions {
   email?: string;
   name?: string;
   httpPort?: number;
+  /** DNS name for TURN/TLS (a second name pointing at this machine); TURN stays off without it. */
+  turnDomain?: string;
+  /** Docker host gateway address, when `docker0` is not 172.17.0.1. */
+  hostGatewayIp?: string;
   yes: boolean;
   force: boolean;
   insecureHttp?: boolean;
@@ -53,6 +57,8 @@ export function buildValues(
     instanceSecret: hex(32),
     livekitKey: `API${hex(6)}`,
     livekitSecret: hex(24),
+    turnDomain: insecureHttp ? null : (o.turnDomain ?? null),
+    hostGatewayIp: o.hostGatewayIp ?? "172.17.0.1",
     uid: typeof process.getuid === "function" ? process.getuid() : 1000,
     gid: typeof process.getgid === "function" ? process.getgid() : 1000,
     repoDir: repo ? (relative(outDir, repo) || ".").replace(/\\/g, "/") : null,
@@ -132,10 +138,10 @@ function describe(f: (typeof FILES)[number]): string {
     case "config.yaml":
       return "settings";
     case "docker-compose.yml":
-      return "Caddy + app (+ LiveKit, not started yet)";
+      return "Caddy + app + LiveKit (voice; start with --profile voice)";
     case "Caddyfile":
       return "TLS, routes and security headers";
     case "livekit.yaml":
-      return "LiveKit settings (voice arrives in a later milestone)";
+      return "LiveKit settings (ports, webhook, TURN)";
   }
 }

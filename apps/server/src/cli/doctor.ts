@@ -10,6 +10,7 @@ import type { CoreConfig } from "../config/schema.js";
 import { resolveModules } from "../framework/loader.js";
 import { ALL_MODULES } from "../modules/index.js";
 import { VERSION } from "../version.js";
+import { runVoiceChecks } from "./voice-checks.js";
 
 /** Glyphs of the design legend (docs/design/README.md): ok, failed, skipped. */
 export type CheckStatus = "ok" | "fail" | "warn" | "skip";
@@ -70,7 +71,7 @@ async function check(name: string, fn: () => Promise<Omit<CheckResult, "name">>)
 /**
  * `tincan doctor` v0 (14 §9): configuration, disk, memory, database, then the public path
  * (DNS, HTTPS/proxy, capabilities, WebSocket). Network checks talk only to this instance's own URL.
- * Voice checks (UDP, TURN, LiveKit API, webhook round trip) arrive with the voice milestone.
+ * Voice checks (LiveKit API, webhook path, media ports, TURN, public IP) are in voice-checks.ts.
  */
 /**
  * A config made by `tincan init` holds container paths (`dataDir: /data`). On the host that folder is the
@@ -93,7 +94,7 @@ export function resolveDataDir(
 
 export async function runDoctor(
   config: CoreConfig,
-  opts: { url?: string; configDir?: string } = {},
+  opts: { url?: string; configDir?: string; turnDomain?: string } = {},
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const url = opts.url ?? config.instance.publicUrl;
@@ -249,14 +250,9 @@ export async function runDoctor(
         },
   );
 
-  for (const name of [
-    "Voice server reachable",
-    "Voice media port (UDP 7882)",
-    "Relay (TURN/TLS 5349)",
-    "Public IP matches",
-  ]) {
-    results.push({ name, status: "skip", detail: "arrives with voice (milestone 3)" });
-  }
+  results.push(
+    ...(await runVoiceChecks(config, { url, ...(opts.turnDomain ? { turnDomain: opts.turnDomain } : {}) })),
+  );
   return results;
 }
 
