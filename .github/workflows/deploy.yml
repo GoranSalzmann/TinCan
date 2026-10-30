@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Deploys a release to the author's server (docs/guides/deploy.md, docs/14 §7). Other installations do not need this
+# file: they upgrade with the steps in the hosting guide, or copy this setup.
+#
+# Triggers:
+#   - the Release workflow finishing successfully for a tag v1.2.3 (not a pre-release tag, not its dry run). A release made
+#     with the workflow's own token does not start other workflows, which is why this listens for the workflow, not for
+#     the "release published" event;
+#   - by hand (Actions > Deploy > Run workflow) with a version: a re-deploy, or going back to an older release.
+#
+# It connects with a key that can run one command on the host (see docs/guides/deploy.md): `deploy <version>`, which runs
+# deploy/deploy.sh there. The script takes a verified backup first and rolls back when the new version is not healthy.
+# Secrets (Settings > Secrets and variables > Actions): DEPLOY_SSH_KEY, DEPLOY_HOST (user@host), DEPLOY_KNOWN_HOSTS.
+# Optional variable DEPLOY_URL (https://chat.example.com): checked from outside after the deploy.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release to deploy, e.g. 1.0.1 (it must exist as an image on GHCR)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One deploy at a time; a second one waits instead of cancelling the first (a deploy must never be cut off half way).
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # For workflow_run: only a successful release run caused by a pushed tag (the manual run of Release is a dry run).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Which version
+        id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ inputs.version }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then ref=$INPUT; else ref=$RUN_TAG; fi
+          version=${ref#v}
+          if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+            echo "::notice::\"$ref\" is not a release version; nothing to deploy."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A pre-release tag is deployed only when somebody asks for it by hand.
+          if [ "$EVENT" != workflow_dispatch ] && printf '%s' "$version" | grep -q -- '-'; then
+            echo "::notice::$version is a pre-release; it is not deployed automatically."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.v.outputs.deploy == 'true'
+        with:
+          # The script of the commit that was released, to compare with the copy on the host.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Connect settings
+        if: steps.v.outputs.deploy == 'true'
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::The secret DEPLOY_SSH_KEY is not set (docs/guides/deploy.md)."; exit 1; }
+          [ -n "$KNOWN_HOSTS" ] || { echo "::error::The secret DEPLOY_KNOWN_HOSTS is not set (docs/guides/deploy.md)."; exit 1; }
+          case $HOST in ?*@?*) ;; *) echo "::error::The secret DEPLOY_HOST must look like user@host (docs/guides/deploy.md)."; exit 1 ;; esac
+          install -d -m 700 ~/.ssh
+          (umask 077; printf '%s\n' "$KEY" > ~/.ssh/deploy_key)
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # No trust on first use: the host key comes from the secret, and a changed key stops the deploy.
+          cat > ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName ${HOST#*@}
+            User ${HOST%@*}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 15
+            ServerAliveCountMax 8
+          EOF
+      - name: Is the script on the host the one in this commit?
+        if: steps.v.outputs.deploy == 'true'
+        run: |
+          want=$(sha256sum deploy/deploy.sh | cut -d' ' -f1)
+          have=$(ssh deploy-target hash) || { echo "::error::Cannot reach the host, or the key is not set up as the guide says."; exit 1; }
+          if [ "$want" != "$have" ]; then
+            echo "::warning::deploy/deploy.sh on the host differs from this commit (host $have, repo $want). Update it as docs/guides/deploy.md says; this deploy uses the host's copy."
+          fi
+      - name: Deploy
+        if: steps.v.outputs.deploy == 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          echo "Deploying $VERSION"
+          set +e
+          ssh deploy-target "deploy $VERSION"
+          rc=$?
+          case $rc in
+            0) echo "::notice::Deployed $VERSION." ;;
+            10) echo "::error::$VERSION did not become healthy; the previous version is running again, no data lost." ;;
+            11) echo "::error::$VERSION did not become healthy and a migration had changed the database: the data was restored from before the migration, and what members wrote since is lost. See ~/tincan-deploy.log on the host." ;;
+            12) echo "::error::$VERSION failed and the rollback failed too. The server needs a person: see ~/tincan-deploy.log on the host." ;;
+            3) echo "::error::Another deploy was running on the host." ;;
+            *) echo "::error::The deploy stopped with code $rc before changing anything that matters (2 version, 4 preflight, 5 backup, 6 image pull, 255 ssh)." ;;
+          esac
+          exit $rc
+      - name: Check from outside
+        if: steps.v.outputs.deploy == 'true' && vars.DEPLOY_URL != ''
+        env:
+          URL: ${{ vars.DEPLOY_URL }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          for i in 1 2 3 4 5 6; do
+            caps=$(curl -fsS -m 10 "$URL/api/v1/capabilities" || true)
+            case $caps in *"\"version\":\"$VERSION\""*) echo "$URL reports $VERSION"; exit 0 ;; esac
+            sleep 10
+          done
+          echo "::error::$URL does not report $VERSION (got: ${caps:-nothing})"
+          exit 1
+      - name: Remove the key
+        if: always()
+        run: rm -rf ~/.ssh/deploy_key ~/.ssh/config ~/.ssh/known_hosts

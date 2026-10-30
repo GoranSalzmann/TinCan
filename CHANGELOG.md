@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- **Automatic deployment (optional):** a Deploy workflow that, after each release, connects to your server with a restricted ssh key and runs `deploy/deploy.sh`: verified backup first, images pulled by version, only the image lines of `docker-compose.yml` changed, health, reported version and `tincan doctor` checked, and a rollback (including restoring the pre-migration snapshot, with the lost data window stated) when the new version does not come up. Set-up, exit codes and security notes in [docs/guides/deploy.md](docs/guides/deploy.md). Nothing changes for installations that do not set it up.
+
 ## [1.0.0] - 2026-10-30
 
 First release (1.0.0). There was no public beta. Everything below was built before the first release and ran on one server (the author's) with a small group of friends; read the list of what is not proven in [docs/17](docs/17-roadmap-and-milestones.md#v10).

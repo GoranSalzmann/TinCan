@@ -611,6 +611,22 @@ Decision (owner): the public beta (M7's exit of three independent hosts and no o
 
 The README, `CHANGELOG.md`, `docs/17` (v1.0) and `docs/release-checklist.md` say the same. Release label: *feature-complete for the documented scope and stable for the author's use, not battle-tested by outsiders.*
 
+## R. Automatic deployment to mkarl.io (2026-10-30)
+
+Owner decisions: deploy only when a release is made, no approval step, the server may be updated while calls run (the app restart does not end them; a LiveKit restart would, and a deploy does not restart LiveKit unless its definition changed), repository and packages are public (no pull token). Rollback was left to the builder.
+
+| Ref | Decision or finding |
+|---|---|
+| R-1 | Trigger is `workflow_run` of the Release workflow (success, event push), not `release: published`: a release created with `GITHUB_TOKEN` starts no other workflow. Pre-release tags and the dry run are skipped; a manual run takes a version |
+| R-2 | One forced command (`command="…",restrict`) runs a script that is installed on the host, not sent by the workflow, so a leaked key can deploy an existing image tag and nothing else. The workflow warns when the host copy differs from the released commit (`hash`) |
+| R-3 | Rollback in two stages: put back the old compose file and images; if the old version refuses to start (a migration ran), put back the pre-migration snapshot (else the verified backup) and report the data window. Detection is by trying, not by guessing whether a migration ran |
+| R-4 | The health check also requires `/api/v1/capabilities` to report the new version, so a container that stayed on the old image cannot pass |
+| R-5 | The compose edit only touches the `image:` lines of the app, web and backup services and drops `build:` blocks; `.env`, `config.yaml`, `Caddyfile`, `livekit.yaml` are never rewritten |
+| R-6 | **Not verified:** the host's real compose file (read access to mkarl.io was refused to the builder; the script fails safely if its image lines look unexpected), the real ssh path and GHCR. See guides/deploy.md §7 for what the tests and the rehearsal on real Docker do prove |
+| R-7 | Open: the host must be moved to release images once by hand; going back across a migration remains a manual restore |
+
+Guide: [guides/deploy.md](guides/deploy.md).
+
 ## Open items
 
 - Decisions and steps in the release checklist.

@@ -166,6 +166,7 @@ caddy-data/  ACME account & certificates
 - Procedure: `tincan backup` → read release notes → bump versions → `docker compose pull && docker compose up -d`. Migrations run automatically at boot (06 §8) after an automatic pre-migration backup (the same `VACUUM INTO` snapshot, not a file copy, 06 §8).
 - Zero-downtime is not a goal; expected downtime seconds. LiveKit restarts drop calls; the app server restart doesn't.
 - Rollback: restore the pre-upgrade backup and previous image tag (the server refuses to start on a newer schema, 06 §8, to prevent silent corruption).
+- Automatic deployment (optional, used by the author's server): the Deploy workflow runs `deploy/deploy.sh` on the host over a restricted ssh key after each release: verified backup, pull by version, only the image lines of the compose file change, health + reported version + `tincan doctor`, rollback to the old images or, when a migration made the old version unable to start, restore of the pre-migration snapshot with the lost data window reported. Details and exit codes: guides/deploy.md.
 - Desktop clients update independently; `apiVersion` negotiation covers skew (07 §6). Release notes flag breaking protocol changes and the minimum client version.
 - Optional "update available" notice for admins in the UI (checks a public version feed; **off by default, no telemetry**; opt-in).
 

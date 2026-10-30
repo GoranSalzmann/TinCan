@@ -48,6 +48,8 @@ jobs:
         run: pnpm check:licenses
       - name: Secret scan
         run: pnpm check:secrets
+      - name: Deploy script
+        run: shellcheck deploy/deploy.sh tools/deploy/*.sh
 
   dco:
     if: github.event_name == 'pull_request'

@@ -131,6 +131,8 @@ Read the release notes of every version between yours and the new one: they say 
 
 **Rolling back.** An older version refuses to start on a database a newer version has changed. That is on purpose, so nothing is damaged. To go back: stop (`docker compose down`), restore the pre-upgrade backup into a new directory (`tincan restore`, or copy the matching `pre-migrate-….db` over `data/app.db` while stopped), set the previous tags, `docker compose up -d`. Everything written after the backup is lost, so decide early. This path was rehearsed with a real previous release ([admin guide §5](admin-guide.md#5-upgrade-and-rollback)).
 
+To have these steps (with a verified backup and an automatic rollback) run by GitHub after each release, see [automatic deployment](deploy.md).
+
 Pre-release tags (`-rc.N`) never move `latest`. The generated files pin an exact version on purpose; you decide when to upgrade.
 
 ## 7. Troubleshooting
