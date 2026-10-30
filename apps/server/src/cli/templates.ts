@@ -193,7 +193,8 @@ export function caddyfile(v: InitValues): string {
   const headers = `	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
-		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self)"
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=()"
+		Cross-Origin-Opener-Policy same-origin
 		Content-Security-Policy "${csp}"${v.insecureHttp ? "" : `\n		Strict-Transport-Security "max-age=31536000"`}
 	}`;
   if (v.insecureHttp) {

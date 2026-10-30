@@ -2,11 +2,11 @@
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
-import pino, { type Logger as PinoLogger } from "pino";
+import pino, { type DestinationStream, type Logger as PinoLogger } from "pino";
 import { LocalAuthAdapter } from "@tincan/auth";
 import { coreMigrations, openSqlite, sql, type Db, type ModuleMigrations } from "@tincan/db";
 import { MemoryPubSub, type PubSub } from "@tincan/pubsub";
-import { API_PREFIX, GATEWAY_DEFAULTS, GATEWAY_PATH } from "@tincan/shared";
+import { API_PREFIX, CloseCode, GATEWAY_DEFAULTS, GATEWAY_PATH } from "@tincan/shared";
 import { LocalStorage, type Storage } from "@tincan/storage";
 import type { CoreConfig } from "./config/schema.js";
 import { ConfigError } from "./config/errors.js";
@@ -80,23 +80,47 @@ export interface RunningApp {
   close(): Promise<void>;
 }
 
-export function createLogger(config: CoreConfig): PinoLogger {
-  return pino({
-    level: config.log.level,
-    redact: {
-      paths: [
-        "req.headers.authorization",
-        "req.headers.cookie",
-        'res.headers["set-cookie"]',
-        "*.password",
-        "*.newPassword",
-        "*.currentPassword",
-        "*.token",
-        "*.ticket",
-      ],
-      censor: "[redacted]",
+/**
+ * What a URL may show in a log line (15 §6, S-12): invite codes and reset codes are bearer secrets and can be part of
+ * a path or query, so only the route's shape is kept.
+ */
+export function redactUrl(url: string): string {
+  const path = url.split("?")[0] ?? "";
+  return path
+    .replace(/^(\/api\/v1\/invites\/)[^/]+/, "$1[redacted]")
+    .replace(/^(\/(?:api\/v1\/)?files\/[^/]+\/)[^/]+/, "$1[name]")
+    .concat(url.includes("?") ? "?[query]" : "");
+}
+
+export function createLogger(config: CoreConfig, destination?: DestinationStream): PinoLogger {
+  return pino(
+    {
+      level: config.log.level,
+      serializers: {
+        req: (req: { method?: string; url?: string; hostname?: string; ip?: string; id?: string }) => ({
+          method: req.method,
+          url: redactUrl(req.url ?? ""),
+          hostname: req.hostname,
+          remoteAddress: req.ip,
+          id: req.id,
+        }),
+      },
+      redact: {
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          'res.headers["set-cookie"]',
+          "*.password",
+          "*.newPassword",
+          "*.currentPassword",
+          "*.token",
+          "*.ticket",
+        ],
+        censor: "[redacted]",
+      },
     },
-  });
+    destination,
+  );
 }
 
 /** Boot step 2: instantiate the configured adapters and prove they work (04 §4). */
@@ -241,7 +265,15 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
   const apis = new ApiMap();
 
   const metrics = new MetricsRegistry();
-  const app = await createHttpApp({ logger, trustProxy: config.server.trustProxy, security, metrics });
+  const { gatewaySessionsPerUser, gatewaySocketsPerIp, ...rateLimits } = config.security.rateLimit;
+  const app = await createHttpApp({
+    logger,
+    trustProxy: config.server.trustProxy,
+    security,
+    metrics,
+    kv: ports.pubsub.kv,
+    rateLimits,
+  });
 
   let address: string | null = null;
   const facade: KernelFacade = {
@@ -263,6 +295,8 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     ...config.server.allowedOrigins.map((o) => new URL(o).origin),
   ]);
   const heartbeatIntervalMs = gw.heartbeatIntervalMs ?? GATEWAY_DEFAULTS.heartbeatIntervalMs;
+  const socketsByIp = new Map<string, number>();
+  hub.maxSessionsPerUser = gatewaySessionsPerUser;
 
   // Probes and the gateway socket are runtime plumbing, not module features (05 §8, 07 §4).
   app.get("/healthz", () => ({ status: "ok" }));
@@ -289,6 +323,18 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
       },
     },
     (socket, req) => {
+      // A flood of sockets from one address is refused before it costs anything (15 §4.2).
+      const open = (socketsByIp.get(req.ip) ?? 0) + 1;
+      if (open > gatewaySocketsPerIp) {
+        socket.close(CloseCode.RATE_LIMITED, "too many connections from this address");
+        return;
+      }
+      socketsByIp.set(req.ip, open);
+      socket.once("close", () => {
+        const left = (socketsByIp.get(req.ip) ?? 1) - 1;
+        if (left <= 0) socketsByIp.delete(req.ip);
+        else socketsByIp.set(req.ip, left);
+      });
       const v = (req.query as Record<string, string | undefined>).v;
       handleConnection(socket, v, {
         hub,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { randomBytes } from "node:crypto";
-import { GATEWAY_DEFAULTS, Op } from "@tincan/shared";
+import { CloseCode, GATEWAY_DEFAULTS, Op } from "@tincan/shared";
 import type { Actor, GatewayCommandHandler } from "../framework/types.js";
 import { RingBuffer } from "./ring.js";
 
@@ -69,6 +69,7 @@ export class GatewayHub {
 
   /** `channels` is the user's current visibility set, computed by `roles` just before the session is created. */
   create(actor: Actor, channels: ReadonlySet<string> = new Set()): GatewaySession {
+    this.#capSessions(actor.userId);
     const id = randomBytes(18).toString("base64url");
     const session = new GatewaySession(
       id,
@@ -78,6 +79,19 @@ export class GatewayHub {
     session.channels = channels;
     this.sessions.set(id, session);
     return session;
+  }
+
+  /** Most gateway sessions one member may hold; when a new one starts beyond it, the oldest ends (15 §4.2). */
+  maxSessionsPerUser = Number.POSITIVE_INFINITY;
+
+  #capSessions(userId: string): void {
+    const mine = [...this.sessions].filter(([, s]) => s.actor.userId === userId);
+    // Map order is creation order, so the first ones are the oldest.
+    for (const [id, session] of mine.slice(0, Math.max(0, mine.length - this.maxSessionsPerUser + 1))) {
+      this.sessions.delete(id);
+      session.conn?.close(CloseCode.SESSION_REPLACED, "too many sessions");
+      session.conn = null;
+    }
   }
 
   /** Called whenever a socket attaches to a session (IDENTIFY, RESUME). */

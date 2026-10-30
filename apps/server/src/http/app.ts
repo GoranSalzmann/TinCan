@@ -19,7 +19,9 @@ import {
 } from "@tincan/shared";
 import { HTTP_BUCKETS, type MetricsRegistry } from "../framework/metrics.js";
 import type { Actor, Authenticator, RequestGate } from "../framework/types.js";
+import type { Kv } from "@tincan/pubsub";
 import { parseCookies } from "./cookies.js";
+import { enforceRateLimit } from "./rate-limit.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -31,6 +33,8 @@ declare module "fastify" {
     authenticate: (req: FastifyRequest) => Promise<void>;
     /** preHandler: authenticate, then require the instance owner. */
     requireOwner: (req: FastifyRequest) => Promise<void>;
+    /** Every route registered, for the test that proves each one asks for a login or is on the public list (S-04). */
+    routeTable: RouteInfo[];
   }
 }
 
@@ -39,11 +43,27 @@ export interface SecurityState {
   gates: RequestGate[];
 }
 
+export interface RateLimits {
+  readsPerMinute: number;
+  writesPerMinute: number;
+  perIpPerMinute: number;
+}
+
 export interface HttpOptions {
   logger: PinoLogger;
   trustProxy: boolean;
   security: SecurityState;
   metrics?: MetricsRegistry;
+  /** Storage for the API rate limits; without it none are applied (unit tests of the plumbing). */
+  kv?: Kv;
+  rateLimits?: RateLimits;
+}
+
+export interface RouteInfo {
+  method: string;
+  url: string;
+  /** True when `authenticate` or `requireOwner` runs before the handler. */
+  auth: boolean;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -85,6 +105,16 @@ export async function createHttpApp(opts: HttpOptions): Promise<FastifyInstance>
   await app.register(websocket, { options: { maxPayload: MAX_CLIENT_FRAME_BYTES } });
 
   app.decorateRequest("actor", null);
+  const routeTable: RouteInfo[] = [];
+  app.decorate("routeTable", routeTable);
+  app.addHook("onRoute", (r) => {
+    const hooks = [r.onRequest, r.preParsing, r.preValidation, r.preHandler]
+      .flat()
+      .filter((h): h is NonNullable<typeof h> => typeof h === "function");
+    const auth = hooks.some((h) => h === app.authenticate || h === app.requireOwner);
+    for (const method of Array.isArray(r.method) ? r.method : [r.method])
+      routeTable.push({ method, url: r.url, auth });
+  });
 
   const authenticate = async (req: FastifyRequest) => {
     const found = extractToken(req);
@@ -97,6 +127,15 @@ export async function createHttpApp(opts: HttpOptions): Promise<FastifyInstance>
     const actor = await auth.fromToken(found.token);
     if (!actor) throw new AppError("UNAUTHENTICATED", "Your session has ended. Log in again.");
     req.actor = actor;
+    // A signed-in member's calls are bounded per minute, reads and writes apart (S-11).
+    if (opts.kv && opts.rateLimits) {
+      const write = !SAFE_METHODS.has(req.method);
+      await enforceRateLimit(opts.kv, {
+        key: `api:${write ? "w" : "r"}:${actor.userId}`,
+        max: write ? opts.rateLimits.writesPerMinute : opts.rateLimits.readsPerMinute,
+        windowMs: 60_000,
+      });
+    }
   };
   app.decorate("authenticate", authenticate);
   app.decorate("requireOwner", async (req: FastifyRequest) => {
@@ -106,6 +145,14 @@ export async function createHttpApp(opts: HttpOptions): Promise<FastifyInstance>
 
   app.addHook("onRequest", async (req) => {
     if (!req.url.startsWith("/api/")) return;
+    // Everything from one address, signed in or not. LiveKit's webhooks come from loopback in bursts and are signed.
+    if (opts.kv && opts.rateLimits && !req.url.startsWith("/api/v1/internal/")) {
+      await enforceRateLimit(opts.kv, {
+        key: `api:ip:${req.ip}`,
+        max: opts.rateLimits.perIpPerMinute,
+        windowMs: 60_000,
+      });
+    }
     for (const gate of opts.security.gates) await gate(req);
   });
 

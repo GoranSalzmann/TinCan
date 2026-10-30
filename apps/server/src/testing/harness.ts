@@ -70,11 +70,21 @@ export async function startTestServer(
     config?: Record<string, unknown>;
     modules?: BootOptions["modules"];
     gateway?: BootOptions["gateway"];
+    logger?: BootOptions["logger"];
   } = {},
 ): Promise<TestServer> {
   const dir = mkdtempSync(join(tmpdir(), "tincan-srv-"));
   const raw = {
-    security: { instanceSecret: "test-secret-".padEnd(40, "x") },
+    // Tests make thousands of calls from one address in seconds; the limits have their own test.
+    security: {
+      instanceSecret: "test-secret-".padEnd(40, "x"),
+      rateLimit: {
+        readsPerMinute: 1_000_000,
+        writesPerMinute: 1_000_000,
+        perIpPerMinute: 1_000_000,
+        gatewaySocketsPerIp: 10_000,
+      },
+    },
     instance: { name: "Test Place", publicUrl: "http://localhost" },
     dataDir: dir,
     adapters: {
@@ -91,6 +101,7 @@ export async function startTestServer(
     config,
     ...(opts.modules ? { modules: opts.modules } : {}),
     ...(opts.gateway ? { gateway: opts.gateway } : {}),
+    ...(opts.logger ? { logger: opts.logger } : {}),
   });
   const url = running.address!;
   const wsUrl = url.replace(/^http/, "ws");
