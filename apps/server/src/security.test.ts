@@ -333,6 +333,45 @@ describe("files cannot run as part of the app (S-07)", () => {
   });
 });
 
+describe("uploads cannot exhaust memory (15 §4.2, 18 §N)", () => {
+  it("turns away uploads that would go over the memory budget, with a retry hint, and counts them", async () => {
+    s = await startTestServer({
+      config: {
+        modules: {
+          accounts: { signup: "open" },
+          uploads: { maxBytes: 20 * 1024 * 1024, memoryBudgetBytes: 16 * 1024 * 1024 },
+        },
+      },
+    });
+    await s.setupOwner();
+    const people = [
+      await s.register("aa"),
+      await s.register("bb"),
+      await s.register("cc"),
+      await s.register("dd"),
+    ];
+    const body = Buffer.alloc(10 * 1024 * 1024, 5);
+    const results = await Promise.all(
+      people.map((p) => {
+        const form = new FormData();
+        form.set("file", new Blob([body], { type: "application/octet-stream" }), "big.bin");
+        return s!.request("POST", "/api/v1/uploads", { token: p.token, form });
+      }),
+    );
+    const busy = results.filter((r) => r.status === 429);
+    expect(results.some((r) => r.status === 201)).toBe(true);
+    expect(busy.length).toBeGreaterThanOrEqual(1);
+    expect(busy[0]!.headers.get("retry-after")).toBe("5");
+    expect(busy[0]!.body.error.details.reason).toBe("upload_memory");
+    const metrics = (await s.request("GET", "/api/v1/metrics")).bytes.toString();
+    expect(metrics).toMatch(/tincan_uploads_busy_total [1-9]/);
+    // After they finish the budget is free again.
+    const form = new FormData();
+    form.set("file", new Blob([body], { type: "application/octet-stream" }), "big.bin");
+    expect((await s.request("POST", "/api/v1/uploads", { token: people[0]!.token, form })).status).toBe(201);
+  });
+});
+
 describe("revocation (S-03, 11 §1.2)", () => {
   it("a password change, a reset code and a ban each end the other sessions at once, sockets included", async () => {
     s = await startTestServer();

@@ -156,6 +156,10 @@ export default defineModule({
       "tincan_uploads_rejected_total",
       "Uploads refused (size, quota, type, rate, permission)",
     );
+    const upBusy = m.counter(
+      "tincan_uploads_busy_total",
+      "Uploads told to retry because the memory budget was in use",
+    );
     const upInflight = m.gauge("tincan_uploads_in_flight", "Uploads being processed right now");
     const upMem = m.gauge(
       "tincan_uploads_in_flight_bytes",
@@ -171,6 +175,7 @@ export default defineModule({
       upCount.setTotal(undefined, u.uploads);
       upBytes.setTotal(undefined, u.bytes);
       upRejected.setTotal(undefined, u.rejected);
+      upBusy.setTotal(undefined, u.busy);
       upInflight.set(u.inFlight);
       upMem.set(u.inFlightBytes);
       upPeak.set(u.peakInFlightBytes);

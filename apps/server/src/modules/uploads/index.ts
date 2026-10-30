@@ -40,6 +40,15 @@ const ConfigSchema = z.strictObject({
   /** Log a warning when the storage disk is fuller than this. */
   diskWarnPercent: z.number().int().min(1).max(100).default(85),
   thumbnailSize: z.number().int().min(64).max(2048).default(512),
+  /**
+   * Memory all running uploads may hold together (uploads are buffered while they are checked and thumbnailed; the load
+   * test measured about 2 × the file size each, 18 §N). A new upload that would go over waits as a "try again" answer.
+   */
+  memoryBudgetBytes: z
+    .number()
+    .int()
+    .min(16 * 1024 * 1024)
+    .default(384 * 1024 * 1024),
 });
 
 /** `Content-Disposition` with an ASCII fallback and the real name encoded (RFC 6266). */
@@ -100,9 +109,18 @@ export default defineModule({
       "/uploads",
       { preHandler: ctx.http.authenticate, schema: { response: { 201: UploadResultSchema } } },
       async (req, reply) => {
-        const file = await readFile(req, svc.limits().maxBytes);
-        const a = await svc.upload(req.actor!.userId, file);
-        return reply.status(201).send(a);
+        // Reserve the memory before reading the body: the declared length, or the largest allowed file if none was declared.
+        const declared = Number(req.headers["content-length"]);
+        const release = svc.reserve(
+          Number.isFinite(declared) && declared > 0 ? declared : svc.limits().maxBytes,
+        );
+        try {
+          const file = await readFile(req, svc.limits().maxBytes);
+          const a = await svc.upload(req.actor!.userId, file);
+          return reply.status(201).send(a);
+        } finally {
+          release();
+        }
       },
     );
 
@@ -188,9 +206,14 @@ export default defineModule({
 
     // ---- avatars ----
     http.put("/users/@me/avatar", { preHandler: ctx.http.authenticate }, async (req, reply) => {
-      const file = await readFile(req, AVATAR_MAX_BYTES);
-      const avatarKey = await svc.setAvatar(req.actor!.userId, file.buffer);
-      return reply.send({ avatarKey });
+      const release = svc.reserve(AVATAR_MAX_BYTES);
+      try {
+        const file = await readFile(req, AVATAR_MAX_BYTES);
+        const avatarKey = await svc.setAvatar(req.actor!.userId, file.buffer);
+        return reply.send({ avatarKey });
+      } finally {
+        release();
+      }
     });
     http.delete("/users/@me/avatar", { preHandler: ctx.http.authenticate }, async (req, reply) => {
       await svc.clearAvatar(req.actor!.userId);

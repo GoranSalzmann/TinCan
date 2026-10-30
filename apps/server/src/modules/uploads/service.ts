@@ -26,6 +26,7 @@ export interface UploadsSettings {
   userQuotaBytes: number;
   diskWarnPercent: number;
   thumbnailSize: number;
+  memoryBudgetBytes: number;
 }
 
 /** Hard ceiling for one file: uploads are buffered in memory while they are checked and thumbnailed. */
@@ -73,7 +74,37 @@ export class UploadsService implements UploadsApi {
     inFlightBytes: 0,
     peakInFlightBytes: 0,
     peakInFlight: 0,
+    busy: 0,
   };
+
+  #reserved = 0;
+
+  /**
+   * Sets aside memory for one upload before its body is read (18 §N). Throws RATE_LIMITED (try again shortly) when the
+   * uploads running now already hold the budget; returns the function that gives the memory back. A single file larger
+   * than the whole budget is still allowed on its own, so raising the file limit never makes uploads impossible.
+   */
+  reserve(bytes: number): () => void {
+    const budget = this.#d.settings.memoryBudgetBytes;
+    if (this.#reserved > 0 && this.#reserved + bytes > budget) {
+      this.#stats.busy++;
+      throw new AppError(
+        "RATE_LIMITED",
+        "The server is busy with other uploads. Try again in a few seconds.",
+        {
+          retryAfterMs: 5000,
+          reason: "upload_memory",
+        },
+      );
+    }
+    this.#reserved += bytes;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#reserved -= bytes;
+    };
+  }
 
   /** Counters for the metrics module; `inFlightBytes` is the memory held by uploads being checked and stored right now. */
   stats(): UploadsStats {

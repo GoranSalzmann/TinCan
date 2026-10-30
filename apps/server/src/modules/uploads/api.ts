@@ -14,6 +14,8 @@ export interface UploadsStats {
   inFlightBytes: number;
   peakInFlight: number;
   peakInFlightBytes: number;
+  /** Uploads turned away because the memory budget was in use. */
+  busy: number;
 }
 
 /** What `uploads` offers other modules (04 §5): attaching uploads to messages and reading them back. */
