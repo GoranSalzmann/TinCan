@@ -17,7 +17,7 @@ exist to compare milestones, not to promise dates.
 ## 2. Milestone overview
 
 ```
- M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video ─▶ M5 Hardening ─▶ M6 Desktop (dropped) ─▶ M7 Beta ─▶ v1.0
+ M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video ─▶ M5 Hardening ─▶ M6 Desktop (dropped) ─▶ M7 Beta (dropped) ─▶ v1.0
    (S–M)        (M)           (L)        (L)         (L)           (L)             (L)          (M)
 ```
 
@@ -114,7 +114,10 @@ tray/badges/notifications/autostart, deep links, pop-out/PiP, auto-update,
 signing + notarisation pipeline, Linux packaging, Wayland support work. Starts with spike D3.
 **Exit:** the success criteria in 01 §8 are demonstrable end to end on all three OSes.
 
-### M7. Beta
+### M7. Beta (dropped, preparation kept)
+**Decision (you, 2026-10-30): no public beta.** The project is brought to an early close: once TURN works, the first release is **1.0.0**, and feedback comes through GitHub Issues. The exit "≥ 3 independent Hosts, no open P0/P1" is withdrawn, not met. The preparation below was built and is used as it is.
+
+Original scope:
 Invite a wider set of testers (other hosts, not only your friends), collect
 issues, burn down P0/P1, release notes, website/README,
 `SECURITY.md`, CONTRIBUTING (DCO), issue templates, example deployments for common providers.
@@ -122,7 +125,18 @@ issues, burn down P0/P1, release notes, website/README,
 **Status (2026-10-30): preparation done on a branch, nothing published.** Written: README, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CHANGELOG.md and a release-notes template, issue forms, pull request template, Dependabot and CODEOWNERS, the release workflow (multi-arch images, SBOMs, checksums, attestations, dry run), `tincan init --image/--version`, the clean-install test (passes locally; opt-in nightly job), the hosting guide, the public-readiness audit and the release checklist. **Still to do, by you:** the name check (F4), the contact placeholders, the history decisions, the GitHub settings, the dry run and the first tag ([release-checklist.md](release-checklist.md)); then recruit hosts and count to three. Facts and cuts: 18 §P.
 
 ### v1.0
-Tag, publish images/checksums/SBOM, announce.
+Tag `v1.0.0`, publish images/checksums/SBOM. No announcement campaign.
+
+**Decision (you, 2026-10-30):** 1.0 is released when the TURN relay works on mkarl.io and you have done the GitHub steps in [release-checklist.md](release-checklist.md). It is labelled honestly: *1.0 means feature-complete for the scope of docs 01 and 17 and stable for the author's own use, not battle-tested by outsiders.*
+
+**What 1.0 does not prove** (the README says the same):
+- Only one installation exists (the author's, with friends). No independent host has run it; the clean-install test passed locally only.
+- Never run: Safari, a phone, Firefox for video and encrypted calls; a restore on a second machine; the release workflow on GitHub's runners (dry run is yours); arm64 on real hardware.
+- The encrypted-backup format (TCBK) has not been reviewed by a second person; no external security audit beyond the M5 review.
+- Off-site copies of backups are not set up (`deploy/backup/pull-backups.sh` exists). Until they are, a lost server loses the backups on it.
+- The accessibility and performance pass beyond what costs nothing; the polish list from M4 was never written down; LiveKit metrics are off; no desktop app (M6 dropped).
+
+**After 1.0:** bugs and wishes are GitHub Issues (P0 to P3); the owner decides what is fixed. A future minor release may revive the shelved items.
 
 ## 4. Dependencies & critical path
 

@@ -1,4 +1,4 @@
-# Tin Can hosting guide (beta)
+# Tin Can hosting guide
 
 For the person who sets up and runs the server. The shortest path is the quickstart in the [README](../../README.md); this page explains the choices around it: what machine, where it lives, which ports, how to upgrade, and what to do when something does not work. Day-to-day running (moderation, encryption, backups, metrics) is in the [admin guide](admin-guide.md).
 
@@ -119,10 +119,10 @@ docker compose exec tincan node dist/cli.js doctor --url https://chat.example.co
 Read the release notes of every version between yours and the new one: they say if an upgrade needs manual steps.
 
 1. **Back up first**, and copy the archive off the machine: `docker compose exec tincan node dist/cli.js backup --include-secrets --passphrase-file …` ([admin guide §4](admin-guide.md#4-backups-and-restore)). An upgrade that changes the database also takes its own snapshot (`data/backups/pre-migrate-*.db`), but that sits on the same disk.
-2. Change the version in `docker-compose.yml`: both `image:` lines, and the `backup` service if you use it (`tincan-server:0.2.0-beta.1` to the new tag).
+2. Change the version in `docker-compose.yml`: both `image:` lines, and the `backup` service if you use it (`tincan-server:1.0.0` to the new tag).
 
    ```bash
-   sed -i 's/\(tincan-\(server\|web\)\):0\.2\.0-beta\.1/\1:0.2.0-beta.2/' docker-compose.yml
+   sed -i 's/\(tincan-\(server\|web\)\):1\.0\.0/\1:1.0.1/' docker-compose.yml
    grep 'image:' docker-compose.yml
    ```
 
@@ -131,7 +131,7 @@ Read the release notes of every version between yours and the new one: they say 
 
 **Rolling back.** An older version refuses to start on a database a newer version has changed. That is on purpose, so nothing is damaged. To go back: stop (`docker compose down`), restore the pre-upgrade backup into a new directory (`tincan restore`, or copy the matching `pre-migrate-….db` over `data/app.db` while stopped), set the previous tags, `docker compose up -d`. Everything written after the backup is lost, so decide early. This path was rehearsed with a real previous release ([admin guide §5](admin-guide.md#5-upgrade-and-rollback)).
 
-Beta tags (`-beta.N`) never move `latest`. The generated files pin an exact version on purpose; you decide when to upgrade.
+Pre-release tags (`-rc.N`) never move `latest`. The generated files pin an exact version on purpose; you decide when to upgrade.
 
 ## 7. Troubleshooting
 

@@ -594,6 +594,23 @@ Prepared on a branch; nothing was pushed, published or changed on GitHub or the 
 
 [release-checklist.md](release-checklist.md): the name check (F4); two contact addresses; the decisions on your e-mail in the history, `mkarl.io` in the documents and the logo's origin; the GitHub settings; the dry run, the first tag and the package visibility.
 
+## Q. Early close: no beta, release at 1.0 (2026-10-30)
+
+Decision (owner): the public beta (M7's exit of three independent hosts and no open P0/P1) is **dropped**. When the TURN relay works on mkarl.io and the owner has done the GitHub steps, the first release is `1.0.0`, with feedback through GitHub Issues. Nothing below was met; it is recorded so 1.0 is not read as more than it is.
+
+| Item | State |
+|---|---|
+| Independent hosts | None. One installation (the author's) with friends |
+| Browsers and devices | Chromium-family on desktop only. Safari, Firefox for video and E2EE calls, and phones were never run |
+| Restore on a second machine | Never rehearsed (the restore drill on the same host passes) |
+| Off-site backup copies | Not set up; `deploy/backup/pull-backups.sh` exists |
+| TCBK backup format | Not reviewed by a second person |
+| Release workflow | Written, never run on GitHub's runners; arm64 untested on hardware |
+| Accessibility and performance | Only what cost nothing; the M4 polish list was never written down |
+| Security | The M5 self-review only; no external audit |
+
+The README, `CHANGELOG.md`, `docs/17` (v1.0) and `docs/release-checklist.md` say the same. Release label: *feature-complete for the documented scope and stable for the author's use, not battle-tested by outsiders.*
+
 ## Open items
 
 - Decisions and steps in the release checklist.

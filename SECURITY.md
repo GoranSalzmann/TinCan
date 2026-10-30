@@ -4,7 +4,7 @@ Tin Can is a hobby-scale project maintained by one person. This page says how to
 
 ## Supported versions
 
-Only the **latest beta** (and, once there is one, the latest stable release) gets security fixes. If you run an older version, the fix is to upgrade; the release notes say when an upgrade needs manual steps. There are no backports.
+Only the **latest release** gets security fixes. If you run an older version, the fix is to upgrade; the release notes say when an upgrade needs manual steps. There are no backports.
 
 ## How to report a vulnerability
 

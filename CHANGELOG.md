@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to Tin Can are written here, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version (0.x) may change things that need manual steps; the entry says when. `apiVersion` (the number in `/api/v1/capabilities`) is separate from the product version.
+All notable changes to Tin Can are written here, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/). A change that needs manual steps is called out under "Before you upgrade" in the entry. `apiVersion` (the number in `/api/v1/capabilities`) is separate from the product version.
 
 The release workflow copies the section for the tagged version into the GitHub Release, so write entries for the person who runs a server first, and for members second.
 
 ## [Unreleased]
 
-First public beta. Everything below was built before the first release and ran on one server (the author's) with a small group of friends.
+First release (1.0.0). There was no public beta. Everything below was built before the first release and ran on one server (the author's) with a small group of friends; read the list of what is not proven in [docs/17](docs/17-roadmap-and-milestones.md#v10).
 
 ### Added
 

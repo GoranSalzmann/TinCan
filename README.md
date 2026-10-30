@@ -4,7 +4,7 @@
 
 Tin Can is a chat server you run yourself, for a group of people who know each other: text channels, voice channels, camera and screen sharing, in the browser. You install it on a server you control with Docker, give your friends an invite link, and they use it in a normal browser tab or as an installed web app. The messages, files and call metadata stay on your server, and you decide who is in and who can do what. It is free software under the AGPL-3.0-or-later.
 
-**Status: beta.** M0 to M5 of the [roadmap](docs/17-roadmap-and-milestones.md) are built and run on one real server (the author's), with a handful of friends. Other people's servers are exactly what the beta is for: expect rough edges, read the release notes before each upgrade, and keep backups. Not run yet: Safari, a phone, and Firefox for video and encrypted calls (see [what is tested](docs/qa/m5.md)). There is no support contract and no guarantee that a release will not need manual steps.
+**Status: version 1.0, honestly labelled.** M0 to M5 and the TURN relay of the [roadmap](docs/17-roadmap-and-milestones.md) are built and run on one real server (the author's) with a handful of friends. There was no public beta: the author decided to release at 1.0 and to take feedback through GitHub Issues ([what that means and what is not proven](docs/17-roadmap-and-milestones.md#v10)). Expect rough edges on other people's servers, read the release notes before each upgrade, and keep backups. Not run yet: Safari, a phone, Firefox for video and encrypted calls, a restore on a second machine, and any installation other than the author's (see [what is tested](docs/qa/m5.md)). There is no support contract and no guarantee that a release will not need manual steps.
 
 ## Who it is for
 
@@ -47,7 +47,7 @@ Point your domain's DNS at the server and open the ports above in the provider's
 
 ```bash
 mkdir -p ~/tincan && cd ~/tincan
-VERSION=0.2.0-beta.1    # replace with the newest version on the Releases page
+VERSION=1.0.0    # replace with the newest version on the Releases page
 docker run --rm --user "$(id -u):$(id -g)" -e TINCAN_INIT_HOST_DIR="$PWD" -v "$PWD:/out" \
   ghcr.io/goransalzmann/tincan-server:$VERSION \
   node dist/cli.js init --dir /out --domain chat.example.com --email you@example.com \

@@ -1,4 +1,4 @@
-# Release checklist: going public and cutting the first beta
+# Release checklist: going public and cutting 1.0.0
 
 For the owner. Do the steps in order; each one says why it is there. Nothing here has been done for you: this branch only prepared the files. Steps marked **(you)** need your account or your decision; the rest is commands.
 
@@ -39,11 +39,11 @@ grep -rn "OWNER TODO" --include=*.md . --exclude-dir=node_modules
 
 ## 5. Choose the version and write the changelog
 
-The first beta is `0.2.0-beta.1`: the packages say `0.1.0` today, and a tag must equal the package version (the workflow checks).
+The first release is `1.0.0`: the packages say `0.1.0` today, and a tag must equal the package version (the workflow checks).
 
-- [ ] Set `"version": "0.2.0-beta.1"` in the root `package.json` and in `apps/server/package.json`. (`apps/web` and the packages have their own numbers and are not published.)
-- [ ] In `CHANGELOG.md`, rename `## [Unreleased]` to `## [0.2.0-beta.1] - 2026-MM-DD`, add a fresh empty `## [Unreleased]` above it, and read the section as a host would. Use the [template](release-notes-template.md) for "Before you upgrade".
-- [ ] In `README.md`, set `VERSION=` in the quickstart to `0.2.0-beta.1`.
+- [ ] Set `"version": "1.0.0"` in the root `package.json` and in `apps/server/package.json`. (`apps/web` and the packages have their own numbers and are not published.)
+- [ ] In `CHANGELOG.md`, rename `## [Unreleased]` to `## [1.0.0] - 2026-MM-DD`, add a fresh empty `## [Unreleased]` above it, and read the section as a host would. Use the [template](release-notes-template.md) for "Before you upgrade".
+- [ ] In `README.md`, set `VERSION=` in the quickstart to `1.0.0`.
 - [ ] Commit with `git commit -s` on a branch, merge it. `pnpm check` must be green.
 
 ## 6. GitHub settings **(you)**
@@ -61,7 +61,7 @@ In the repository's Settings. Do these before or together with making it public;
 
 The workflow file must be on the default branch to appear in the Actions tab.
 
-- [ ] **Actions › Release › Run workflow**, version `0.2.0-beta.1`. It runs the full check set, builds `tincan-server` and `tincan-web` for amd64 **and arm64** (the arm64 build runs under emulation and is slow, up to about 45 minutes the first time), and pushes nothing. If a step fails, that is the thing to fix before tagging.
+- [ ] **Actions › Release › Run workflow**, version `1.0.0`. It runs the full check set, builds `tincan-server` and `tincan-web` for amd64 **and arm64** (the arm64 build runs under emulation and is slow, up to about 45 minutes the first time), and pushes nothing. If a step fails, that is the thing to fix before tagging.
 - [ ] **Actions › Clean install › Run workflow.** It must end with `PASS`.
 - [ ] **Actions › Media tests › Run workflow** (nightly anyway). Must be green.
 - [ ] Try the arm64 image on a real arm64 machine if you have one (a Raspberry Pi or an ARM VPS): the pipeline builds it but cannot run it. During preparation the **server** image was built for arm64 under emulation on a Windows machine and `tincan setup` ran in it (the argon2 and SQLite native modules load); the web image (Caddy plus static files) was not built for arm64, and nothing ran on real ARM hardware.
@@ -70,20 +70,20 @@ The workflow file must be on the default branch to appear in the Actions tab.
 
 ```bash
 git switch main && git pull
-git tag -s v0.2.0-beta.1 -m "Tin Can 0.2.0-beta.1"       # -a instead of -s if you do not sign tags
-git push origin v0.2.0-beta.1
+git tag -s v1.0.0 -m "Tin Can 1.0.0"       # -a instead of -s if you do not sign tags
+git push origin v1.0.0
 ```
 
-- [ ] Watch **Actions › Release**. It creates the images on GHCR, the attestations, the SBOMs, `SHA256SUMS` and a GitHub Release marked **pre-release**, with the changelog section as its text. A beta never moves `latest`.
+- [ ] Watch **Actions › Release**. It creates the images on GHCR, the attestations, the SBOMs, `SHA256SUMS` and a GitHub Release marked **latest** (stable tag), with the changelog section as its text. A `-rc.N` tag never moves `latest`.
 - [ ] **(you)** **Packages:** the first push creates two **private** packages (`tincan-server`, `tincan-web`) under your account. Open each ▸ *Package settings* ▸ *Change visibility* ▸ **Public**, and check that they are connected to the repository (the image label `org.opencontainers.image.source` does that). Anonymous `docker pull` fails until you do.
 - [ ] Verify like a host would, from a machine that is not logged in:
 
 ```bash
-docker pull ghcr.io/goransalzmann/tincan-server:0.2.0-beta.1
-docker pull ghcr.io/goransalzmann/tincan-web:0.2.0-beta.1
-docker buildx imagetools inspect ghcr.io/goransalzmann/tincan-server:0.2.0-beta.1     # shows linux/amd64 and linux/arm64
-gh attestation verify oci://ghcr.io/goransalzmann/tincan-server:0.2.0-beta.1 --repo GoranSalzmann/TinCan
-curl -fsSLO https://github.com/GoranSalzmann/TinCan/releases/download/v0.2.0-beta.1/SHA256SUMS
+docker pull ghcr.io/goransalzmann/tincan-server:1.0.0
+docker pull ghcr.io/goransalzmann/tincan-web:1.0.0
+docker buildx imagetools inspect ghcr.io/goransalzmann/tincan-server:1.0.0     # shows linux/amd64 and linux/arm64
+gh attestation verify oci://ghcr.io/goransalzmann/tincan-server:1.0.0 --repo GoranSalzmann/TinCan
+curl -fsSLO https://github.com/GoranSalzmann/TinCan/releases/download/v1.0.0/SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -93,15 +93,15 @@ sha256sum -c SHA256SUMS --ignore-missing
 ## 9. If the tag was wrong
 
 ```bash
-gh release delete v0.2.0-beta.1 --yes --cleanup-tag
-# then delete the two package versions under Packages, fix, and tag again with a new number (0.2.0-beta.2)
+gh release delete v1.0.0 --yes --cleanup-tag
+# then delete the two package versions under Packages, fix, and tag again with a new number (1.0.1)
 ```
 
 Do not reuse a version number that anyone may have pulled.
 
-## 10. The M7 exit
+## 10. After the release
 
-Beta is over when three independent hosts run Tin Can successfully and no P0 or P1 issue is open ([docs/17 M7](17-roadmap-and-milestones.md)). Keep a list of hosts (who, which version, since when, what went wrong) in Discussions or in docs/18, label issues P0 to P3, then tag `v1.0.0` (no `-beta`): that moves `latest` and the `1.0` line.
+There is no beta and no host count (decision 2026-10-30, docs/17 v1.0). Feedback arrives as GitHub Issues; label them P0 to P3 and fix P0/P1 first. The tag `v1.0.0` moves `latest` and the `1.0` line. If the dry run or the tag shows a problem, fix it and use a new number (`1.0.1`), or a `-rc.N` tag to rehearse without moving `latest`.
 
 ## Accounts and access you need
 
