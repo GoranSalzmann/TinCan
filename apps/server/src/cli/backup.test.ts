@@ -293,7 +293,7 @@ describe("the pre-migration backup (14 §7, 06 §8)", () => {
 
       // The snapshot is the database as it was before the upgrade: it opens, has the owner, and lacks the new tables.
       const { openSqlite, sql } = await import("@tincan/db");
-      const snap = await openSqlite({ path: join(dir, "backups", newest) });
+      const snap = openSqlite({ path: join(dir, "backups", newest) });
       try {
         const users = await sql<{ n: number }>`SELECT count(*) AS n FROM user`.execute(snap.query);
         expect(users.rows[0]!.n).toBe(1);

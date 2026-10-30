@@ -44,7 +44,7 @@ export function searchReindex(
  * the server runs. It does not replace the instance secret in the configuration: if that leaked, change it there.
  */
 export async function e2eeRotateSecret(config: CoreConfig): Promise<string> {
-  const db = await openSqlite({ path: config.adapters.database.path });
+  const db = openSqlite({ path: config.adapters.database.path });
   try {
     const t = await sql<{
       n: number;

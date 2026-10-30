@@ -228,7 +228,7 @@ export async function prune(
 }
 
 async function readSchema(dbFile: string): Promise<Record<string, number>> {
-  const db = await openSqlite({ path: dbFile });
+  const db = openSqlite({ path: dbFile });
   try {
     const rows = await sql<{
       module: string;
@@ -317,7 +317,7 @@ export async function restoreBackup(
 
     const dbFile = join(staging, "db", "app.db");
     if (!existsSync(dbFile)) throw new AppError("VALIDATION_FAILED", "The archive has no database.");
-    const db = await openSqlite({ path: dbFile });
+    const db = openSqlite({ path: dbFile });
     try {
       const check = await sql<{ integrity_check: string }>`PRAGMA integrity_check`.execute(db.query);
       if (check.rows.length !== 1 || check.rows[0]!.integrity_check !== "ok")
