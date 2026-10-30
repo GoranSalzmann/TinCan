@@ -242,6 +242,8 @@ screenshare publishing (not supported on most mobile browsers); the UI hides
 unsupported controls using capability detection. Native mobile remains a future
 option (Q10); keep audio and E2EE code free of desktop-only assumptions.
 
+**Installable web app (PWA, added after M4).** The web client ships a manifest (`apps/web/public/manifest.webmanifest`, standalone display, icons from `apps/web/public/icons/`, regenerated from the SVG sources with `apps/web/scripts/gen-icons.mjs`) and a small service worker (`apps/web/public/sw.js`), so browsers offer "Install" on desktop and phones (HTTPS required). The worker caches only the hashed build files and the page shell: navigations go to the network first and fall back to the cached shell when the server cannot be reached, which then shows the normal "server unreachable" screen. It never touches `/api`, the gateway, files, avatars or LiveKit, so no chat data is kept on the device by the worker, and it needs no version bump because it does not precache. It is registered in production builds only. Caddy serves `/assets/*` as immutable and `/sw.js` and the manifest with `no-cache`. Not in scope: offline use of chat, push notifications (a later decision with server-side Web Push), background sync. The icon is a placeholder; the Host's own instance icon (12 §13) does not change it yet.
+
 ## 15. Build and release (web)
 
 - Static assets with content hashes; served by Caddy with long-lived cache headers for hashed files and no-cache for `index.html`.

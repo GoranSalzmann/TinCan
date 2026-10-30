@@ -27,6 +27,13 @@ describe("caddyfile", () => {
     expect(caddyfile(values)).not.toContain("email");
   });
 
+  it("serves hashed build files as immutable and the service worker and manifest uncached", () => {
+    const text = caddyfile(values);
+    expect(text).toContain('header /assets/* Cache-Control "public, max-age=31536000, immutable"');
+    expect(text).toContain("@pwa path /sw.js /manifest.webmanifest");
+    expect(text).toContain('header @pwa Cache-Control "no-cache"');
+  });
+
   it("includes it when an address was given", () => {
     expect(caddyfile({ ...values, acmeEmail: "ops@example.com" })).toContain("email {$ACME_EMAIL}");
   });

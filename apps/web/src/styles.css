@@ -70,3 +70,24 @@
     box-shadow: 0 4px 16px #00000073;
   }
 }
+
+/* The logo comes in a light and a dark variant; the theme picks one (default and light show the light one). */
+.brand-dark {
+  display: none;
+}
+[data-theme="dark"] .brand-light,
+[data-theme="hc"] .brand-light {
+  display: none;
+}
+[data-theme="dark"] .brand-dark,
+[data-theme="hc"] .brand-dark {
+  display: inline;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .brand-light {
+    display: none;
+  }
+  :root:not([data-theme]) .brand-dark {
+    display: inline;
+  }
+}
