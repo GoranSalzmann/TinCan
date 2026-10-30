@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import pino, { type Logger as PinoLogger } from "pino";
@@ -12,6 +12,7 @@ import type { CoreConfig } from "./config/schema.js";
 import { ConfigError } from "./config/errors.js";
 import { InProcessEventBus } from "./framework/events.js";
 import { Scheduler } from "./framework/jobs.js";
+import { MetricsRegistry } from "./framework/metrics.js";
 import { Outbox } from "./framework/outbox.js";
 import { ApiMap, CapabilityStore, type BootDescription, type KernelFacade } from "./framework/kernel.js";
 import { resolveModules, type ResolvedModules } from "./framework/loader.js";
@@ -30,6 +31,18 @@ import { GatewayHub } from "./gateway/hub.js";
 import { createHttpApp, NODE_ID, type SecurityState } from "./http/app.js";
 import { ALL_MODULES } from "./modules/index.js";
 import { API_VERSION, VERSION } from "./version.js";
+
+/** Keeps the newest `keep` pre-migration snapshots; every upgrade makes one and they would otherwise pile up (14 §7). */
+async function prunePreMigrate(dir: string, keep: number): Promise<void> {
+  try {
+    const names = readdirSync(dir)
+      .filter((n) => /^pre-migrate-.*\.db$/.test(n))
+      .sort();
+    for (const n of names.slice(0, Math.max(0, names.length - keep))) rmSync(join(dir, n), { force: true });
+  } catch {
+    // Pruning is housekeeping; a failure must never stop an upgrade.
+  }
+}
 
 export interface BootOptions {
   config: CoreConfig;
@@ -203,6 +216,7 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
         const dest = join(dataDir, "backups", `pre-migrate-${stamp}.db`);
         logger.info({ dest, pending: pending.length }, "backing up the database before migrating");
         await ports.db.snapshot(dest);
+        await prunePreMigrate(join(dataDir, "backups"), 5);
       },
     });
   } catch (err) {
@@ -226,7 +240,8 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
   const security: SecurityState = { authenticator: null, gates: [] };
   const apis = new ApiMap();
 
-  const app = await createHttpApp({ logger, trustProxy: config.server.trustProxy, security });
+  const metrics = new MetricsRegistry();
+  const app = await createHttpApp({ logger, trustProxy: config.server.trustProxy, security, metrics });
 
   let address: string | null = null;
   const facade: KernelFacade = {
@@ -235,6 +250,9 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     events,
     scheduler,
     security,
+    metrics,
+    outbox,
+    db: ports.db,
     describe: () => describeBoot(config, graph, address),
     health: () => ports.db.health(),
   };

@@ -26,4 +26,6 @@ export interface VoiceApi {
   /** Throws when the person could not join `channelId` (not a voice channel, no CONNECT, full). */
   checkMoveTarget(userId: string, channelId: string): Promise<void>;
   rotateKey(channelId: string): Promise<void>;
+  /** Number of people in each occupied voice room, for the metrics module. */
+  occupancy(): number[];
 }

@@ -7,6 +7,7 @@ import { memberName, useCan, useCommunity, type PresenceStatus } from "../../cor
 import { Avatar, PresenceDot } from "../../ui/Avatar.js";
 import { Button } from "../../ui/Button.js";
 import { Modal } from "../../ui/Dialog.js";
+import { ModerationActions } from "./ModerationActions.js";
 
 interface Group {
   key: string;
@@ -100,6 +101,7 @@ function MemberCard({ member, onClose }: { member: Member; onClose: () => void }
             {t("member.manage")}
           </Button>
         ) : null}
+        <ModerationActions member={member} onDone={onClose} />
       </div>
     </Modal>
   );

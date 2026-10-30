@@ -82,6 +82,8 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
           e2ee: { ...cfg.e2ee },
         },
         instanceSecret: ctx.core.security.instanceSecret,
+        onE2eeDefault: (enabled) =>
+          ctx.capabilities.feature("voice", { defaultUserLimit: cfg.defaultUserLimit, e2ee: enabled }),
         livekit: { url: lk.url, apiKey: lk.apiKey, apiSecret: lk.apiSecret },
         rooms: overrides.rooms ?? new SdkLiveKit(lk.apiUrl, lk.apiKey, lk.apiSecret),
         verify: overrides.verify ?? sdkWebhookVerifier(lk.apiKey, lk.apiSecret),
@@ -122,7 +124,7 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
       accounts.registerSetting("audio.noiseTier", z.enum(["off", "browser", "rnnoise"]));
       accounts.registerSetting("audio.pushToTalk", z.boolean());
 
-      ctx.capabilities.feature("voice", { defaultUserLimit: cfg.defaultUserLimit });
+      ctx.capabilities.feature("voice", { defaultUserLimit: cfg.defaultUserLimit, e2ee: svc.e2eeEnabled() });
       const api: VoiceApi = {
         participants: (channelId) => svc.presence.inChannel(channelId).map((e) => svc.wire(e)),
         stats: () => svc.stats,
@@ -133,6 +135,7 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
         disconnect: (userId, reason, to) => svc.disconnect(userId, reason, to),
         checkMoveTarget: (userId, channelId) => svc.checkMoveTarget(userId, channelId),
         rotateKey: (channelId) => svc.rotate(channelId),
+        occupancy: () => svc.presence.channelIds().map((id) => svc.presence.count(id)),
       };
       ctx.api.provide("voice", api);
     },

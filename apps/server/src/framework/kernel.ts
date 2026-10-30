@@ -4,7 +4,10 @@ import type { CoreConfig } from "../config/schema.js";
 import { DEFAULT_SOURCE_URL, VERSION } from "../version.js";
 import type { GatewayHub } from "../gateway/hub.js";
 import type { SecurityState } from "../http/app.js";
+import type { Db } from "@tincan/db";
 import type { InProcessEventBus } from "./events.js";
+import type { MetricsRegistry } from "./metrics.js";
+import type { Outbox } from "./outbox.js";
 import type { Scheduler } from "./jobs.js";
 import type { ApiRegistry, CapabilityRegistrar, InstanceInfo } from "./types.js";
 
@@ -77,6 +80,9 @@ export interface KernelFacade {
   events: InProcessEventBus;
   scheduler: Scheduler;
   security: SecurityState;
+  metrics: MetricsRegistry;
+  outbox: Outbox;
+  db: Db;
   /** Resolved boot description, for `GET /admin/modules` and the boot output. */
   describe(): BootDescription;
   /** Called by the readiness probe. */

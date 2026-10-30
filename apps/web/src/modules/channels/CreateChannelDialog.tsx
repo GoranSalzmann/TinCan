@@ -37,6 +37,7 @@ export function CreateChannelDialog({
   const [shareMbps, setShareMbps] = useState(
     edit?.settings.maxScreenshareKbps ? String(+(edit.settings.maxScreenshareKbps / 1000).toFixed(2)) : "",
   );
+  const [e2ee, setE2ee] = useState<"inherit" | "required" | "off">(edit?.settings.e2ee ?? "inherit");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -56,6 +57,7 @@ export function CreateChannelDialog({
               videoAllowed: cameraOn,
               screenshareAllowed: shareOn,
               maxScreenshareKbps: blankOr(shareMbps, 1000),
+              e2ee,
             };
       if (edit) {
         await api.patchChannel(edit.id, {
@@ -150,6 +152,21 @@ export function CreateChannelDialog({
                 onChange={(e) => setShareMbps(e.target.value)}
                 disabled={!shareOn}
               />
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                {t("channel.e2ee")}
+                <select
+                  value={e2ee}
+                  onChange={(e) => setE2ee(e.target.value as typeof e2ee)}
+                  className="min-h-9 rounded-md border border-border-control bg-bg-input px-2 text-base font-normal"
+                >
+                  {(["inherit", "required", "off"] as const).map((v) => (
+                    <option key={v} value={v}>
+                      {t(`channel.e2ee.${v}`)}
+                    </option>
+                  ))}
+                </select>
+                <span className="font-normal text-text-muted">{t("channel.e2ee.hint")}</span>
+              </label>
               <Field
                 label={t("channel.voice.limit")}
                 hint={t("channel.voice.default.hint")}

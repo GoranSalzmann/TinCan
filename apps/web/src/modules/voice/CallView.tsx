@@ -11,6 +11,7 @@ import { useVoice } from "../../core/voice/store.js";
 import { streamKey } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
 import { toastError } from "../../ui/toast.js";
+import { CallLock } from "./E2eeBadge.js";
 import { ControlBar } from "./ControlBar.js";
 import { StreamView } from "./StreamView.js";
 import { PersonTile, ScreenTile, TileGrid } from "./Tiles.js";
@@ -105,6 +106,7 @@ export function CallView() {
         <h1 className="m-0 min-w-0 flex-1 truncate text-lg font-semibold">
           <bdi>{t("voice.call.title", { name: channel.name, count: people.length })}</bdi>
         </h1>
+        {inThis ? <CallLock /> : null}
         {screens.length > 0 ? (
           <div role="group" aria-label={t("video.layout")} className="flex gap-1 text-sm">
             {(["focus", "grid"] as const).map((l) => (

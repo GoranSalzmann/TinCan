@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { COMPOSE_SERVICES } from "./monitoring.js";
+
 /** Files `tincan init` writes (14 §4). Kept as code so the CLI is a single artifact (14 §9). */
 
 export interface InitValues {
@@ -14,6 +16,9 @@ export interface InitValues {
   instanceSecret: string;
   livekitKey: string;
   livekitSecret: string;
+  /** Bearer token for Prometheus (`GET /api/v1/metrics`), and the Grafana admin password (14 §8). */
+  metricsToken: string;
+  grafanaPassword: string;
   /** Name Caddy gets a certificate for and LiveKit's TURN/TLS serves; null leaves TURN off (14 §2.3). */
   turnDomain: string | null;
   /** The Docker host gateway: LiveKit's HTTP port also listens here so Caddy and the app can reach it (18 T26). */
@@ -33,6 +38,7 @@ TINCAN_LIVEKIT__URL=${v.insecureHttp ? "ws" : "wss"}://${v.domain}${v.insecureHt
 TINCAN_LIVEKIT__API_URL=http://host.docker.internal:7880
 TINCAN_LIVEKIT__API_KEY=${v.livekitKey}
 TINCAN_LIVEKIT__API_SECRET=${v.livekitSecret}
+TINCAN_MODULES__METRICS__TOKEN=${v.metricsToken}
 
 # Used by docker-compose.yml and the Caddyfile.
 DOMAIN=${v.domain}
@@ -41,6 +47,7 @@ HTTP_PORT=${v.httpPort}
 TURN_DOMAIN=${v.turnDomain ?? ""}
 HOST_UID=${v.uid}
 HOST_GID=${v.gid}
+GRAFANA_PASSWORD=${v.grafanaPassword}
 `;
 }
 
@@ -140,6 +147,7 @@ ${build("web")}    image: ${v.image}-web
       # Caddy's certificates, read-only, for TURN/TLS. LiveKit loads them at start only (18 D6, T30).
       - caddy-data:/caddy:ro
 
+${COMPOSE_SERVICES}
 volumes:
   caddy-data:
   caddy-config:
@@ -148,7 +156,7 @@ volumes:
 
 export function caddyfile(v: InitValues): string {
   const routes = `	encode zstd gzip
-	@internal path /api/internal/* /api/v1/internal/*
+	@internal path /api/internal/* /api/v1/internal/* /api/v1/metrics
 	handle @internal {
 		respond 404
 	}

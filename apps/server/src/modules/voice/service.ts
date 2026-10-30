@@ -64,6 +64,8 @@ export interface VoiceDeps {
   log: Logger;
   /** Core `security.instanceSecret`: the root of the E2EE keys (10 §4.1). */
   instanceSecret: string;
+  /** Called when the owner changes the encryption default, so `/capabilities` can say so. */
+  onE2eeDefault?: (enabled: boolean) => void;
   now?: () => number;
 }
 
@@ -74,10 +76,11 @@ export type RepairKind =
   | "permission_updated"
   | "participant_removed"
   | "duplicate_session"
-  | "orphan_room"
-  | "e2ee_rotated";
+  | "orphan_room";
 
 export interface VoiceStats {
+  /** Key rotations of encrypted rooms (10 §4.3); not repairs: kicks and long calls rotate by design. */
+  e2ee: { rotations: number };
   webhooks: {
     received: number;
     rejected: number;
@@ -104,12 +107,12 @@ const emptyRepairs = (): Record<RepairKind, number> => ({
   participant_removed: 0,
   duplicate_session: 0,
   orphan_room: 0,
-  e2ee_rotated: 0,
 });
 
 export class VoiceService {
   readonly presence: PresenceStore;
   readonly stats: VoiceStats = {
+    e2ee: { rotations: 0 },
     webhooks: { received: 0, rejected: 0, duplicates: 0, byEvent: {}, lastLagMs: null },
     reconcile: {
       runs: 0,
@@ -218,6 +221,7 @@ export class VoiceService {
       .onConflict((oc) => oc.column("key").doUpdateSet({ value, updated_at: this.#now() }))
       .execute();
     this.#d.settings.e2ee.enabled = enabled;
+    this.#d.onE2eeDefault?.(enabled);
     await this.syncModes();
   }
 
@@ -279,7 +283,7 @@ export class VoiceService {
           await this.#d.rooms.setRoomMetadata(name, roomMetadata({ on: true, epoch }));
           const key = this.#e2ee.key(channelId, room.sid, epoch);
           this.#lastRotation.set(channelId, this.#now());
-          this.stats.reconcile.repairs.e2ee_rotated++;
+          this.stats.e2ee.rotations++;
           for (const e of this.presence.inChannel(channelId)) {
             this.#d.gateway.dispatchToUser(e.userId, "E2EE_KEY_UPDATE", { channelId, ...key });
           }

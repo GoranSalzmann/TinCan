@@ -10,6 +10,7 @@ import readState from "./read-state/index.js";
 import roles from "./roles/index.js";
 import textChat from "./text-chat/index.js";
 import voice from "./voice/index.js";
+import metrics from "./metrics/index.js";
 import moderation from "./moderation/index.js";
 
 /**
@@ -28,4 +29,5 @@ export const ALL_MODULES: readonly AnyManifest[] = [
   search,
   voice,
   moderation,
+  metrics,
 ];

@@ -23,11 +23,38 @@ export async function joinVoice(channelId: string): Promise<void> {
     useVoice.getState().patch({
       status: "failed",
       channelId: null,
-      notice: api?.code === "UNAVAILABLE" ? "offline" : api?.code === "CONFLICT" ? "full" : "disconnected",
+      notice:
+        api?.code === "UNAVAILABLE"
+          ? "offline"
+          : api?.code === "CONFLICT"
+            ? api.details?.reason === "e2ee_unsupported"
+              ? "e2ee_unsupported"
+              : "full"
+            : "disconnected",
     });
     if (!api) throw err;
     throw err;
   }
+}
+
+/** Leaves and joins again: after a moderator's move or a change of the channel's encryption mode. */
+export async function rejoinVoice(
+  channelId: string,
+  notice: "moved_by_moderator" | "e2ee_mode_changed",
+): Promise<void> {
+  await (await manager()).leave({ silent: true });
+  try {
+    await joinVoice(channelId);
+    useVoice.getState().patch({ notice });
+  } catch {
+    // joinVoice has already put the reason in the store.
+  }
+}
+
+/** A new room key from the server (E2EE_KEY_UPDATE, 10 §4.2). */
+export async function applyE2eeKey(d: { channelId: string; epoch: number; keyIndex: number; key: string }) {
+  if (useVoice.getState().channelId !== d.channelId) return;
+  await (await manager()).setE2eeKey(d);
 }
 
 export async function leaveVoice(o: { keepNotice?: boolean; silent?: boolean } = {}): Promise<void> {

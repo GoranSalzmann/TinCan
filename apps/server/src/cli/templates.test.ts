@@ -12,6 +12,8 @@ const values: InitValues = {
   instanceSecret: "x".repeat(64),
   livekitKey: "APIkey",
   livekitSecret: "secret",
+  metricsToken: "m".repeat(48),
+  grafanaPassword: "g".repeat(24),
   turnDomain: null,
   hostGatewayIp: "172.17.0.1",
   uid: 1000,
@@ -46,6 +48,15 @@ describe("voice files", () => {
     const caddy = caddyfile(values);
     expect(caddy).toContain("@internal path /api/internal/* /api/v1/internal/*");
     expect(caddy).toContain("handle /livekit/rtc*");
+  });
+
+  it("keeps the metrics endpoint off the internet and the dashboards on loopback", () => {
+    expect(caddyfile(values)).toContain("/api/v1/metrics");
+    const compose = composeFile(values);
+    expect(compose).toContain("profiles: [dashboards]");
+    expect(compose).toContain('"127.0.0.1:9090:9090"');
+    expect(compose).toContain('"127.0.0.1:3001:3000"');
+    expect(compose).toContain("GF_ANALYTICS_REPORTING_ENABLED");
   });
 
   it("turns TURN/TLS on with a certificate name that Caddy obtains", () => {

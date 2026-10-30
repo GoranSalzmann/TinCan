@@ -50,7 +50,6 @@ const INVENTORY: Spec[] = [
   },
   { id: "recording", dependsOn: ["voice"], ports: ["livekit", "storage"] },
   { id: "moderation", dependsOn: ["roles"] },
-  { id: "audit-log", dependsOn: ["roles"] },
   { id: "metrics", dependsOn: ["core"] },
 ];
 
@@ -201,7 +200,6 @@ describe("module boot matrix", () => {
         "voice-e2ee",
         "recording",
         "moderation",
-        "audit-log",
         "metrics",
       ].sort(),
     );

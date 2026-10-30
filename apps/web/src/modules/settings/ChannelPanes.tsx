@@ -63,6 +63,7 @@ export function ServerPane() {
           </Button>
         </div>
       </form>
+      {owner ? <E2eeCard /> : null}
       {owner ? <VideoLimitsCard /> : null}
       {owner ? <UploadLimitsCard /> : null}
       <p className="text-sm text-text-muted">
@@ -72,6 +73,56 @@ export function ServerPane() {
         </a>
       </p>
     </section>
+  );
+}
+
+/** The server default for voice encryption (10 §5, 18 T17): on for new installs; channels can override it. */
+function E2eeCard() {
+  const t = useT();
+  const voiceOn = useSession((s) => Boolean(s.capabilities?.features.voice));
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!voiceOn) return;
+    void api
+      .e2eeDefault()
+      .then((r) => setEnabled(r.enabled))
+      .catch(toastError);
+  }, [voiceOn]);
+  if (!voiceOn) return null;
+  return (
+    <div className={card}>
+      <h3 className="m-0 text-lg">{t("settings.e2ee")}</h3>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={enabled === true}
+          disabled={enabled === null}
+          onChange={(e) => {
+            const next = e.target.checked;
+            void api
+              .setE2eeDefault(next)
+              .then((r) => {
+                setEnabled(r.enabled);
+                const caps = useSession.getState().capabilities;
+                if (caps)
+                  useSession.setState({
+                    capabilities: {
+                      ...caps,
+                      features: {
+                        ...caps.features,
+                        voice: { ...(caps.features.voice as object), e2ee: r.enabled },
+                      },
+                    },
+                  });
+                toast(t("settings.saved"));
+              })
+              .catch(toastError);
+          }}
+        />
+        {t("settings.e2ee.default")}
+      </label>
+      <p className="m-0 max-w-prose text-sm text-text-muted">{t("settings.e2ee.hint")}</p>
+    </div>
   );
 }
 

@@ -17,6 +17,7 @@ import {
 } from "livekit-client";
 import { request } from "../api/client.js";
 import { sendCommand, useSession } from "../session/store.js";
+import { createE2eeWorker, decodeKey, e2eeSupported, RoomKeyProvider } from "./e2ee.js";
 import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
 import { useVoice, type ActualInfo, type Quality, type SpecInfo, type VoiceNotice } from "./store.js";
@@ -105,6 +106,11 @@ class VoiceManager {
   /** Streams the person asked to watch; kept across a camera being switched off and on (R-041). */
   #wanted = new Set<string>();
   #dims = new Map<string, { width: number; height: number }>();
+  /** Frame encryption (10): the key provider and its worker exist only while the call is encrypted. */
+  #keys: RoomKeyProvider | null = null;
+  #e2eeWorker: Worker | null = null;
+  #e2eeEpoch = -1;
+  #decryptErrors: number[] = [];
 
   get room(): Room | null {
     return this.#room;
@@ -129,6 +135,7 @@ class VoiceManager {
     const grant = await request<VoiceJoinResponse>(
       "POST",
       `/voice/channels/${encodeURIComponent(channelId)}/join`,
+      { body: { e2ee: e2eeSupported() } },
     );
     const prefs = useAudioPrefs.getState().prefs;
     const canSpeak = grant.publishDefaults.sources.includes("microphone");
@@ -150,12 +157,22 @@ class VoiceManager {
     // Our own context for playback, so a per-person gain above 1 is possible (HTMLMediaElement.volume stops at 1).
     this.#playback = new AudioContext({ latencyHint: "interactive" });
     void this.#playback.resume().catch(() => undefined);
+    // The key is in place before connecting, so nothing is ever sent or received in the clear (10 §3).
+    if (grant.e2ee) {
+      this.#keys = new RoomKeyProvider();
+      this.#e2eeWorker = createE2eeWorker();
+      await this.#keys.setKeyAt(decodeKey(grant.e2ee.key), grant.e2ee.keyIndex);
+      this.#e2eeEpoch = grant.e2ee.epoch;
+    }
     const room = new Room({
       webAudioMix: { audioContext: this.#playback },
       adaptiveStream: false,
       dynacast: true,
       stopLocalTrackOnUnpublish: false,
       publishDefaults: { dtx: settings.dtx, red: settings.dtx },
+      ...(this.#keys && this.#e2eeWorker
+        ? { e2ee: { keyProvider: this.#keys, worker: this.#e2eeWorker } }
+        : {}),
     });
     this.#room = room;
     this.#wire(room);
@@ -168,6 +185,11 @@ class VoiceManager {
 
     try {
       await room.connect(grant.url, grant.token, { autoSubscribe: false });
+      if (this.#keys) await room.setE2EEEnabled(true);
+      useVoice.getState().patch({
+        e2ee: this.#keys ? "on" : "off",
+        e2eeEpoch: grant.e2ee?.epoch ?? null,
+      });
     } catch (err) {
       await this.#teardown();
       throw err;
@@ -236,6 +258,35 @@ class VoiceManager {
     if (!this.#meter) this.#startMeter();
   }
 
+  /**
+   * A new key from the server (10 §4.2). Setting it at its own index leaves the earlier keys in the keyring, so frames
+   * sent just before the change still decrypt.
+   */
+  async setE2eeKey(k: { epoch: number; keyIndex: number; key: string }): Promise<void> {
+    if (!this.#keys || k.epoch <= this.#e2eeEpoch) return;
+    await this.#keys.setKeyAt(decodeKey(k.key), k.keyIndex);
+    this.#e2eeEpoch = k.epoch;
+    this.#decryptErrors = [];
+    useVoice.getState().patch({ e2ee: "on", e2eeEpoch: k.epoch });
+  }
+
+  /** Decryption keeps failing: the rekey message may have been missed, so ask for the current key (10 §8). */
+  async #resyncKey(): Promise<void> {
+    const channelId = useVoice.getState().channelId;
+    if (!channelId || !this.#keys) return;
+    useVoice.getState().patch({ e2ee: "resyncing" });
+    try {
+      const k = await request<{ epoch: number; keyIndex: number; key: string }>(
+        "GET",
+        `/voice/channels/${encodeURIComponent(channelId)}/e2ee-key`,
+      );
+      if (k.epoch > this.#e2eeEpoch) await this.setE2eeKey(k);
+      else useVoice.getState().patch({ e2ee: "on" });
+    } catch {
+      // The next burst of errors tries again.
+    }
+  }
+
   async leave(o: { keepNotice?: boolean; silent?: boolean } = {}): Promise<void> {
     this.#leaving = true;
     const had = this.#room !== null;
@@ -270,6 +321,9 @@ class VoiceManager {
     this.#ptt = null;
     const room = this.#room;
     this.#room = null;
+    this.#keys = null;
+    this.#e2eeEpoch = -1;
+    this.#decryptErrors = [];
     this.#local = null;
     this.#pipeline?.stop();
     this.#pipeline = null;
@@ -277,6 +331,8 @@ class VoiceManager {
       room.removeAllListeners();
       await room.disconnect().catch(() => undefined);
     }
+    this.#e2eeWorker?.terminate();
+    this.#e2eeWorker = null;
     document.querySelectorAll("audio[data-tincan-voice]").forEach((el) => el.remove());
   }
 
@@ -333,6 +389,11 @@ class VoiceManager {
 
   /** Test hook (media test, `localStorage["tincan.debug"]`): energy per output channel after gain and limiter, per person. */
   #debugTaps = new Map<string, AnalyserNode[]>();
+  /** For the media test: whether frame encryption is on in this room and which epoch's key is in use. */
+  e2eeInfo(): { on: boolean; epoch: number } {
+    return { on: this.#room?.isE2EEEnabled === true, epoch: this.#e2eeEpoch };
+  }
+
   levels(userId: string): { left: number; right: number } | null {
     const taps = this.#debugTaps.get(userId);
     if (!taps) return null;
@@ -938,6 +999,11 @@ class VoiceManager {
       useVoice.getState().patch({ canCamera: may(PROTOCOL_CAMERA), canScreen: may(PROTOCOL_SCREEN_SHARE) });
       if (mayPublishMic) void this.#publishMic(room, useAudioPrefs.getState().prefs);
     });
+    room.on(RoomEvent.EncryptionError, () => {
+      const now = Date.now();
+      this.#decryptErrors = [...this.#decryptErrors.filter((t) => now - t < 10_000), now];
+      if (this.#decryptErrors.length >= 5 && useVoice.getState().e2ee !== "resyncing") void this.#resyncKey();
+    });
     room.on(RoomEvent.Reconnecting, () => useVoice.getState().patch({ status: "reconnecting" }));
     room.on(RoomEvent.Reconnected, () => {
       useVoice.getState().patch({ status: "connected" });
@@ -1026,6 +1092,8 @@ const VIDEO_RESET = {
   share: null,
   watchNotice: null,
   rev: 0,
+  e2ee: "off" as const,
+  e2eeEpoch: null,
 };
 
 export const voiceManager = new VoiceManager();

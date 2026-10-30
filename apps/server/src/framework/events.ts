@@ -25,6 +25,8 @@ export interface Events {
   "member.banned": { userId: string };
   /** Anything may report an auditable fact; `moderation` stores it (11 §3, 06 §3.10). Never include secrets or message text. */
   "audit.record": AuditInput;
+  /** An audit entry was stored (by the moderation module); for metrics. */
+  "audit.recorded": { action: string };
   /** Anything that can change what someone may do: roles, role assignment, overwrites, channels, timeouts. */
   "permissions.changed": { userIds: string[] | "all"; channelId?: string };
 }

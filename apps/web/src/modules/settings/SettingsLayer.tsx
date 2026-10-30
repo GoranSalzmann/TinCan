@@ -7,6 +7,7 @@ import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { useSession } from "../../core/session/store.js";
 import { useCan, useCommunity } from "../../core/state/community.js";
 import { ChannelsPane, InvitesPane, ServerPane } from "./ChannelPanes.js";
+import { ModerationPane } from "./ModerationPane.js";
 import { MembersPane, RolesPane } from "./RolePanes.js";
 import { VoicePane } from "./VoicePane.js";
 import { AccountPane, AppearancePane, NotificationsPane, StoragePane } from "./UserPanes.js";
@@ -22,11 +23,14 @@ export function SettingsLayer() {
   const uploads = useSession((s) => !!s.capabilities?.features.uploads);
   const voiceOn = useSession((s) => !!s.capabilities?.features.voice);
   const invitesOn = useSession((s) => !!s.capabilities?.features.invites);
+  const moderationOn = useSession((s) => !!s.capabilities?.features.moderation);
   const owner = useSession((s) => s.user?.isInstanceOwner ?? false);
   const canChannels = useCan("MANAGE_CHANNELS");
   const canRoles = useCan("MANAGE_ROLES");
   const canInvites = useCan("CREATE_INVITE");
   const canInstance = useCan("MANAGE_INSTANCE");
+  const canAudit = useCan("VIEW_AUDIT_LOG");
+  const canBans = useCan("BAN_MEMBERS");
   const ready = useCommunity((s) => s.ready);
 
   // Esc closes the layer back to the chat.
@@ -51,6 +55,7 @@ export function SettingsLayer() {
     ["roles", "settings.roles", canRoles],
     ["members", "settings.members", canRoles || canInstance],
     ["invites", "settings.invites", invitesOn && canInvites],
+    ["moderation", "settings.moderation", moderationOn && (canAudit || canBans)],
   ];
   const allowed = [...user, ...admin].filter(([, , show]) => show).map(([k]) => k);
   if (ready && !allowed.includes(section)) return <Navigate to="/settings/account" replace />;
@@ -79,6 +84,7 @@ export function SettingsLayer() {
     roles: <RolesPane />,
     members: <MembersPane />,
     invites: <InvitesPane />,
+    moderation: <ModerationPane />,
   }[section];
 
   return (

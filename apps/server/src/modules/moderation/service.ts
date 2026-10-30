@@ -76,6 +76,7 @@ export class ModerationService {
           data: JSON.stringify(e.data ?? {}),
         })
         .execute();
+      this.#d.events.emit("audit.recorded", { action: e.action });
     } catch (err) {
       // An audit failure never undoes a moderation action that already happened; the log line is the fallback.
       this.#d.log.error({ err, action: e.action, requestId }, "moderation: audit entry could not be written");

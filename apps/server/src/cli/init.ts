@@ -6,6 +6,13 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureSetupToken } from "../modules/accounts/setup-token.js";
 import { ask, confirm } from "./prompt.js";
+import {
+  alertRules,
+  grafanaDashboard,
+  grafanaDatasource,
+  grafanaProvider,
+  prometheusConfig,
+} from "./monitoring.js";
 import { caddyfile, composeFile, configFile, envFile, livekitFile, type InitValues } from "./templates.js";
 
 export interface InitOptions {
@@ -26,7 +33,14 @@ export interface InitOptions {
   image?: string;
 }
 
-const FILES = [".env", "config.yaml", "docker-compose.yml", "Caddyfile", "livekit.yaml"] as const;
+const FILES = [
+  ".env",
+  "config.yaml",
+  "docker-compose.yml",
+  "Caddyfile",
+  "livekit.yaml",
+  "monitoring/prometheus.yml",
+] as const;
 
 function findRepoRoot(): string | null {
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -57,6 +71,8 @@ export function buildValues(
     instanceSecret: hex(32),
     livekitKey: `API${hex(6)}`,
     livekitSecret: hex(24),
+    metricsToken: hex(24),
+    grafanaPassword: hex(12),
     turnDomain: insecureHttp ? null : (o.turnDomain ?? null),
     hostGatewayIp: o.hostGatewayIp ?? "172.17.0.1",
     uid: typeof process.getuid === "function" ? process.getuid() : 1000,
@@ -115,6 +131,21 @@ export async function runInit(opts: InitOptions): Promise<string[]> {
   await write("docker-compose.yml", composeFile(values));
   await write("Caddyfile", caddyfile(values));
   await write("livekit.yaml", livekitFile(values), 0o600);
+  // The dashboards profile (14 §8). Its data directories exist before Docker can create them as root.
+  for (const d of [
+    "monitoring/grafana/provisioning/datasources",
+    "monitoring/grafana/provisioning/dashboards",
+    "monitoring/grafana/dashboards",
+    "monitoring/prometheus-data",
+    "monitoring/grafana-data",
+  ])
+    await mkdir(join(dir, d), { recursive: true });
+  await write("monitoring/prometheus.yml", prometheusConfig());
+  await write("monitoring/alerts.yml", alertRules());
+  await write("monitoring/metrics-token", values.metricsToken, 0o600);
+  await write("monitoring/grafana/provisioning/datasources/prometheus.yml", grafanaDatasource());
+  await write("monitoring/grafana/provisioning/dashboards/tincan.yml", grafanaProvider());
+  await write("monitoring/grafana/dashboards/tincan.json", grafanaDashboard());
   const { token } = await ensureSetupToken(join(dir, "data"));
 
   say("");
@@ -143,5 +174,7 @@ function describe(f: (typeof FILES)[number]): string {
       return "TLS, routes and security headers";
     case "livekit.yaml":
       return "LiveKit settings (ports, webhook, TURN)";
+    case "monitoring/prometheus.yml":
+      return "metrics and dashboards (monitoring/, start with --profile dashboards)";
   }
 }

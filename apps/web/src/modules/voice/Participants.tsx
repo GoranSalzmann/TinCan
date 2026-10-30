@@ -40,6 +40,8 @@ export function useParticipantView(p: VoiceParticipant) {
     mine,
     muted: mine ? localMuted : p.muted,
     deafened: mine ? localDeaf : p.deafened,
+    serverMuted: p.serverMuted === true,
+    serverDeafened: p.serverDeafened === true,
     label: mine ? t("voice.you", { name }) : name,
   };
 }
@@ -56,7 +58,15 @@ export function ParticipantRow({ p }: { p: VoiceParticipant }) {
         <Avatar name={v.name} avatarKey={v.avatarKey} size={20} />
       </span>
       <bdi className="min-w-0 flex-1 truncate">{v.label}</bdi>
-      {v.deafened ? (
+      {v.serverDeafened ? (
+        <Headphones
+          aria-label={v.t("voice.serverDeafened")}
+          size={14}
+          className="shrink-0 text-danger-text"
+        />
+      ) : v.serverMuted ? (
+        <MicOff aria-label={v.t("voice.serverMuted")} size={14} className="shrink-0 text-danger-text" />
+      ) : v.deafened ? (
         <Headphones aria-label={v.t("voice.deafened")} size={14} className="shrink-0" />
       ) : v.muted ? (
         <MicOff aria-label={v.t("voice.muted")} size={14} className="shrink-0" />

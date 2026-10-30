@@ -10,7 +10,7 @@ import type { Logger } from "../../framework/types.js";
 import { enforceRateLimit } from "../../http/rate-limit.js";
 import type { AccountsApi } from "../accounts/api.js";
 import type { RolesApi } from "../roles/api.js";
-import type { UploadsApi } from "./api.js";
+import type { UploadsApi, UploadsStats } from "./api.js";
 import {
   avatarImage,
   cleanFilename,
@@ -65,6 +65,20 @@ const wire = (r: Row): Attachment => ({
 
 export class UploadsService implements UploadsApi {
   readonly #d: UploadsDeps;
+  readonly #stats = {
+    uploads: 0,
+    bytes: 0,
+    rejected: 0,
+    inFlight: 0,
+    inFlightBytes: 0,
+    peakInFlightBytes: 0,
+    peakInFlight: 0,
+  };
+
+  /** Counters for the metrics module; `inFlightBytes` is the memory held by uploads being checked and stored right now. */
+  stats(): UploadsStats {
+    return { ...this.#stats };
+  }
 
   constructor(deps: UploadsDeps) {
     this.#d = deps;
@@ -123,6 +137,29 @@ export class UploadsService implements UploadsApi {
   // ---- upload --------------------------------------------------------------------------------
 
   async upload(
+    userId: string,
+    file: { buffer: Buffer; filename: string | undefined; declaredType: string | undefined },
+  ): Promise<Attachment> {
+    const s = this.#stats;
+    s.inFlight++;
+    s.inFlightBytes += file.buffer.length;
+    s.peakInFlight = Math.max(s.peakInFlight, s.inFlight);
+    s.peakInFlightBytes = Math.max(s.peakInFlightBytes, s.inFlightBytes);
+    try {
+      const out = await this.#upload(userId, file);
+      s.uploads++;
+      s.bytes += file.buffer.length;
+      return out;
+    } catch (err) {
+      s.rejected++;
+      throw err;
+    } finally {
+      s.inFlight--;
+      s.inFlightBytes -= file.buffer.length;
+    }
+  }
+
+  async #upload(
     userId: string,
     file: { buffer: Buffer; filename: string | undefined; declaredType: string | undefined },
   ): Promise<Attachment> {

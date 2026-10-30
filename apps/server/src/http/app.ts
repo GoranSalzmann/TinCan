@@ -17,6 +17,7 @@ import {
   newId,
   type ErrorEnvelope,
 } from "@tincan/shared";
+import { HTTP_BUCKETS, type MetricsRegistry } from "../framework/metrics.js";
 import type { Actor, Authenticator, RequestGate } from "../framework/types.js";
 import { parseCookies } from "./cookies.js";
 
@@ -42,6 +43,7 @@ export interface HttpOptions {
   logger: PinoLogger;
   trustProxy: boolean;
   security: SecurityState;
+  metrics?: MetricsRegistry;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -107,7 +109,29 @@ export async function createHttpApp(opts: HttpOptions): Promise<FastifyInstance>
     for (const gate of opts.security.gates) await gate(req);
   });
 
+  if (opts.metrics) {
+    const total = opts.metrics.counter("tincan_http_requests_total", "HTTP requests by route and status", [
+      "method",
+      "route",
+      "status",
+    ]);
+    const duration = opts.metrics.histogram(
+      "tincan_http_request_duration_seconds",
+      "HTTP request duration by route",
+      ["method", "route"],
+      HTTP_BUCKETS,
+    );
+    // The route pattern, never the URL: IDs in paths must not become label values.
+    app.addHook("onResponse", async (req, reply) => {
+      const route = req.routeOptions?.url ?? "unmatched";
+      total.inc({ method: req.method, route, status: String(reply.statusCode) });
+      duration.observe(reply.elapsedTime / 1000, { method: req.method, route });
+    });
+  }
+
   app.addHook("onSend", async (req, reply) => {
+    // Lets a user quote the id of a failed call, and lets a log line be found from it (18 T34).
+    reply.header("X-Request-Id", req.id);
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("Referrer-Policy", "no-referrer");
     // Routes that serve immutable files set their own policy.
