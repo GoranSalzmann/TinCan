@@ -42,7 +42,8 @@ const secret = "rehearsal-secret-".padEnd(40, "x");
 const env = {
   ...process.env,
   TINCAN_SECURITY__INSTANCE_SECRET: secret,
-  TINCAN_LIVEKIT__API_SECRET: "rehearsal-livekit-secret-".padEnd(40, "y"),
+  TINCAN_LIVEKIT__API_KEY: "devkey",
+  TINCAN_LIVEKIT__API_SECRET: "rehearsal-livekit-".padEnd(40, "y"),
 };
 
 function config(dir, port) {
@@ -131,7 +132,8 @@ try {
   const cfgA = config(dirA, portA);
   say(`\n1. The previous release creates an instance (${OLD})`);
   let proc = serve(OLD, cfgA);
-  check("it starts", await ready(portA, proc));
+  const up1 = await ready(portA, proc);
+  check("it starts", up1, up1 ? "" : proc.output().slice(-600));
   const setupToken = readFileSync(join(dirA, "data", "setup-token"), "utf8").trim();
   const A = api(portA);
   const setup = await A("POST", "/auth/setup", {
@@ -181,7 +183,8 @@ try {
   // ---- 3. forward ----
   say("\n3. This release starts on the same data (migrations run forward)");
   proc = serve(NEW, cfgA);
-  check("it starts", await ready(portA, proc));
+  const up2 = await ready(portA, proc);
+  check("it starts", up2, up2 ? "" : proc.output().slice(-600));
   const snaps = existsSync(join(dirA, "data", "backups"))
     ? readdirSync(join(dirA, "data", "backups")).filter((n) => n.startsWith("pre-migrate-"))
     : [];
