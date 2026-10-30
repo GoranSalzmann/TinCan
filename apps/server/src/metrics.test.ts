@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MetricsRegistry } from "./framework/metrics.js";
 import { ALL_MODULES } from "./modules/index.js";
@@ -104,15 +105,18 @@ describe("GET /metrics (14 §8)", () => {
     );
   });
 
-  it("shows uploads in flight and the largest memory they held", async () => {
+  it("counts uploads and shows the memory an image held while it was decoded", async () => {
     const ann = await s.register("ann");
+    const png = await sharp({ create: { width: 200, height: 100, channels: 3, background: "#369" } })
+      .png()
+      .toBuffer();
     const form = new FormData();
-    form.set("file", new Blob([Buffer.alloc(300_000, 1)], { type: "application/octet-stream" }), "a.bin");
+    form.set("file", new Blob([png], { type: "image/png" }), "a.png");
     expect((await s.request("POST", "/api/v1/uploads", { token: ann.token, form })).status).toBe(201);
     const body = text(await scrape({ token: TOKEN }));
     expect(body).toMatch(/tincan_uploads_total 1/);
-    expect(body).toMatch(/tincan_upload_bytes_total 300000/);
-    expect(body).toMatch(/tincan_uploads_in_flight_peak_bytes 300000/);
+    expect(body).toContain(`tincan_upload_bytes_total ${png.length}`);
+    expect(body).toContain(`tincan_uploads_in_flight_peak_bytes ${png.length}`);
     expect(body).toMatch(/tincan_uploads_in_flight_bytes 0/);
   });
 });

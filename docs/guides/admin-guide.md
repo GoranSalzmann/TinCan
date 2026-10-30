@@ -107,7 +107,7 @@ Prometheus (`127.0.0.1:9090`) and Grafana (`127.0.0.1:3001`) are never published
 
 ## 7. Limits and capacity (what was measured)
 
-On a desktop machine with the server and the test client in one process (pessimistic): 500 connected sockets cost about 190 KiB each; a message in a channel with 500 listeners is delivered to all of them in about 0.5 s, and one core saturates at roughly 20 000 deliveries a second; 200 simultaneous voice joins take under 2 s of server time. **Uploads are held in memory while they are checked**: about twice the file size per running upload. The server keeps all running uploads within `modules.uploads.memoryBudgetBytes` (384 MiB default) and tells the rest to try again. On a 1 GB VPS keep the file limit at the default 25 MiB. Voice capacity is LiveKit's and the provider's bandwidth (08 §5.5), not measured here.
+On a desktop machine with the server and the test client in one process (pessimistic): 500 connected sockets cost about 190 KiB each; a message in a channel with 500 listeners is delivered to all of them in about 0.5 s, and one core saturates at roughly 20 000 deliveries a second; 200 simultaneous voice joins take under 2 s of server time. **Uploads stream to disk**: the server's memory grows by roughly 70 MiB however large the files are (measured up to 512 MiB, two at once). Only images up to 48 MiB are read back to make a thumbnail, within `modules.uploads.memoryBudgetBytes` (384 MiB default); beyond it an upload is told to try again. Disk space and the per-person quota are what limit uploads now. Voice capacity is LiveKit's and the provider's bandwidth (08 §5.5), not measured here.
 
 Repeat on your own hardware (never against a live server): `pnpm load`, and `sh tools/load/soak.sh` for a memory-limited soak in Docker (`SOAK_MINUTES=30 SOAK_MEM=512m`).
 
@@ -126,7 +126,7 @@ Repeat on your own hardware (never against a live server): `pnpm load`, and `sh 
 |---|---|---|
 | "This call is end-to-end encrypted and this browser cannot join it" | Browser without the needed APIs | Use Chrome/Edge, or set the channel to Never encrypt |
 | Call restarts when you change a setting | By design (encryption mode) | |
-| `429` on upload with "busy" | Upload memory budget in use | Retry; lower the file limit; see §7 |
+| `429` on an image upload with "busy" | Image-decoding memory budget in use | Retry; see §7 |
 | Prometheus shows the app "down" | Token mismatch | `monitoring/metrics-token` equals `TINCAN_MODULES__METRICS__TOKEN` |
 | Rising `tincan_reconcile_repairs_total` | Webhooks not arriving | `livekit.yaml` webhook URL, `tincan doctor` |
 | Restore says "not empty" | It refuses non-empty targets | Use a new directory |

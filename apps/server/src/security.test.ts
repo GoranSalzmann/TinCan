@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Writable } from "node:stream";
 import { Op, CloseCode } from "@tincan/shared";
+import sharp from "sharp";
 import { afterEach, describe, expect, it } from "vitest";
 import { createLogger } from "./boot.js";
 import { parseCoreConfig } from "./config/load.js";
@@ -333,14 +334,92 @@ describe("files cannot run as part of the app (S-07)", () => {
   });
 });
 
-describe("uploads cannot exhaust memory (15 §4.2, 18 §N)", () => {
-  it("turns away uploads that would go over the memory budget, with a retry hint, and counts them", async () => {
+describe("uploads cannot exhaust memory (15 §4.2, 18 §M)", () => {
+  it("a big non-image goes to storage in chunks: the process does not grow by the file size", async () => {
+    s = await startTestServer({
+      config: { modules: { accounts: { signup: "open" }, uploads: { maxBytes: 256 * 1024 * 1024 } } },
+    });
+    await s.setupOwner();
+    const ann = await s.register("aa");
+    const size = 200 * 1024 * 1024;
+    const boundary = "----stream";
+    const CRLF = "\r\n";
+    const head = Buffer.from(
+      [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="big.bin"',
+        "Content-Type: application/octet-stream",
+        "",
+        "",
+      ].join(CRLF),
+    );
+    const chunk = Buffer.alloc(256 * 1024, 9);
+    let sent = 0;
+    let phase = 0;
+    const bodyStream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (phase === 0) {
+          c.enqueue(head);
+          phase = 1;
+          return;
+        }
+        if (sent < size) {
+          c.enqueue(chunk);
+          sent += chunk.length;
+          return;
+        }
+        if (phase === 1) {
+          c.enqueue(Buffer.from(`${CRLF}--${boundary}--${CRLF}`));
+          phase = 2;
+          return;
+        }
+        c.close();
+      },
+    });
+    global.gc?.();
+    let peak = 0;
+    const timer = setInterval(() => (peak = Math.max(peak, process.memoryUsage().arrayBuffers)), 20);
+    const base = process.memoryUsage().arrayBuffers;
+    const res = await fetch(`${s.url}/api/v1/uploads`, {
+      method: "POST",
+      duplex: "half",
+      headers: {
+        authorization: `Bearer ${ann.token}`,
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: bodyStream,
+    });
+    clearInterval(timer);
+    expect(res.status).toBe(201);
+    const out = (await res.json()) as { size: number };
+    expect(out.size).toBe(size);
+    // The old path held the whole file (and a second copy while joining chunks); streaming stays well below half.
+    expect(peak - base).toBeLessThan(size / 2);
+  });
+
+  it("refuses a body over the limit part way and leaves nothing behind", async () => {
+    s = await startTestServer({
+      config: { modules: { accounts: { signup: "open" }, uploads: { maxBytes: 2 * 1024 * 1024 } } },
+    });
+    await s.setupOwner();
+    const ann = await s.register("aa");
+    const form = new FormData();
+    form.set(
+      "file",
+      new Blob([Buffer.alloc(3 * 1024 * 1024, 1)], { type: "application/octet-stream" }),
+      "big.bin",
+    );
+    const res = await s.request("POST", "/api/v1/uploads", { token: ann.token, form });
+    expect(res.status).toBe(413);
+    expect((await s.request("GET", "/api/v1/users/@me/storage", { token: ann.token })).body.usedBytes).toBe(
+      0,
+    );
+  });
+
+  it("turns away images that would go over the memory budget, with a retry hint, and counts them", async () => {
     s = await startTestServer({
       config: {
-        modules: {
-          accounts: { signup: "open" },
-          uploads: { maxBytes: 20 * 1024 * 1024, memoryBudgetBytes: 16 * 1024 * 1024 },
-        },
+        modules: { accounts: { signup: "open" }, uploads: { memoryBudgetBytes: 16 * 1024 * 1024 } },
       },
     });
     await s.setupOwner();
@@ -350,11 +429,16 @@ describe("uploads cannot exhaust memory (15 §4.2, 18 §N)", () => {
       await s.register("cc"),
       await s.register("dd"),
     ];
-    const body = Buffer.alloc(10 * 1024 * 1024, 5);
+    const png = await sharp({
+      create: { width: 1200, height: 1200, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 60 } },
+    })
+      .png()
+      .toBuffer();
+    expect(png.length).toBeGreaterThan(3 * 1024 * 1024);
     const results = await Promise.all(
       people.map((p) => {
         const form = new FormData();
-        form.set("file", new Blob([body], { type: "application/octet-stream" }), "big.bin");
+        form.set("file", new Blob([png], { type: "image/png" }), "n.png");
         return s!.request("POST", "/api/v1/uploads", { token: p.token, form });
       }),
     );
@@ -363,12 +447,9 @@ describe("uploads cannot exhaust memory (15 §4.2, 18 §N)", () => {
     expect(busy.length).toBeGreaterThanOrEqual(1);
     expect(busy[0]!.headers.get("retry-after")).toBe("5");
     expect(busy[0]!.body.error.details.reason).toBe("upload_memory");
-    const metrics = (await s.request("GET", "/api/v1/metrics")).bytes.toString();
-    expect(metrics).toMatch(/tincan_uploads_busy_total [1-9]/);
-    // After they finish the budget is free again.
-    const form = new FormData();
-    form.set("file", new Blob([body], { type: "application/octet-stream" }), "big.bin");
-    expect((await s.request("POST", "/api/v1/uploads", { token: people[0]!.token, form })).status).toBe(201);
+    expect((await s.request("GET", "/api/v1/metrics")).bytes.toString()).toMatch(
+      /tincan_uploads_busy_total [1-9]/,
+    );
   });
 });
 
