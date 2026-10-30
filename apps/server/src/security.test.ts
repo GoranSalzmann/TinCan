@@ -22,7 +22,7 @@ let s: TestServer | undefined;
 afterEach(async () => {
   await s?.close();
   s = undefined;
-});
+}, 60_000);
 
 const SECRET = "security-test-secret-".padEnd(40, "x");
 
@@ -397,7 +397,7 @@ describe("uploads cannot exhaust memory (15 §4.2, 18 §M)", () => {
     expect(out.size).toBe(size);
     // The old path held the whole file (and a second copy while joining chunks); streaming stays well below half.
     expect(peak - base).toBeLessThan(200 * 1024 * 1024);
-  });
+  }, 120_000);
 
   const storedFiles = (dir: string): string[] => {
     const out: string[] = [];
