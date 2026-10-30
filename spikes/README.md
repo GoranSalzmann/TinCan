@@ -1,5 +1,7 @@
 # Spikes (throwaway)
 
+This directory is a record of experiments, not maintained code: its lockfile is not updated by Dependabot and it is excluded from the header, secret and licence checks.
+
 Spike code for milestone M0 (17 §3). Not product code: nothing here is imported
 by the product, and it can be deleted once the decisions it informs are made.
 Results and recommendations live in the docs (03 ADR-005/ADR-007, 05 §3.1,

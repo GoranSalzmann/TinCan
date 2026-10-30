@@ -7,7 +7,7 @@ Where things are: [public-readiness audit](security/public-readiness.md) (what i
 ## 0. Decide first
 
 - [ ] **(you)** The name. See step 1. Everything below uses `Tin Can`, `tincan` and `GoranSalzmann/TinCan`; a rename touches the places listed there.
-- [ ] **(you)** The four decisions of the audit ([§4 of public-readiness](security/public-readiness.md#4-findings-that-need-your-decision)): your e-mail address in the history, `mkarl.io` in the documents, the logo's origin, what to do with `spikes/`.
+- [x] **(you, decided 2026-10-30)** The four decisions of the audit ([§4 of public-readiness](security/public-readiness.md#4-findings-that-need-your-decision)): your e-mail address in the history, `mkarl.io` in the documents, the logo's origin, what to do with `spikes/`.
 - [ ] **(you)** Two contact addresses (they can be the same): one for security reports, one for code-of-conduct reports. Use an address you are happy to publish. A shared mailbox or an alias of its own is better than your private one.
 
 ## 1. Name and trademark check (docs/18 F4)
