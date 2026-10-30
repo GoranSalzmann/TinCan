@@ -527,3 +527,21 @@ See [qa/m5.md](qa/m5.md). In short: review the branch (nothing is pushed, merged
 ## N. Scope decisions (2026-10-30)
 
 **The desktop app (M6) is dropped.** You decided the installable web app is enough for the foreseeable future. Consequences for this document: spike D3 (Electron capture and `globalShortcut`), T31 (Electron header injection), K-05 and K-06 (Wayland and macOS capture), K-14 (signing and notarisation costs) and K-35 (desktop file access) no longer have a milestone and stay as shelved items for the case where the desktop app is revived after v1.0. The web client gives up global shortcuts, a global push-to-talk key and system-audio screenshare outside Windows and ChromeOS; the UI should say so where it matters (a hint next to the push-to-talk setting, a hint in the screenshare dialog) rather than hide the controls. Milestone numbering is unchanged: M7 (Beta) follows M5.
+
+## O. Backups follow-up to M5 (2026-10-30)
+
+M5 cut scheduled and encrypted backups and never ran backup or restore on a real server. This closes the first two and prepares the third; the real-server rows are in [qa/backups.md](qa/backups.md). Format and procedures: 14 §6.
+
+| # | What | Why / note |
+|---|---|---|
+| O-1 | Encrypted archives (`.tar.gz.enc`): AES-256-GCM in 64 KiB frames, scrypt (N = 2^17, r = 8, p = 1) from a Host passphrase of at least 12 characters, header and frame counter authenticated, a verified last frame required | An own container format on Node's `crypto` instead of shelling out to `age` or `gpg`: no extra tool on the Host, one command, streaming (no archive in memory), tests for a wrong key, flipped bytes, truncation, reordering and appended data. The cost is that nobody else's tool reads it; the format is documented in `backup-crypto.ts` |
+| O-2 | A passphrase **present** means **encrypted**; `--encrypt` demands one | A forgotten flag must not produce a plain archive on a server whose `.env` carries a passphrase. `--include-secrets` without a passphrase still works and warns |
+| O-3 | `tincan backup --daemon --at HH:MM` and the `backup` compose profile | Hosts without cron or sudo (the mkarl.io user has neither) get a schedule from compose; systemd user timer and cron files are in `deploy/backup/` for the rest. The clock is the container's, UTC unless `TZ` is set |
+| O-4 | `last-backup.json` / `last-backup-error.json` beside the archives, read by `doctor` and the metrics endpoint; alerts `BackupStale` and `BackupFailed` | The failure that matters is silence. The metric is 0 when there never was a backup, so a Host without backups sees `BackupStale` on purpose |
+| O-5 | Manifest row counts, compared on restore | Detects a snapshot that restores to something other than what was backed up; the drill relies on it |
+| O-6 | Off-host: `pull-backups.sh`, run **from the receiving machine** | The server never holds a credential for the copies. No cloud SDK in the app; `rclone`, `restic` or a bucket still work because the archives are plain files |
+| O-7 | `restore-drill.sh` | Restores and boots a throw-away server (plain HTTP on loopback, no voice, random secret) and checks that the owner is known. Not covered: voice, the E2EE state of a live call, the Caddy certificate |
+| O-F1 | **Bug found by the drill: `TINCAN_BACKUP_PASSPHRASE` and `_FILE` were read as configuration settings** (`unknown setting "backupPassphrase"`), so any container with the variable set refused to start. Both names are now exempt in `config/load.ts`, with a test | The environment-to-config mapping treats every `TINCAN_*` variable as a setting |
+| O-F2 | **Bug found by the drill: an unreadable archive crashed `restore` with an unhandled stream event** instead of an error message. The archive is now opened first | Hit when a container user could not read a 0600 archive (UID mapping on Docker Desktop) |
+
+**Not done / for you:** where the off-site copies go and the passphrase's custody (your decisions), the first run on mkarl.io (qa/backups.md §C), a schedule on the server (the `backup` profile is not started there), and the encrypted-archive format being reviewed by someone who is not me. Backups made before this change stay valid: they are plain archives without row counts, so the count comparison is skipped for them.

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createHash, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { z } from "zod";
 import { AppError } from "@tincan/shared";
@@ -69,6 +71,34 @@ export default defineModule({
       lagP99.set(delay.percentile(99) / 1e9);
       lagMax.set(delay.max / 1e9);
       delay.reset();
+    });
+
+    // ---- backups: written by `tincan backup` beside the archives (14 §6) ----
+    const lastBackup = m.gauge(
+      "tincan_last_backup_timestamp_seconds",
+      "Unix time of the newest successful backup; 0 when there never was one",
+    );
+    const lastBackupFailed = m.gauge(
+      "tincan_last_backup_failed",
+      "1 when the newest backup run failed after the newest success",
+    );
+    const backupDir = join(ctx.core.dataDir, "backups");
+    const readMarker = async (name: string): Promise<number | null> => {
+      try {
+        const at = (JSON.parse(await readFile(join(backupDir, name), "utf8")) as { at?: unknown }).at;
+        const ms = typeof at === "string" ? Date.parse(at) : NaN;
+        return Number.isNaN(ms) ? null : ms;
+      } catch {
+        return null;
+      }
+    };
+    m.collect(async () => {
+      const [ok, bad] = await Promise.all([
+        readMarker("last-backup.json"),
+        readMarker("last-backup-error.json"),
+      ]);
+      lastBackup.set(ok === null ? 0 : Math.floor(ok / 1000));
+      lastBackupFailed.set(bad !== null && (ok === null || bad > ok) ? 1 : 0);
     });
 
     // ---- the runtime ----

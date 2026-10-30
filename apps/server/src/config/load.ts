@@ -9,7 +9,12 @@ import { CoreConfigSchema, type CoreConfig } from "./schema.js";
 export const ENV_PREFIX = "TINCAN_";
 
 /** Control variables that share the prefix but are not settings. */
-const NOT_SETTINGS = new Set(["TINCAN_CONFIG"]);
+const NOT_SETTINGS = new Set([
+  "TINCAN_CONFIG",
+  // Read by `tincan backup` / `tincan restore` only (backup-crypto.ts), never a setting.
+  "TINCAN_BACKUP_PASSPHRASE",
+  "TINCAN_BACKUP_PASSPHRASE_FILE",
+]);
 
 function camel(seg: string): string {
   return seg.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());

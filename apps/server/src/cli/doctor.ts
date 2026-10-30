@@ -10,6 +10,7 @@ import type { CoreConfig } from "../config/schema.js";
 import { resolveModules } from "../framework/loader.js";
 import { ALL_MODULES } from "../modules/index.js";
 import { VERSION } from "../version.js";
+import { readBackupStatus } from "./backup.js";
 import { runVoiceChecks } from "./voice-checks.js";
 
 /** Glyphs of the design legend (docs/design/README.md): ok, failed, skipped. */
@@ -145,6 +146,40 @@ export async function runDoctor(
             fix: "free some disk space; messages, uploads and backups all grow",
           }
         : { status: "ok", detail: `${gb} GiB free` };
+    }),
+  );
+
+  results.push(
+    await check("Last backup", async () => {
+      if (data.dir === null)
+        return {
+          status: "skip",
+          detail: `container path ${config.dataDir}: check it inside Docker`,
+          fix: "run `docker compose exec tincan node dist/cli.js doctor`",
+        };
+      const dir = join(dataDir, "backups");
+      const s = await readBackupStatus(dir);
+      if (s.error)
+        return {
+          status: "warn",
+          detail: `the newest backup run failed (${s.error.at}): ${s.error.message}`,
+          fix: "run `tincan backup` by hand and read the error; see docs/14 §6",
+        };
+      if (s.lastOkAt === null)
+        return {
+          status: "warn",
+          detail: `no backup has been made (looked in ${dir})`,
+          fix: "run `tincan backup`, then schedule it: the `backup` compose profile, or a systemd timer or cron (docs/14 §6)",
+        };
+      const hours = (Date.now() - Date.parse(s.lastOkAt)) / 3_600_000;
+      const when = `${s.lastOkAt} (${hours < 48 ? `${Math.max(0, Math.round(hours))} h ago` : `${Math.round(hours / 24)} days ago`})`;
+      return hours > 48
+        ? {
+            status: "warn",
+            detail: `the newest backup is from ${when}`,
+            fix: "check that the backup schedule still runs (docker compose --profile backup ps, or systemctl list-timers)",
+          }
+        : { status: "ok", detail: `${when}, ${s.encrypted ? "encrypted" : "not encrypted"}` };
     }),
   );
 

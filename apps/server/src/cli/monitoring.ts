@@ -75,6 +75,17 @@ groups:
         for: 1m
         labels: { severity: warning }
         annotations: { summary: "Uploads hold more than 1 GiB in memory; lower the file size limit or add memory (18 §N)" }
+      - alert: BackupStale
+        # Needs 'tincan backup' on a schedule (14 §6). A Host who makes no backups sees this one always, on purpose.
+        expr: time() - tincan_last_backup_timestamp_seconds > 172800
+        for: 1h
+        labels: { severity: warning }
+        annotations: { summary: "No successful backup for 48 hours (or ever)" }
+      - alert: BackupFailed
+        expr: tincan_last_backup_failed == 1
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "The newest backup run failed; look at the backup log and run tincan doctor" }
       - alert: MemoryHigh
         expr: process_resident_memory_bytes > 1.5e9
         for: 15m

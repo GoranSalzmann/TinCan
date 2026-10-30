@@ -147,6 +147,31 @@ ${build("web")}    image: ${v.image}-web
       # Caddy's certificates, read-only, for TURN/TLS. LiveKit loads them at start only (18 D6, T30).
       - caddy-data:/caddy:ro
 
+  # Daily backups into ./data/backups (docs/14 §6). Start it with: docker compose --profile backup up -d
+  # Encrypted when TINCAN_BACKUP_PASSPHRASE (or _FILE) is set in .env. To include secrets, mount .env and livekit.yaml
+  # below and add --include-secrets to the command, but only together with a passphrase. Copy the archives off this
+  # machine (docs/14 §6.4); a backup on the same disk does not survive the disk.
+  backup:
+    profiles: [backup]
+    image: ${v.image}-server
+    restart: unless-stopped
+    user: "\${HOST_UID:-1000}:\${HOST_GID:-1000}"
+    env_file: .env
+    environment:
+      TINCAN_CONFIG: /config/config.yaml
+    command: ["node", "dist/cli.js", "backup", "--daemon", "--at", "03:30", "--keep", "14"]
+    volumes:
+      - ./data:/data
+      - ./config.yaml:/config/config.yaml:ro
+      - ./docker-compose.yml:/config/docker-compose.yml:ro
+      - ./Caddyfile:/config/Caddyfile:ro
+      # - ./.env:/config/.env:ro
+      # - ./livekit.yaml:/config/livekit.yaml:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
 ${COMPOSE_SERVICES}
 volumes:
   caddy-data:

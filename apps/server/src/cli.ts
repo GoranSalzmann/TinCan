@@ -9,6 +9,8 @@ import { boot, createLogger } from "./boot.js";
 import { cliSetup, configCheck, moduleList, userCreate } from "./cli/admin.js";
 import { formatReport, runDoctor } from "./cli/doctor.js";
 import { createBackup, restoreBackup } from "./cli/backup.js";
+import { readPassphrase } from "./cli/backup-crypto.js";
+import { runSchedule } from "./cli/backup-schedule.js";
 import { e2eeRotateSecret, permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
 import { runInit } from "./cli/init.js";
 import { turnReloadReport } from "./cli/voice-checks.js";
@@ -30,7 +32,7 @@ Usage: tincan [admin] <command> [options]
   user reset-password     Print a one-time password-reset code for a user (or --owner)
   search reindex          Rebuild the search index from the messages, online
   voice turn-reload       Restart LiveKit for a renewed TURN certificate when no call is running
-  backup                  Write a consistent backup (database, uploads, config) as one .tar.gz
+  backup                  Write a consistent backup (database, uploads, config) as one .tar.gz, optionally encrypted
   restore <archive>       Unpack a backup into a new, empty directory and verify it
   e2ee rotate-secret      Give every encrypted voice call a new key from a fresh salt
   perms explain           Show how a member's permissions in a channel come about
@@ -44,8 +46,11 @@ setup:   --username <name> [--display-name <name>] [--instance-name <name>] [--p
 user create: --username <name> [--display-name <name>] [--password-stdin]
 user reset-password: --username <name> | --owner
 perms explain: --user <username> --channel <name or id>
-backup:  [--out <dir>] [--include-secrets] [--keep <n>]    (the archive is only as private as the secrets in it)
-restore: <archive> --into <empty dir>
+backup:  [--out <dir>] [--include-secrets] [--keep <n>] [--encrypt] [--passphrase-file <file>] [--daemon --at HH:MM]
+         A passphrase (--passphrase-file, TINCAN_BACKUP_PASSPHRASE_FILE or TINCAN_BACKUP_PASSPHRASE) encrypts the archive;
+         --encrypt makes it an error when there is none. Without one, the archive is only as private as the secrets in it.
+         --daemon stays running and backs up once a day at --at (the clock of the machine, UTC in the container).
+restore: <archive> --into <empty dir> [--passphrase-file <file>]
 doctor:  [--url <public url>] [--turn-domain <name>]
 voice turn-reload: --turn-domain <name> [--apply]
 `;
@@ -82,6 +87,10 @@ async function main(argv: string[]): Promise<number> {
       into: { type: "string" },
       keep: { type: "string" },
       "include-secrets": { type: "boolean" },
+      encrypt: { type: "boolean" },
+      "passphrase-file": { type: "string" },
+      daemon: { type: "boolean" },
+      at: { type: "string" },
       user: { type: "string" },
       channel: { type: "string" },
       help: { type: "boolean", short: "h" },
@@ -196,30 +205,57 @@ async function main(argv: string[]): Promise<number> {
       const keep = values.keep === undefined ? undefined : Number(values.keep);
       if (keep !== undefined && (!Number.isInteger(keep) || keep < 1))
         throw new Error("--keep needs a whole number of 1 or more");
-      const { path: file, manifest } = await createBackup(config, {
-        ...(values.out ? { outDir: values.out } : {}),
-        ...(path ? { configDir: dirname(resolve(path)) } : {}),
-        includeSecrets: values["include-secrets"] ?? false,
-        ...(keep !== undefined ? { keep } : {}),
-        log: (l) => console.log(l),
-      });
-      console.log(
-        `
+      const passphrase = await readPassphrase(values["passphrase-file"]);
+      if (values.encrypt && !passphrase)
+        throw new Error(
+          "--encrypt needs a passphrase: --passphrase-file <file>, or TINCAN_BACKUP_PASSPHRASE_FILE, or TINCAN_BACKUP_PASSPHRASE",
+        );
+      const once = async () => {
+        const { path: file, manifest } = await createBackup(config, {
+          ...(values.out ? { outDir: values.out } : {}),
+          ...(path ? { configDir: dirname(resolve(path)) } : {}),
+          includeSecrets: values["include-secrets"] ?? false,
+          ...(keep !== undefined ? { keep } : {}),
+          ...(passphrase ? { passphrase } : {}),
+          log: (l) => console.log(l),
+        });
+        console.log(
+          `
 Backup written: ${file}
 ${manifest.entries.length} entries, ${
-          manifest.secretsIncluded
-            ? "WITH secrets: keep it as private as the server itself"
-            : "without secrets (.env is not included)"
-        }.`,
-      );
+            passphrase
+              ? "encrypted: without the passphrase it cannot be opened, so keep the passphrase somewhere other than this server"
+              : manifest.secretsIncluded
+                ? "WITH secrets and NOT encrypted: keep it as private as the server itself"
+                : "without secrets (.env is not included)"
+          }.`,
+        );
+      };
+      if (!values.daemon) {
+        await once();
+        return 0;
+      }
+      const stop = new AbortController();
+      for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => stop.abort());
+      await runSchedule({
+        at: values.at ?? "03:30",
+        run: once,
+        log: (l) => console.log(l),
+        signal: stop.signal,
+      });
       return 0;
     }
 
     case "restore": {
       const archive = sub;
       if (!archive || !values.into)
-        throw new Error("Usage: tincan restore <archive> --into <empty directory>");
-      const r = await restoreBackup(archive, values.into, { log: (l) => console.log(l) });
+        throw new Error(
+          "Usage: tincan restore <archive> --into <empty directory> [--passphrase-file <file>]",
+        );
+      const r = await restoreBackup(archive, values.into, {
+        log: (l) => console.log(l),
+        passphrase: await readPassphrase(values["passphrase-file"]),
+      });
       console.log(`
 Restored ${r.files} file(s) and the database into ${r.into}`);
       for (const w of r.warnings) console.log(`  ! ${w}`);

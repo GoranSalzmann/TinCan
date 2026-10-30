@@ -44,20 +44,38 @@ tincan backup --out /srv/backups --keep 14
 
 This writes `tincan-backup-<time>.tar.gz` (a plain archive: `tar -tzf` lists it) with a consistent copy of the database (taken while the server keeps running), the uploaded files, and `config.yaml`, `docker-compose.yml` and the `Caddyfile`. **Secrets are left out** (`config.yaml` has them blanked, `.env` and `livekit.yaml` are not included). Add `--include-secrets` to include them; then the archive is as sensitive as the server itself. Without `.env` a restored instance cannot keep sessions' IP hashes or voice keys consistent, so keep `.env` in your password manager or in an encrypted copy.
 
-Encrypt the archive before it leaves the machine:
+### Encrypt it
+
+Give the backup a passphrase and the archive is encrypted (AES-256-GCM, a key derived from the passphrase with scrypt, a new random salt each time; a changed, cut-off or reordered byte is detected):
 
 ```bash
-age -p -o backup.tar.gz.age tincan-backup-*.tar.gz      # or: gpg --symmetric
+printf '%s' 'a long passphrase of your own, at least 12 characters' > ~/.tincan-backup-key && chmod 600 ~/.tincan-backup-key
+tincan backup --passphrase-file ~/.tincan-backup-key --keep 14
 ```
+
+The file is then called `tincan-backup-<time>.tar.gz.enc`. The passphrase can also come from `TINCAN_BACKUP_PASSPHRASE_FILE` or `TINCAN_BACKUP_PASSPHRASE` (put it in `.env` for the `backup` service below); `--encrypt` makes a missing passphrase an error instead of a silent plain archive. **Losing the passphrase loses the backup**: there is no recovery. Keep it in a password manager or on paper, *not* only on the server it protects. With a passphrase you can add `--include-secrets` (the `.env` and `livekit.yaml` go in, so a restore needs nothing else); without one Tin Can warns, because that archive is only as private as the server.
 
 ### Schedule it
 
-Host cron, daily at 03:15, keeping two weeks, then an off-host copy:
+Easiest: the `backup` profile of the compose file runs `tincan backup` once a day at 03:30 (the container's clock, UTC unless you set `TZ`) and keeps the newest 14:
 
-```cron
-15 3 * * * cd /srv/tincan && docker compose exec -T tincan node apps/server/dist/cli.js backup --out /data/backups --keep 14 >> /var/log/tincan-backup.log 2>&1
-45 3 * * * rclone copy /srv/tincan/data/backups remote:tincan-backups --max-age 2d
+```bash
+docker compose --profile backup up -d
 ```
+
+Archives land in `data/backups/` (beside the pre-upgrade snapshots). To encrypt them add `TINCAN_BACKUP_PASSPHRASE=…` to `.env` and run the command again; to include secrets also remove the two `#` before the `.env` and `livekit.yaml` lines of the `backup` service and add `--include-secrets` to its command. Without a compose profile, use a systemd user timer or cron: `deploy/backup/tincan-backup.timer`, `.service` and `.cron` are ready to copy (14 §6).
+
+`tincan doctor` shows when the last backup was made and warns after 48 hours, a failed night, or when there never was one. The metrics endpoint exposes `tincan_last_backup_timestamp_seconds` and `tincan_last_backup_failed`, and the dashboards profile has the alerts `BackupStale` and `BackupFailed`.
+
+### Keep a copy somewhere else
+
+A backup on the same disk does not survive the disk, the provider account or the intruder. Pull the archives to another machine you control, from *that* machine, so the server holds no key to the copies:
+
+```bash
+sh deploy/backup/pull-backups.sh mkarl.io:tincan/data/backups ~/tincan-backups
+```
+
+(rsync when it exists, otherwise ssh and scp; it never deletes anything on your side.) Run it from cron or a scheduled task there, once a day after the backup. If you prefer pushing to a bucket or another host with `rclone`, `restic` or `rsync`, that works as well: the archives are ordinary files.
 
 **Retention guidance (3-2-1):** three copies, on two kinds of storage, one off the machine. Keep 14 dailies on the host; keep a weekly and a monthly off-host copy for as long as you are comfortable holding members' data; delete older ones, since a backup holds everything you would otherwise have deleted. A database snapshot is also taken automatically before every upgrade that changes the schema (`data/backups/pre-migrate-*.db`, the newest five are kept).
 
@@ -68,11 +86,13 @@ Into a **new, empty directory** (never over a live one):
 ```bash
 tincan restore tincan-backup-2026-10-30T03-15-00Z.tar.gz --into /srv/tincan-restored
 # it checks every file against its checksum and runs SQLite's integrity check before it moves anything into place
+# an encrypted archive (.tar.gz.enc) also needs:  --passphrase-file ~/.tincan-backup-key
+# it also compares the number of users, channels, messages and uploads with what the backup recorded
 cp /safe/place/.env /srv/tincan-restored/.env     # secrets are not in the archive unless you asked
 cd /srv/tincan-restored && docker compose up -d
 ```
 
-The directory has the layout `tincan init` makes (`data/app.db`, `data/files/…`, `config.yaml`, `Caddyfile` …). **Test a restore before you need one**: the same command into a scratch directory, then `docker compose up` on another port and look at it. The repository's CI does this on every change (`apps/server/src/cli/backup.test.ts`: restore into a fresh instance, log in, compare members, messages and a file byte for byte).
+The directory has the layout `tincan init` makes (`data/app.db`, `data/files/…`, `config.yaml`, `Caddyfile` …). **Test a restore before you need one.** `deploy/backup/restore-drill.sh` does it for you, on the server, without touching the live instance: it restores the newest backup into a scratch directory, starts a throw-away server on it (plain HTTP on `127.0.0.1:3999`, no voice, its own random secret), checks that it answers and knows the owner, and removes everything again. `PASSPHRASE_FILE=~/.tincan-backup-key sh restore-drill.sh` for an encrypted one. Once a month is a good habit; the drill is also what tells you the passphrase you wrote down is the right one.
 
 ## 5. Upgrade and rollback
 

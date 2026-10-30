@@ -76,3 +76,14 @@ describe("voice files", () => {
     expect(composeFile(v)).toContain("caddy-data:/caddy:ro");
   });
 });
+
+describe("composeFile backup profile", () => {
+  it("has an optional daily backup service with the host's uid and a read-only root", () => {
+    const text = composeFile(values);
+    expect(text).toContain("profiles: [backup]");
+    expect(text).toContain(
+      'command: ["node", "dist/cli.js", "backup", "--daemon", "--at", "03:30", "--keep", "14"]',
+    );
+    expect(text).toMatch(/\n {2}backup:\n[\s\S]*?read_only: true/);
+  });
+});

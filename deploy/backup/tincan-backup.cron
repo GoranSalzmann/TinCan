@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Cron alternative (crontab -e). Daily at 03:30 server time; the log shows why a night failed.
+30 3 * * * cd "$HOME/tincan" && docker compose --profile backup run --rm --no-deps backup node dist/cli.js backup --keep 14 >> "$HOME/tincan/data/backups/backup.log" 2>&1

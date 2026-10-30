@@ -58,6 +58,18 @@ describe("environment overrides", () => {
     expect(out).toEqual({ modules: { "text-chat": { enabled: false }, accounts: { sessionIdleDays: 7 } } });
   });
 
+  it("ignores the backup passphrase variables: `tincan backup` reads them, they are not settings", () => {
+    expect(
+      applyEnv(
+        {},
+        {
+          TINCAN_BACKUP_PASSPHRASE: "a long passphrase",
+          TINCAN_BACKUP_PASSPHRASE_FILE: "/run/secrets/backup-key",
+        },
+      ),
+    ).toEqual({});
+  });
+
   it("ignores TINCAN_CONFIG, which names the file rather than a setting", () => {
     expect(applyEnv({}, { TINCAN_CONFIG: "/config/config.yaml" })).toEqual({});
   });

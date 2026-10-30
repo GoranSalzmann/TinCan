@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# A systemd *user* unit that makes one backup through the `backup` service of the compose file (no sudo needed).
+# Install:  mkdir -p ~/.config/systemd/user && cp tincan-backup.service tincan-backup.timer ~/.config/systemd/user/
+#           systemctl --user daemon-reload && systemctl --user enable --now tincan-backup.timer
+# To let it run while you are logged out: loginctl enable-linger $USER (may need your provider's root). Otherwise use
+# the `backup` compose profile (docker compose --profile backup up -d) or cron (see tincan-backup.cron).
+[Unit]
+Description=Tin Can backup
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/tincan
+ExecStart=/usr/bin/docker compose --profile backup run --rm --no-deps backup node dist/cli.js backup --keep 14
