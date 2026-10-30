@@ -167,11 +167,11 @@ are documented as out-of-scope for v1 (Q9, K-13).
 | S-06 | Stored content cannot execute script in any client (web or desktop) |
 | S-07 | Uploads cannot be rendered as active content in the app origin |
 | S-08 | LiveKit credentials never reach clients; client tokens are short-lived and least-privilege |
-| S-09 | Desktop renderer has no Node access; IPC validated; navigation locked |
+| S-09 | Desktop renderer has no Node access; IPC validated; navigation locked. *Not applicable while there is no desktop app (17, M6 dropped).* |
 | S-10 | Webhook endpoint rejects unsigned requests and is not publicly routable |
 | S-11 | Rate limits present on auth, invite, upload, message routes |
 | S-12 | Secrets absent from logs, images and repo |
-| S-13 | Release artifacts signed; update integrity verified |
+| S-13 | Release artifacts signed; update integrity verified. *Applies to container images and checksums only (no desktop installers).* |
 | S-14 | Dependencies scanned in CI; critical advisories block release |
 | S-15 | E2EE-required channels cannot be joined unencrypted |
 | S-16 | Losing CONNECT (ban, kick, role change) removes the user from voice within one reconciliation interval, even when the first removal attempt fails |

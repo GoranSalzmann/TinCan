@@ -1,5 +1,7 @@
 # 13. Desktop App (Electron)
 
+> **Shelved (2026-10-30).** The desktop app is dropped for the foreseeable future (17, M6): the installable web app (12 §14) is the supported way to run Tin Can as an app. This document is kept as the design to follow if the desktop app is revived after v1.0. Nothing in it is built.
+
 Cross-platform desktop (Windows, macOS, Linux) is the top client priority. This
 doc covers the Electron shell around the shared renderer (12): process model,
 security hardening, native integrations, packaging, updates, and per-OS

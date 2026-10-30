@@ -35,7 +35,7 @@ The docs go top-down. Each level assumes the one above it.
 | 10 | End-to-end encryption | Written |
 | 11 | Auth, roles & permissions | Written |
 | 12 | Client architecture (web/shared UI) | Written |
-| 13 | Desktop app (Electron) | Written |
+| 13 | Desktop app (Electron) | Written, shelved (M6 dropped 2026-10-30; the PWA replaces it) |
 | 14 | Deployment & operations | Written |
 | 15 | Security & threat model | Written |
 | 16 | Testing & CI | Written |
@@ -96,7 +96,7 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 | D3 | Modular monolith; features toggled by config | Settled |
 | D4 | Swappable ports only for DB, storage, pubsub, auth | Settled |
 | D5 | TypeScript end to end | Proposed |
-| D6 | Electron desktop shell (not Tauri) | Proposed |
+| D6 | Electron desktop shell (not Tauri) | Dropped 2026-10-30 with M6 (the PWA replaces it) |
 | D7 | SQLite only in v1; Postgres, Redis, S3 adapters post-v1 (18 T32) | Settled |
 | D8 | Voice/video E2EE yes; text E2EE no (v1) | Proposed |
 | D9 | One instance = one community (schema allows more) | Settled |

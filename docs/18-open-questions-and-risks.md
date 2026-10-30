@@ -523,3 +523,7 @@ Bundle at the end of M5 (`pnpm build`): main chunk 731 kB (225 kB gzipped), Live
 ### What I need from you
 
 See [qa/m5.md](qa/m5.md). In short: review the branch (nothing is pushed, merged or deployed; streaming uploads are in); the rows marked **VPS** or **people** need the real server and another person; to use the new pieces on mkarl.io add `TINCAN_MODULES__METRICS__TOKEN`, the Caddy changes and (optionally) the `dashboards` files as the admin guide says; decide M5-1, M5-3 and M5-12, 
+
+## N. Scope decisions (2026-10-30)
+
+**The desktop app (M6) is dropped.** You decided the installable web app is enough for the foreseeable future. Consequences for this document: spike D3 (Electron capture and `globalShortcut`), T31 (Electron header injection), K-05 and K-06 (Wayland and macOS capture), K-14 (signing and notarisation costs) and K-35 (desktop file access) no longer have a milestone and stay as shelved items for the case where the desktop app is revived after v1.0. The web client gives up global shortcuts, a global push-to-talk key and system-audio screenshare outside Windows and ChromeOS; the UI should say so where it matters (a hint next to the push-to-talk setting, a hint in the screenshare dialog) rather than hide the controls. Milestone numbering is unchanged: M7 (Beta) follows M5.

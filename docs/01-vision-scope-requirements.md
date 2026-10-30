@@ -1,5 +1,7 @@
 # 01. Vision, Scope & Requirements
 
+> **Scope change (2026-10-30).** The Electron desktop app is dropped for the foreseeable future; the installable web app (PWA, 12 §14) takes its place (17, M6). Read "desktop app" below as "the web client, installed as an app" where it appears in the vision, G8 and the priority list. Requirements that need a native shell are not met: global mute/deafen/leave shortcuts and any global push-to-talk key (R-035), pop-out of a stream into its own window beyond the browser's picture-in-picture (R-045), and system-audio capture on every OS. They return only if the desktop app is revived (13 stays as the shelved design).
+
 ## 1. Vision
 
 A self-hostable, Discord-style chat platform for friends and small communities:

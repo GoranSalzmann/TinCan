@@ -17,7 +17,7 @@ exist to compare milestones, not to promise dates.
 ## 2. Milestone overview
 
 ```
- M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video ─▶ M5 Hardening ─▶ M6 Desktop ─▶ M7 Beta ─▶ v1.0
+ M0 Spikes ─▶ M1 Skeleton ─▶ M2 Text ─▶ M3 Voice ─▶ M4 Video ─▶ M5 Hardening ─▶ M6 Desktop (dropped) ─▶ M7 Beta ─▶ v1.0
    (S–M)        (M)           (L)        (L)         (L)           (L)             (L)          (M)
 ```
 
@@ -29,9 +29,9 @@ exist to compare milestones, not to promise dates.
 | M3 | Voice (web) | L | Voice channels, presence, audio pipeline v1, device settings, TURN, doctor |
 | M4 | Video & screenshare (web) | L | Camera, screenshare presets, viewer opt-in, stream view, quality controls |
 | M5 | Hardening & ops | L | E2EE, moderation, audit, backups, metrics, security review, load tests |
-| M6 | Desktop (Electron) | L | Shell, keychain, source picker + system audio, global shortcuts, tray, installers, updater, signing/notarisation |
+| M6 | ~~Desktop (Electron)~~ **Dropped 2026-10-30** | – | The installable web app (PWA) replaces it; see §3 M6 |
 | M7 | Beta | M | Wider testers, bug burn-down, docs complete |
-| v1.0 | Release | S | Tagged release, installers, images, announce |
+| v1.0 | Release | S | Tagged release, images, announce |
 
 Rough total: 5–8 months for one full-time developer (wide uncertainty); a
 usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
@@ -44,7 +44,7 @@ usable friends-group build (text + voice) at the end of M3 (≈ 2.5–4 months).
 |---|---|---|
 | D1 | LiveKit self-hosted behaviour: ports, config keys, dynacast flatness, egress per viewer; whether LiveKit refreshes tokens for connected participants itself (18 T25) | Config sketch in 08/14 corrected; measured numbers recorded |
 | D2 | Denoiser worklet CPU/latency/quality; AEC vs Web Audio playback; model licence | Tier choice made (T16); numbers in 09 |
-| D3 | Electron screenshare + audio on Windows/Linux/macOS/Wayland; `globalShortcut` behaviour per OS/Wayland (native PTT hook feasibility only as v1.1 input) | Support matrix written (13 §5) |
+| D3 | **(Dropped with M6.)** Electron screenshare + audio on Windows/Linux/macOS/Wayland; `globalShortcut` behaviour per OS/Wayland (native PTT hook feasibility only as v1.1 input) | Support matrix written (13 §5) |
 | D4 | E2EE + simulcast/SVC + speaker detection; LiveKit room SID and metadata as the E2EE session (T27); audio-level header under E2EE (T33) | Decision on defaults (T12, T17); T27 confirmed; T33 closed |
 | D5 | Kysely vs Drizzle on better-sqlite3 + FTS5 (v1 is SQLite-only, T32): async transactions, event-loop blocking of backups and search (T28) | Pick + migration pattern (T2); blocking numbers recorded. **Done (2026-10-28):** Kysely; numbers in 18 §D D5 |
 | D6 | TURN/TLS cert sharing with deferred LiveKit reload (T30); single-port UDP; host-network routing and the narrowed Caddy route (T26) | Final network docs (T3) |
@@ -104,7 +104,10 @@ performance pass, upgrade/rollback rehearsal, docs (admin guide, user guide).
 **Exit:** security checklist S-01…S-15 verified; restore tested; known gaps documented.
 **Status (2026-10-30): built, deployed on mkarl.io and confirmed by you.** Moderation and audit log, voice E2EE with rotation and UI (on by default), `tincan backup`/`restore`/`e2ee rotate-secret` with a restore-and-compare test, metrics and the `dashboards` profile (running on mkarl.io, reachable through an SSH tunnel), API rate limits and caps, the review pass ([security/m5-review.md](security/m5-review.md)), load and soak scripts, an upgrade and rollback rehearsal, admin and user guides, and streaming uploads with a 4 GiB owner-changeable ceiling. S-09 and S-13 wait for M6 and v1.0. **Open:** encrypted backups, scheduled backups, the accessibility and performance pass beyond what costs nothing, and the backup/restore commands and load scripts have not been run on the real server. Numbers and cuts in 18 §M; checklist in [qa/m5.md](qa/m5.md).
 
-### M6. Desktop (Electron)
+### M6. Desktop (Electron): dropped (2026-10-30)
+**Decision (you, 2026-10-30): no desktop app for the foreseeable future.** The installable web app (PWA, 12 §14) is enough: it has its own window, taskbar icon and desktop shortcut, and everything else is the browser client that M1–M5 built. The numbering stays so the references in these docs keep working; M7 is the next milestone. What this gives up, for the record: global mute/deafen/leave shortcuts and a global push-to-talk key (the browser only sees keys while its window has focus), system-audio capture when screensharing on every OS (browsers offer it on Windows and ChromeOS, tab audio only elsewhere), a stream pop-out window beyond the browser's own picture-in-picture, tray and badge, auto-update and signing and notarisation (the web app updates on reload). The design in 13 and the original scope below stay as a shelved plan; it can be revived after v1.0 if the need appears, and spike D3 would be its first step.
+
+Original scope:
 The minimal Electron shell (window, secure bridge, keychain, instance entry, Authorization header injection T31,
 unsigned installers), desktop source picker + system audio per OS, global mute/deafen/leave shortcuts and CLI commands,
 tray/badges/notifications/autostart, deep links, pop-out/PiP, auto-update,
@@ -113,25 +116,25 @@ signing + notarisation pipeline, Linux packaging, Wayland support work. Starts w
 
 ### M7. Beta
 Invite a wider set of testers (other hosts, not only your friends), collect
-issues, burn down P0/P1, finalise installers, release notes, website/README,
+issues, burn down P0/P1, release notes, website/README,
 `SECURITY.md`, CONTRIBUTING (DCO), issue templates, example deployments for common providers.
 **Exit:** ≥ 3 independent Hosts run it successfully; no open P0/P1.
 
 ### v1.0
-Tag, publish images/installers/checksums/SBOM, announce.
+Tag, publish images/checksums/SBOM, announce.
 
 ## 4. Dependencies & critical path
 
 ```
 M0 (D1,D6) ─▶ M3 voice networking
 M0 (D2)    ─▶ M3 audio pipeline
-M0 (D3)    ─▶ M6 desktop capture/PTT
+M0 (D3)    ─▶ (M6 desktop capture/PTT: dropped)
 M0 (D4)    ─▶ M5 E2EE
 M1 skeleton ─▶ everything
 M2 permissions ─▶ M3 token grants ─▶ M5 moderation
-M3 voice ─▶ M4 video/screenshare ─▶ M5 E2EE ─▶ M6 desktop ─▶ M7 beta
+M3 voice ─▶ M4 video/screenshare ─▶ M5 E2EE ─▶ M7 beta
 ```
-Critical path: M0 → M1 → M2(permissions) → M3 → M4 → M5 → M6 → M7. Text chat polish items can
+Critical path: M0 → M1 → M2(permissions) → M3 → M4 → M5 → M7. Text chat polish items can
 run parallel to voice work if a second contributor appears.
 
 ## 5. Staffing assumptions & parallelism
@@ -155,7 +158,7 @@ If time runs short, cut in this order (last first):
 6. macOS system audio, Linux Flatpak.
 7. E2EE (the module is optional by design; ship in v1.1).
 **Not cuttable for v1:** accounts/invites, roles/permissions, text chat, voice with
-good audio, screenshare, desktop installers for the three OSes, backups, security
+good audio, screenshare, the installable web app, backups, security
 basics, docs.
 
 ## 7. v1.1 and beyond (backlog)
@@ -189,9 +192,9 @@ basics, docs.
 
 | Risk | Effect | Mitigation |
 |---|---|---|
-| Screen capture / PTT platform quirks (K-05, K-06) | M6 overruns | Spike D3 early; ship documented limitations |
+| Screen capture / PTT platform quirks (K-05, K-06) | (desktop dropped) | Spike D3 early; ship documented limitations |
 | Audio quality tuning is open-ended | M3 slips | Time-box: ship default presets, tune later via settings |
-| Code-signing/notarisation setup friction (K-14) | M6/M7 delays | Start accounts/certs in M1; unsigned dev builds meanwhile |
+| Code-signing/notarisation setup friction (K-14) | (desktop dropped) | Start accounts/certs in M1; unsigned dev builds meanwhile |
 | Scope creep from modularity | Everything | Follow cut lines; module interfaces only when two implementations exist |
 | Single-developer burnout (K-16) | Stall | Dogfood milestone M3, small wins, publish progress |
 | Upstream changes in LiveKit/Electron | Rework | Pin versions; schedule dependency-upgrade windows between milestones |
@@ -228,4 +231,4 @@ basics, docs.
 - Calendar dates (need your availability).
 - Whether to hire/commission UI design.
 - Whether beta testers beyond the friends group exist.
-- Budget for signing certificates and a staging VPS.
+- Budget for a staging VPS (signing certificates only if the desktop app is revived).
