@@ -6,6 +6,8 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-30
+
 First release (1.0.0). There was no public beta. Everything below was built before the first release and ran on one server (the author's) with a small group of friends; read the list of what is not proven in [docs/17](docs/17-roadmap-and-milestones.md#v10).
 
 ### Added
@@ -46,4 +48,5 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/commits/main
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/GoranSalzmann/TinCan/releases/tag/v1.0.0
