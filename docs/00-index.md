@@ -112,3 +112,9 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 - Diagrams are ASCII or Mermaid so they diff well in git.
 - Every doc ends with an **Open items** section that feeds doc 18.
 - IDs: requirements are `R-xxx`, decisions `D-n`/`ADR-nnn`, risks `K-nn`, wireframe screens `W-nn` and UI design calls `Un` (design/README.md).
+
+## Guides and reviews written during the build
+
+- [guides/admin-guide.md](guides/admin-guide.md) and [guides/user-guide.md](guides/user-guide.md) (drafts, M5)
+- [security/m5-review.md](security/m5-review.md): the S-01 to S-16 checklist with evidence, and residual risks
+- Demo checklists: [qa/m1.md](qa/m1.md) to [qa/m5.md](qa/m5.md)

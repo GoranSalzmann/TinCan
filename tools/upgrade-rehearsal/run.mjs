@@ -56,7 +56,7 @@ adapters:
   database: { kind: sqlite, path: ${join(dir, "data", "app.db").replaceAll("\\", "/")} }
   storage: { kind: local, path: ${join(dir, "data", "files").replaceAll("\\", "/")} }
 log: { level: warn }
-livekit: { url: "ws://127.0.0.1:${port}/livekit", apiUrl: "http://127.0.0.1:1", apiKey: devkey, apiSecret: "rehearsal-livekit-secret-yyyyyyyyyyyyyyyyyyyyyy" }
+livekit: { url: "ws://127.0.0.1:${port}/livekit", apiUrl: "http://127.0.0.1:1" }
 modules:
   accounts: { signup: open }
   voice: { reconcileIntervalMs: 3600000 }

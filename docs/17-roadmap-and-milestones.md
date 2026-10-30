@@ -102,6 +102,7 @@ audit log, backups/restore commands + CI test, metrics + dashboards profile,
 rate-limit tuning, security review pass (15 §9), load/soak tests, a11y pass,
 performance pass, upgrade/rollback rehearsal, docs (admin guide, user guide).
 **Exit:** security checklist S-01…S-15 verified; restore tested; known gaps documented.
+**Status (2026-10-30): built, awaiting your review (not merged, not deployed).** Moderation and audit log, voice E2EE with rotation and UI, `tincan backup`/`restore`/`e2ee rotate-secret` with a restore-and-compare test, metrics and the `dashboards` profile, API rate limits and caps, the review pass ([security/m5-review.md](security/m5-review.md)), load and soak scripts, an upgrade and rollback rehearsal, admin and user guides. S-09 and S-13 wait for M6 and v1.0. Cut: encrypted backups, scheduled backups, streaming uploads (proposed), the accessibility and performance pass beyond what costs nothing. Choices to confirm, numbers and cuts in 18 §M; checklist in [qa/m5.md](qa/m5.md).
 
 ### M6. Desktop (Electron)
 The minimal Electron shell (window, secure bridge, keychain, instance entry, Authorization header injection T31,

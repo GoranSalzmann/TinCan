@@ -5,14 +5,22 @@ import { useT } from "../../core/i18n/index.js";
 import { useSession } from "../../core/session/store.js";
 import { useVoice } from "../../core/voice/store.js";
 
+/** The rule of 10 §5: `required` always, `off` never, `inherit` follows the server default. */
+export function isEncrypted(
+  mode: "inherit" | "required" | "off" | undefined,
+  serverDefault: boolean,
+): boolean {
+  const m = mode ?? "inherit";
+  return m === "required" || (m === "inherit" && serverDefault);
+}
+
 /** Whether calls in a channel are encrypted, from its own setting and the server default (10 §5). */
 export function useChannelEncrypted(channel: Pick<Channel, "settings">): boolean {
   const serverDefault = useSession((s) => {
     const v = s.capabilities?.features.voice;
     return typeof v === "object" && v !== null && (v as { e2ee?: boolean }).e2ee === true;
   });
-  const mode = channel.settings.e2ee ?? "inherit";
-  return mode === "required" || (mode === "inherit" && serverDefault);
+  return isEncrypted(channel.settings.e2ee, serverDefault);
 }
 
 const tip = "voice.e2ee.tooltip" as const;

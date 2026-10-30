@@ -190,7 +190,7 @@ interface Sock {
   frames: { t?: string; d?: unknown; at: number }[];
 }
 
-async function openSocket(env: Env, u: { id: string; token: string }): Promise<Sock> {
+async function openSocket(env: Env, u: { id: string; token: string }, keep = true): Promise<Sock> {
   const t0 = performance.now();
   const ws = new WebSocket(`${env.ws}/gateway?v=1&encoding=json`);
   const sock: Sock = { ws, userId: u.id, ready: NaN, frames: [] };
@@ -209,7 +209,7 @@ async function openSocket(env: Env, u: { id: string; token: string }): Promise<S
         sock.ready = performance.now() - t0;
         clearTimeout(timer);
         resolve();
-      } else if (f.t) sock.frames.push({ t: f.t, d: f.d, at: performance.now() });
+      } else if (f.t && keep) sock.frames.push({ t: f.t, d: f.d, at: performance.now() });
     });
     ws.on("error", reject);
   });
@@ -217,11 +217,15 @@ async function openSocket(env: Env, u: { id: string; token: string }): Promise<S
 }
 
 /** Opens sockets in waves of 50, so the listen backlog is not what is being measured. */
-async function openMany(env: Env, users: Env["users"]): Promise<{ socks: Sock[]; failed: number }> {
+async function openMany(
+  env: Env,
+  users: Env["users"],
+  keep = true,
+): Promise<{ socks: Sock[]; failed: number }> {
   const socks: Sock[] = [];
   let failed = 0;
   for (let i = 0; i < users.length; i += 50) {
-    const wave = await Promise.allSettled(users.slice(i, i + 50).map((u) => openSocket(env, u)));
+    const wave = await Promise.allSettled(users.slice(i, i + 50).map((u) => openSocket(env, u, keep)));
     for (const w of wave) {
       if (w.status === "fulfilled") socks.push(w.value);
       else failed++;
@@ -528,7 +532,7 @@ async function scenarioSoak(): Promise<void> {
   console.log(`\n== Soak: ${minutes} min of mixed traffic, ${SOCKETS} sockets ==`);
   const env = await start(SOCKETS + 10);
   try {
-    const { socks } = await openMany(env, env.users.slice(0, SOCKETS));
+    const { socks } = await openMany(env, env.users.slice(0, SOCKETS), false);
     const senders = env.users.slice(SOCKETS);
     const end = Date.now() + minutes * 60_000;
     const samples: {

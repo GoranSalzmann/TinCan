@@ -188,6 +188,8 @@ reconciler (05 §6.3) enforces the change within one pass (≤ 30 s by default; 
 - Everything creates an audit-log entry (06 §3.10): actor, action, target, reason, timestamp.
 - Reports from users and auto-moderation (spam, link filters) are not in v1.
 
+> **As built in M5 (18 §M).** Kick signs the person out everywhere and they may sign in again; ban refuses later logins; timeouts are stored and end by a job; server mute and deafen persist across rejoining; a moderator's move sends the person to the new channel. The audit log is in `moderation` (`GET /audit-log`, `VIEW_AUDIT_LOG`). Guide: [guides/admin-guide.md](guides/admin-guide.md).
+
 ## 4. Admin tooling
 - Owner/Admin UI: members list with roles, invites management, role editor with permission toggles and a "preview as member" view, channel permission editor showing effective result.
 - CLI (`tincan user|invite|module|e2ee|backup`): create user, reset password, create invite, ban, dump effective permissions for debugging (`tincan perms explain --user X --channel Y`, prints each step of §2.3).
