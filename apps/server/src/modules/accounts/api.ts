@@ -56,6 +56,9 @@ export interface ResetAuthorizer {
   canReset(actorUserId: string, targetUserId: string): Promise<boolean>;
 }
 
+/** Lets another module refuse a login after the password was right (bans, 11 §1.5). Returns the message to show, or null. */
+export type LoginBlocker = (userId: string) => Promise<{ message: string; reason?: string } | null>;
+
 export interface AccountsApi {
   getUser(id: string): Promise<PublicUser | null>;
   getUsers(ids: readonly string[]): Promise<Map<string, PublicUser>>;
@@ -72,6 +75,11 @@ export interface AccountsApi {
   setNickname(userId: string, nickname: string | null): Promise<void>;
   /** Sets or clears the avatar key and tells connected clients. */
   setAvatarKey(userId: string, key: string | null): Promise<void>;
+  /** Revokes every session of a user and closes their sockets (kick, ban, 11 §2.6). Returns how many were live. */
+  revokeAllSessions(userId: string): Promise<number>;
+  /** Stores or clears the end of a timeout (epoch ms). `roles` applies it to permissions; this keeps it across restarts. */
+  setTimeoutUntil(userId: string, until: number | null): Promise<void>;
+  setLoginBlocker(blocker: LoginBlocker): void;
   onMemberJoin(hook: JoinHook): void;
   onMemberJoined(hook: JoinedHook): void;
   setInviteRedeemer(redeemer: InviteRedeemer): void;

@@ -4,7 +4,10 @@ import type { Kv } from "@tincan/pubsub";
 import {
   AppError,
   channelIdOfRoom,
+  has,
   voiceRoomName,
+  type E2eeKey,
+  type VoiceDisconnectReason,
   type VoiceJoinResponse,
   type VoiceParticipant,
   type VoiceSource,
@@ -14,7 +17,8 @@ import type { GatewayRegistrar, Logger } from "../../framework/types.js";
 import type { AccountsApi } from "../accounts/api.js";
 import type { ChannelRecord, ChannelsApi } from "../channels/api.js";
 import type { RolesApi } from "../roles/api.js";
-import { grantFor, samePermission } from "./grants.js";
+import { E2eeKeys, parseRoomMetadata, roomMetadata } from "./e2ee.js";
+import { grantFor, samePermission, type Restriction } from "./grants.js";
 import {
   mintToken,
   type LiveKitRooms,
@@ -35,6 +39,8 @@ export interface VoiceSettings {
   emptyTimeoutSecs: number;
   departureTimeoutSecs: number;
   joinRate: { max: number; windowSecs: number };
+  /** 10 §4.3: `enabled` is the default `inherit` channels follow; the owner can change it at runtime. */
+  e2ee: { enabled: boolean; rotateHours: number; lazyRotateMinutes: number };
 }
 
 import type { VoiceTables } from "./schema.js";
@@ -56,6 +62,8 @@ export interface VoiceDeps {
   gateway: GatewayRegistrar;
   kv: Kv;
   log: Logger;
+  /** Core `security.instanceSecret`: the root of the E2EE keys (10 §4.1). */
+  instanceSecret: string;
   now?: () => number;
 }
 
@@ -66,7 +74,8 @@ export type RepairKind =
   | "permission_updated"
   | "participant_removed"
   | "duplicate_session"
-  | "orphan_room";
+  | "orphan_room"
+  | "e2ee_rotated";
 
 export interface VoiceStats {
   webhooks: {
@@ -95,6 +104,7 @@ const emptyRepairs = (): Record<RepairKind, number> => ({
   participant_removed: 0,
   duplicate_session: 0,
   orphan_room: 0,
+  e2ee_rotated: 0,
 });
 
 export class VoiceService {
@@ -114,11 +124,16 @@ export class VoiceService {
   readonly #now: () => number;
   #reconciling: Promise<void> | null = null;
   readonly #refreshing = new Map<string, Promise<void>>();
+  readonly #restrictions = new Map<string, Restriction>();
+  readonly #e2ee: E2eeKeys;
+  readonly #lastRotation = new Map<string, number>();
+  readonly #rotating = new Map<string, Promise<void>>();
 
   constructor(deps: VoiceDeps) {
     this.#d = deps;
     this.#now = deps.now ?? Date.now;
     this.presence = new PresenceStore(this.#now);
+    this.#e2ee = new E2eeKeys(deps.instanceSecret, "");
   }
 
   // ---- join / leave --------------------------------------------------------------------------
@@ -151,7 +166,218 @@ export class VoiceService {
     for (const r of rows) {
       if (r.key === "camera_max_kbps") this.#d.settings.camera.maxBitrateKbps = r.value;
       if (r.key === "screenshare_max_kbps") this.#d.settings.screenshare.maxBitrateKbps = r.value;
+      if (r.key === "e2ee_default") this.#d.settings.e2ee.enabled = r.value === 1;
     }
+    for (const r of await this.#d.db.query.selectFrom("voice_restriction").selectAll().execute()) {
+      this.#restrictions.set(r.user_id, { muted: r.muted === 1, deafened: r.deafened === 1 });
+    }
+    await this.#loadSalt(true);
+  }
+
+  // ---- E2EE (10) -----------------------------------------------------------------------------
+
+  /** Reads the salt, creating it on first use. Returns true when it differs from the one in memory. */
+  async #loadSalt(create: boolean): Promise<boolean> {
+    const read = () =>
+      this.#d.db.query
+        .selectFrom("voice_secret")
+        .select("value")
+        .where("key", "=", "e2ee_salt")
+        .executeTakeFirst();
+    let salt = (await read())?.value;
+    if (!salt) {
+      if (!create) return false;
+      await this.#d.db.query
+        .insertInto("voice_secret")
+        .values({ key: "e2ee_salt", value: E2eeKeys.newSalt(), updated_at: this.#now() })
+        .onConflict((oc) => oc.column("key").doNothing())
+        .execute();
+      salt = (await read())?.value;
+    }
+    if (!salt || salt === this.#e2ee.salt) return false;
+    this.#e2ee.setSalt(salt);
+    return true;
+  }
+
+  /** Whether a channel's calls are frame-encrypted: `required` always, `inherit` when the server default is on. */
+  encryptedFor(ch: ChannelRecord): boolean {
+    const mode = ch.settings.e2ee ?? "inherit";
+    return mode === "required" || (mode === "inherit" && this.#d.settings.e2ee.enabled);
+  }
+
+  e2eeEnabled(): boolean {
+    return this.#d.settings.e2ee.enabled;
+  }
+
+  /** The owner's switch for `inherit` channels. Occupied rooms that no longer match are closed and rejoined (10 §5). */
+  async setE2eeDefault(enabled: boolean): Promise<void> {
+    const value = enabled ? 1 : 0;
+    await this.#d.db.query
+      .insertInto("voice_setting")
+      .values({ key: "e2ee_default", value, updated_at: this.#now() })
+      .onConflict((oc) => oc.column("key").doUpdateSet({ value, updated_at: this.#now() }))
+      .execute();
+    this.#d.settings.e2ee.enabled = enabled;
+    await this.syncModes();
+  }
+
+  /** Closes an occupied room whose encryption no longer matches its channel and tells everyone in it to rejoin. */
+  async syncModes(channelId?: string): Promise<void> {
+    const ids = channelId ? [channelId] : this.presence.channelIds();
+    for (const id of ids) {
+      if (this.presence.count(id) === 0) continue;
+      const ch = await this.#d.channels.get(id);
+      if (!ch) continue;
+      const room = await this.#d.rooms.getRoom(voiceRoomName(id)).catch(() => null);
+      if (!room) continue;
+      if (parseRoomMetadata(room.metadata).on !== this.encryptedFor(ch)) {
+        await this.#resetRoom(id, "e2ee_mode_changed");
+      }
+    }
+  }
+
+  async #resetRoom(channelId: string, reason: VoiceDisconnectReason): Promise<void> {
+    for (const e of this.presence.removeChannel(channelId)) {
+      this.#announce(channelId, e.userId, null);
+      this.#d.gateway.dispatchToUser(e.userId, "VOICE_SERVER_DISCONNECT", { channelId, reason });
+    }
+    try {
+      await this.#d.rooms.deleteRoom(voiceRoomName(channelId));
+    } catch (err) {
+      this.#d.log.warn({ err, channelId }, "voice: could not close the room");
+    }
+    this.#lastRotation.delete(channelId);
+  }
+
+  /** The key a participant needs now. Only people in the room get one (10 §4.2). */
+  async keyFor(userId: string, channelId: string): Promise<E2eeKey> {
+    if (!this.presence.get(channelId, userId))
+      throw new AppError("NOT_FOUND", "You are not in that voice channel.");
+    await this.#d.roles.assert(userId, "CONNECT", channelId);
+    const room = await this.#d.rooms.getRoom(voiceRoomName(channelId)).catch(() => null);
+    const meta = parseRoomMetadata(room?.metadata);
+    if (!room || !meta.on) throw new AppError("NOT_FOUND", "That call is not encrypted.");
+    return this.#e2ee.key(channelId, room.sid, meta.epoch);
+  }
+
+  /**
+   * Next epoch for one room: bumps the epoch in the room's metadata, then sends the new key to everyone still in it.
+   * Calls for one room run one after another.
+   */
+  rotate(channelId: string): Promise<void> {
+    const prev = this.#rotating.get(channelId) ?? Promise.resolve();
+    const next: Promise<void> = prev
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const name = voiceRoomName(channelId);
+          const room = await this.#d.rooms.getRoom(name);
+          if (!room) return;
+          const meta = parseRoomMetadata(room.metadata);
+          if (!meta.on) return;
+          const epoch = meta.epoch + 1;
+          await this.#d.rooms.setRoomMetadata(name, roomMetadata({ on: true, epoch }));
+          const key = this.#e2ee.key(channelId, room.sid, epoch);
+          this.#lastRotation.set(channelId, this.#now());
+          this.stats.reconcile.repairs.e2ee_rotated++;
+          for (const e of this.presence.inChannel(channelId)) {
+            this.#d.gateway.dispatchToUser(e.userId, "E2EE_KEY_UPDATE", { channelId, ...key });
+          }
+        } catch (err) {
+          this.#d.log.warn({ err, channelId }, "voice: E2EE key rotation failed; the periodic pass retries");
+        }
+      })
+      .finally(() => {
+        if (this.#rotating.get(channelId) === next) this.#rotating.delete(channelId);
+      });
+    this.#rotating.set(channelId, next);
+    return next;
+  }
+
+  /** 10 §4.3: someone left of their own accord. Rotate only if others remain and it has been a while. */
+  async #lazyRotate(channelId: string): Promise<void> {
+    if (this.presence.count(channelId) === 0) return;
+    const last = this.#lastRotation.get(channelId);
+    if (last !== undefined && this.#now() - last < this.#d.settings.e2ee.lazyRotateMinutes * 60_000) return;
+    await this.rotate(channelId);
+  }
+
+  /** Job: periodic rotation of long calls (10 §4.3) and pickup of a salt changed by the CLI. */
+  async e2eeTick(): Promise<void> {
+    const saltChanged = await this.#loadSalt(false).catch(() => false);
+    const every = this.#d.settings.e2ee.rotateHours * 3_600_000;
+    for (const id of this.presence.channelIds()) {
+      if (this.presence.count(id) === 0) continue;
+      const last = this.#lastRotation.get(id);
+      if (last === undefined) this.#lastRotation.set(id, this.#now());
+      if (saltChanged || (last !== undefined && this.#now() - last >= every)) await this.rotate(id);
+    }
+  }
+
+  // ---- moderation (11 §3) --------------------------------------------------------------------
+
+  restrictionOf(userId: string): Restriction {
+    return this.#restrictions.get(userId) ?? { muted: false, deafened: false };
+  }
+
+  /** Server mute or deafen. Persists, pushes the new grant to LiveKit and tells everyone in the room. */
+  async setServerState(
+    userId: string,
+    patch: { muted?: boolean | undefined; deafened?: boolean | undefined },
+    by: string,
+  ): Promise<Restriction> {
+    const cur = this.restrictionOf(userId);
+    const next = { muted: patch.muted ?? cur.muted, deafened: patch.deafened ?? cur.deafened };
+    if (next.muted || next.deafened) {
+      const row = {
+        muted: next.muted ? 1 : 0,
+        deafened: next.deafened ? 1 : 0,
+        set_by: by,
+        set_at: this.#now(),
+      };
+      await this.#d.db.query
+        .insertInto("voice_restriction")
+        .values({ user_id: userId, ...row })
+        .onConflict((oc) => oc.column("user_id").doUpdateSet(row))
+        .execute();
+      this.#restrictions.set(userId, next);
+    } else {
+      await this.#d.db.query.deleteFrom("voice_restriction").where("user_id", "=", userId).execute();
+      this.#restrictions.delete(userId);
+    }
+    const e = this.presence.find(userId);
+    if (e) {
+      this.#announce(e.channelId, userId, e);
+      await this.enforce(userId);
+    }
+    return next;
+  }
+
+  /** Sends a person out of voice with a reason the client shows; `to` makes the client join that channel. */
+  async disconnect(
+    userId: string,
+    reason: "disconnected" | "kicked" | "moved_by_moderator",
+    to?: string,
+  ): Promise<boolean> {
+    const e = this.presence.find(userId);
+    if (!e) return false;
+    await this.#evict(e, reason, to);
+    return true;
+  }
+
+  /** The destination must be a live voice channel the person can join (11 §3). */
+  async checkMoveTarget(userId: string, toChannelId: string): Promise<void> {
+    const ch = await this.#d.channels.get(toChannelId);
+    if (!ch || ch.type !== "voice" || ch.archivedAt !== null)
+      throw new AppError("NOT_FOUND", "No such voice channel.");
+    const { roles } = this.#d;
+    if (
+      !(await roles.can(userId, "VIEW_CHANNEL", toChannelId)) ||
+      !(await roles.can(userId, "CONNECT", toChannelId))
+    )
+      throw new AppError("CONFLICT", "That person cannot join that channel.", { reason: "cannot_connect" });
+    if (this.presence.count(toChannelId) >= this.limitOf(ch) && !this.presence.get(toChannelId, userId))
+      throw new AppError("CONFLICT", "That voice channel is full.", { reason: "channel_full" });
   }
 
   /** Changes the caps for the next join, without a restart, and keeps them across restarts. */
@@ -183,8 +409,18 @@ export class VoiceService {
     };
   }
 
-  async join(userId: string, channelId: string): Promise<VoiceJoinResponse> {
+  async join(userId: string, channelId: string, clientCanEncrypt = false): Promise<VoiceJoinResponse> {
     const ch = await this.#voiceChannel(userId, channelId);
+    const encrypted = this.encryptedFor(ch);
+    // 10 §3: a client that cannot encrypt must not enter an encrypted room (S-15). The same rule covers
+    // `inherit` with the server default on, because a mixed room would leave someone unable to hear anyone.
+    if (encrypted && !clientCanEncrypt) {
+      throw new AppError(
+        "CONFLICT",
+        "This call is end-to-end encrypted and this browser cannot join it. Try a current Chrome, Edge or Firefox.",
+        { reason: "e2ee_unsupported" },
+      );
+    }
     await this.#d.roles.assert(userId, "CONNECT", channelId);
     const rate = this.#d.settings.joinRate;
     await enforceRateLimit(this.#d.kv, {
@@ -206,19 +442,35 @@ export class VoiceService {
     if (elsewhere && elsewhere.channelId !== channelId) await this.#evict(elsewhere, "moved");
 
     const room = voiceRoomName(channelId);
-    try {
-      await this.#d.rooms.createRoom({
+    const create = () =>
+      this.#d.rooms.createRoom({
         name: room,
         emptyTimeoutSecs: this.#d.settings.emptyTimeoutSecs,
         departureTimeoutSecs: this.#d.settings.departureTimeoutSecs,
         maxParticipants: limit,
+        metadata: roomMetadata({ on: encrypted, epoch: 0 }),
       });
+    let lk;
+    try {
+      lk = await create();
+      // A room made under the other mode (the channel setting changed, or a room from before E2EE existed) is
+      // replaced when empty and otherwise closed with everyone told to rejoin, so no room mixes the two (10 §5).
+      if (parseRoomMetadata(lk.metadata).on !== encrypted) {
+        if (this.presence.count(channelId) > 0) await this.#resetRoom(channelId, "e2ee_mode_changed");
+        else await this.#d.rooms.deleteRoom(room);
+        lk = await create();
+      }
     } catch (err) {
       this.#d.log.warn({ err, room }, "voice: LiveKit refused to create the room");
       throw new AppError("UNAVAILABLE", "Voice is offline right now. Text chat is unaffected.");
     }
+    const e2ee = encrypted ? this.#e2ee.key(channelId, lk.sid, parseRoomMetadata(lk.metadata).epoch) : null;
 
-    const permission = grantFor(await this.#d.roles.permissionsIn(userId, channelId), ch.settings);
+    const permission = grantFor(
+      await this.#d.roles.permissionsIn(userId, channelId),
+      ch.settings,
+      this.restrictionOf(userId),
+    );
     const ttl = this.#d.settings.tokenTtlSecs;
     const token = await mintToken({
       apiKey: this.#d.livekit.apiKey,
@@ -242,6 +494,7 @@ export class VoiceService {
         video: this.videoCaps(ch),
       },
       userLimit: limit,
+      e2ee,
     };
   }
 
@@ -288,15 +541,16 @@ export class VoiceService {
     if (e) await this.#evict(e, null);
   }
 
-  async #evict(
-    e: PresenceEntry,
-    reason: "moved" | "kicked" | "permission_lost" | "channel_deleted" | null,
-  ): Promise<void> {
+  async #evict(e: PresenceEntry, reason: VoiceDisconnectReason | null, to?: string): Promise<void> {
     this.presence.remove(e.channelId, e.userId);
     this.#announce(e.channelId, e.userId, null);
     // Say why first: the person's client also hears from LiveKit that it was removed, and should show our reason.
     if (reason) {
-      this.#d.gateway.dispatchToUser(e.userId, "VOICE_SERVER_DISCONNECT", { channelId: e.channelId, reason });
+      this.#d.gateway.dispatchToUser(e.userId, "VOICE_SERVER_DISCONNECT", {
+        channelId: e.channelId,
+        reason,
+        ...(to ? { to } : {}),
+      });
     }
     try {
       await this.#d.rooms.removeParticipant(voiceRoomName(e.channelId), e.userId);
@@ -304,6 +558,16 @@ export class VoiceService {
       // Already gone is the common case; anything else is repaired by the next reconciliation (T25).
       this.#d.log.debug({ err, channelId: e.channelId }, "voice: removeParticipant failed");
     }
+    await this.#afterDeparture(e.channelId, reason);
+  }
+
+  /** Someone sent away involuntarily must not keep a key that still decrypts the call (10 §4.3). */
+  async #afterDeparture(channelId: string, reason: VoiceDisconnectReason | null): Promise<void> {
+    if (this.presence.count(channelId) === 0) return;
+    const forced =
+      reason !== null && reason !== "moved" && reason !== "joined_elsewhere" && reason !== "channel_deleted";
+    if (forced) await this.rotate(channelId);
+    else await this.#lazyRotate(channelId);
   }
 
   // ---- state for clients ---------------------------------------------------------------------
@@ -312,7 +576,7 @@ export class VoiceService {
     const visible = await this.#d.roles.visibleChannelIds(userId);
     const out: Record<string, VoiceParticipant[]> = {};
     for (const id of this.presence.channelIds()) {
-      if (visible.has(id)) out[id] = this.presence.inChannel(id).map(toWire);
+      if (visible.has(id)) out[id] = this.presence.inChannel(id).map((e) => this.wire(e));
     }
     return out;
   }
@@ -323,7 +587,8 @@ export class VoiceService {
   }
 
   wire(e: PresenceEntry): VoiceParticipant {
-    return toWire(e);
+    const r = this.restrictionOf(e.userId);
+    return { ...toWire(e), serverMuted: r.muted, serverDeafened: r.deafened };
   }
 
   #announce(channelId: string, userId: string, entry: PresenceEntry | null): void {
@@ -331,7 +596,7 @@ export class VoiceService {
       channelId,
       userId,
       joined: entry !== null,
-      ...(entry ? { participant: toWire(entry) } : {}),
+      ...(entry ? { participant: this.wire(entry) } : {}),
     });
   }
 
@@ -379,7 +644,10 @@ export class VoiceService {
       case "participant_connection_aborted": {
         if (!ev.participant) return;
         const gone = this.presence.left(channelId, ev.participant.identity, ev.participant.sid, ev.createdAt);
-        if (gone) this.#announce(channelId, gone.userId, null);
+        if (gone) {
+          this.#announce(channelId, gone.userId, null);
+          void this.#lazyRotate(channelId);
+        }
         return;
       }
       case "track_published":
@@ -443,10 +711,10 @@ export class VoiceService {
   async #desired(userId: string, ch: ChannelRecord): Promise<LkPermission | "remove"> {
     const member = await this.#d.accounts.getMember(userId);
     if (!member || member.disabled) return "remove";
-    const grant = grantFor(await this.#d.roles.permissionsIn(userId, ch.id), ch.settings);
-    if (!grant.canSubscribe) return "remove";
+    const perms = await this.#d.roles.permissionsIn(userId, ch.id);
+    if (!has(perms, "CONNECT")) return "remove";
     if (!(await this.#d.roles.can(userId, "VIEW_CHANNEL", ch.id))) return "remove";
-    return grant;
+    return grantFor(perms, ch.settings, this.restrictionOf(userId));
   }
 
   /**
@@ -529,6 +797,8 @@ export class VoiceService {
             });
             await this.#d.rooms.removeParticipant(room.name, p.identity).catch(() => undefined);
             if (this.presence.remove(channelId, p.identity)) this.#announce(channelId, p.identity, null);
+            // The event path missed this removal, so the person still holds the key (10 §4.3).
+            await this.rotate(channelId);
             continue;
           }
           if (!samePermission(p.permission, want)) {

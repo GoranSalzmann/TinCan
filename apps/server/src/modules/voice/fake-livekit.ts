@@ -14,7 +14,7 @@ import type {
 export class FakeLiveKit implements LiveKitRooms {
   readonly rooms = new Map<
     string,
-    { sid: string; participants: Map<string, LkParticipant>; opts: CreateRoomOptions }
+    { sid: string; participants: Map<string, LkParticipant>; opts: CreateRoomOptions; metadata: string }
   >();
   readonly calls: string[] = [];
   /** Methods listed here throw, as if LiveKit were unreachable. */
@@ -30,12 +30,31 @@ export class FakeLiveKit implements LiveKitRooms {
   async createRoom(opts: CreateRoomOptions): Promise<LkRoom> {
     this.#maybeFail("createRoom");
     let r = this.rooms.get(opts.name);
-    if (!r) this.rooms.set(opts.name, (r = { sid: `RM_${++this.#n}`, participants: new Map(), opts }));
-    return { name: opts.name, sid: r.sid, numParticipants: r.participants.size };
+    if (!r)
+      this.rooms.set(
+        opts.name,
+        (r = { sid: `RM_${++this.#n}`, participants: new Map(), opts, metadata: opts.metadata ?? "" }),
+      );
+    return { name: opts.name, sid: r.sid, numParticipants: r.participants.size, metadata: r.metadata };
   }
   async listRooms(): Promise<LkRoom[]> {
     this.#maybeFail("listRooms");
-    return [...this.rooms].map(([name, r]) => ({ name, sid: r.sid, numParticipants: r.participants.size }));
+    return [...this.rooms].map(([name, r]) => ({
+      name,
+      sid: r.sid,
+      numParticipants: r.participants.size,
+      metadata: r.metadata,
+    }));
+  }
+  async getRoom(name: string): Promise<LkRoom | null> {
+    this.#maybeFail("getRoom");
+    const r = this.rooms.get(name);
+    return r ? { name, sid: r.sid, numParticipants: r.participants.size, metadata: r.metadata } : null;
+  }
+  async setRoomMetadata(room: string, metadata: string): Promise<void> {
+    this.#maybeFail("setRoomMetadata");
+    const r = this.rooms.get(room);
+    if (r) r.metadata = metadata;
   }
   async listParticipants(room: string): Promise<LkParticipant[]> {
     this.#maybeFail("listParticipants");
@@ -67,6 +86,7 @@ export class FakeLiveKit implements LiveKitRooms {
         sid: `RM_${++this.#n}`,
         participants: new Map(),
         opts: { name: room, emptyTimeoutSecs: 60, departureTimeoutSecs: 20, maxParticipants: 99 },
+        metadata: "",
       };
       this.rooms.set(room, r);
     }

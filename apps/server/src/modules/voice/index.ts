@@ -37,6 +37,16 @@ const ConfigSchema = z.strictObject({
     .prefault({}),
   /** 05 §7: presence.reconcile, 30 s. */
   reconcileIntervalMs: z.number().int().min(1000).default(30_000),
+  /** 10: frame encryption is on by default (18 T17); the owner can switch the default off in Settings. */
+  e2ee: z
+    .strictObject({
+      enabled: z.boolean().default(true),
+      /** Long calls get a new key this often (10 §4.3). */
+      rotateHours: z.number().min(0.01).max(168).default(6),
+      /** After a voluntary leave, rotate only when the last rotation is at least this old. */
+      lazyRotateMinutes: z.number().min(0).max(1440).default(5),
+    })
+    .prefault({}),
 });
 
 export interface VoiceOverrides {
@@ -65,7 +75,13 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
       const svc = new VoiceService({
         db: ctx.ports.db.as<VoiceTables>(),
         // A copy: the owner's runtime changes must not write into the shared config object.
-        settings: { ...cfg, camera: { ...cfg.camera }, screenshare: { ...cfg.screenshare } },
+        settings: {
+          ...cfg,
+          camera: { ...cfg.camera },
+          screenshare: { ...cfg.screenshare },
+          e2ee: { ...cfg.e2ee },
+        },
+        instanceSecret: ctx.core.security.instanceSecret,
         livekit: { url: lk.url, apiKey: lk.apiKey, apiSecret: lk.apiSecret },
         rooms: overrides.rooms ?? new SdkLiveKit(lk.apiUrl, lk.apiKey, lk.apiSecret),
         verify: overrides.verify ?? sdkWebhookVerifier(lk.apiKey, lk.apiSecret),
@@ -90,7 +106,14 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
       // Fast path of T25: push permission changes to LiveKit within seconds; the reconciler is the backstop.
       ctx.events.on("permissions.changed", ({ userIds, channelId }) => svc.enforceMany(userIds, channelId));
       ctx.events.on("user.disabled", ({ userId }) => svc.enforce(userId));
-      ctx.events.on("channel.updated", ({ channelId }) => svc.enforceMany("all", channelId));
+      ctx.events.on("channel.updated", async ({ channelId }) => {
+        await svc.enforceMany("all", channelId);
+        await svc.syncModes(channelId);
+      });
+      // Kicked and banned people leave voice at once and the call gets a new key (11 §2.6, 10 §4.3).
+      ctx.events.on("member.kicked", ({ userId }) => svc.disconnect(userId, "kicked").then(() => undefined));
+      ctx.events.on("member.banned", ({ userId }) => svc.disconnect(userId, "kicked").then(() => undefined));
+      ctx.jobs.every("voice.e2ee", 30_000, () => svc.e2eeTick());
       ctx.events.on("channel.deleted", ({ channelId }) => svc.channelRemoved(channelId));
       ctx.jobs.every("voice.reconcile", cfg.reconcileIntervalMs, () => svc.reconcile(), { runOnStart: true });
 
@@ -104,6 +127,12 @@ export function createVoiceModule(overrides: VoiceOverrides = {}): AnyManifest {
         participants: (channelId) => svc.presence.inChannel(channelId).map((e) => svc.wire(e)),
         stats: () => svc.stats,
         reconcileNow: () => svc.reconcile(),
+        setServerState: (userId, patch, by) => svc.setServerState(userId, patch, by),
+        restrictionOf: (userId) => svc.restrictionOf(userId),
+        whereIs: (userId) => svc.presence.find(userId)?.channelId ?? null,
+        disconnect: (userId, reason, to) => svc.disconnect(userId, reason, to),
+        checkMoveTarget: (userId, channelId) => svc.checkMoveTarget(userId, channelId),
+        rotateKey: (channelId) => svc.rotate(channelId),
       };
       ctx.api.provide("voice", api);
     },

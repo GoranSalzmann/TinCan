@@ -38,6 +38,8 @@ export interface LkRoom {
   name: string;
   sid: string;
   numParticipants: number;
+  /** Free text the app keeps on the room; the E2EE epoch lives here (10 §4.1, 18 T27). */
+  metadata: string;
 }
 
 export interface CreateRoomOptions {
@@ -45,12 +47,17 @@ export interface CreateRoomOptions {
   emptyTimeoutSecs: number;
   departureTimeoutSecs: number;
   maxParticipants: number;
+  /** Only used when the room is created; an existing room keeps its own (D1). */
+  metadata?: string;
 }
 
 export interface LiveKitRooms {
   /** Idempotent: an existing room keeps its SID and metadata (D1). */
   createRoom(opts: CreateRoomOptions): Promise<LkRoom>;
   listRooms(): Promise<LkRoom[]>;
+  /** The room or null when it does not exist (rooms are created on first join and removed when empty). */
+  getRoom(name: string): Promise<LkRoom | null>;
+  setRoomMetadata(room: string, metadata: string): Promise<void>;
   listParticipants(room: string): Promise<LkParticipant[]>;
   updatePermission(room: string, identity: string, permission: LkPermission): Promise<void>;
   removeParticipant(room: string, identity: string): Promise<void>;
@@ -109,6 +116,13 @@ function toParticipant(p: ParticipantInfo): LkParticipant {
   };
 }
 
+const toRoom = (r: { name: string; sid: string; numParticipants: number; metadata: string }): LkRoom => ({
+  name: r.name,
+  sid: r.sid,
+  numParticipants: r.numParticipants,
+  metadata: r.metadata,
+});
+
 export class SdkLiveKit implements LiveKitRooms {
   readonly #svc: RoomServiceClient;
   constructor(apiUrl: string, apiKey: string, apiSecret: string) {
@@ -120,15 +134,19 @@ export class SdkLiveKit implements LiveKitRooms {
       emptyTimeout: o.emptyTimeoutSecs,
       departureTimeout: o.departureTimeoutSecs,
       maxParticipants: o.maxParticipants,
+      ...(o.metadata !== undefined ? { metadata: o.metadata } : {}),
     });
-    return { name: r.name, sid: r.sid, numParticipants: r.numParticipants };
+    return { name: r.name, sid: r.sid, numParticipants: r.numParticipants, metadata: r.metadata };
   }
   async listRooms(): Promise<LkRoom[]> {
-    return (await this.#svc.listRooms()).map((r) => ({
-      name: r.name,
-      sid: r.sid,
-      numParticipants: r.numParticipants,
-    }));
+    return (await this.#svc.listRooms()).map(toRoom);
+  }
+  async getRoom(name: string): Promise<LkRoom | null> {
+    const found = await this.#svc.listRooms([name]);
+    return found[0] ? toRoom(found[0]) : null;
+  }
+  async setRoomMetadata(room: string, metadata: string): Promise<void> {
+    await this.#svc.updateRoomMetadata(room, metadata);
   }
   async listParticipants(room: string): Promise<LkParticipant[]> {
     return (await this.#svc.listParticipants(room)).map(toParticipant);

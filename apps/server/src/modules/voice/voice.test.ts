@@ -29,7 +29,7 @@ async function start(opts: { real?: boolean; voice?: Record<string, unknown> } =
       livekit: { url: "ws://localhost/livekit", apiKey: KEY, apiSecret: SECRET },
       modules: {
         accounts: { signup: "open", argon2: { memoryKiB: 1024, timeCost: 1, parallelism: 1 } },
-        voice: { reconcileIntervalMs: 3_600_000, ...opts.voice },
+        voice: { reconcileIntervalMs: 3_600_000, e2ee: { enabled: false }, ...opts.voice },
       },
     },
     modules: [...ALL_MODULES.filter((m) => m.id !== "voice"), voice],

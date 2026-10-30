@@ -66,6 +66,8 @@ export const MemberSchema = z.object({
   joinedAt: z.string(),
   roleIds: z.array(z.string()),
   isOwner: z.boolean(),
+  /** Set while a moderator's timeout is running (11 §3). */
+  timeoutUntil: z.string().nullable().optional(),
 });
 export type Member = z.infer<typeof MemberSchema>;
 
@@ -90,6 +92,8 @@ export const ChannelSettingsSchema = z.object({
   screenshareAllowed: z.boolean().optional(),
   /** Screen share cap in kbit/s for this channel; never above the server's own cap (08 §5.2). */
   maxScreenshareKbps: z.number().int().min(300).max(60_000).nullish(),
+  /** Voice E2EE (10 §5): follow the server default, always encrypt, or never. */
+  e2ee: z.enum(["inherit", "required", "off"]).optional(),
 });
 
 export type ChannelSettings = z.infer<typeof ChannelSettingsSchema>;

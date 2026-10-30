@@ -6,15 +6,23 @@ import type { LkPermission } from "./livekit.js";
  * Tin Can permissions → LiveKit grant (08 §8). Pure, so the authorisation tests can run it table-driven.
  * Server-side actions (mute, move) are never part of a client token.
  */
-export function grantFor(perms: bigint, settings: ChannelSettings): LkPermission {
+export interface Restriction {
+  muted: boolean;
+  deafened: boolean;
+}
+
+export function grantFor(perms: bigint, settings: ChannelSettings, restriction?: Restriction): LkPermission {
   if (!has(perms, "CONNECT")) return { canSubscribe: false, canPublish: false, sources: [] };
   const sources: VoiceSource[] = [];
-  if (has(perms, "SPEAK")) sources.push("microphone");
+  // Server mute takes the microphone (and shared-screen sound) away; the camera and screen picture stay.
+  if (has(perms, "SPEAK") && !restriction?.muted) sources.push("microphone");
   if (has(perms, "VIDEO") && settings.videoAllowed !== false) sources.push("camera");
   if (has(perms, "SCREEN_SHARE") && settings.screenshareAllowed !== false) {
-    sources.push("screen_share", "screen_share_audio");
+    sources.push("screen_share");
+    if (!restriction?.muted) sources.push("screen_share_audio");
   }
-  return { canSubscribe: true, canPublish: sources.length > 0, sources };
+  // Server deafen stops everything the person would receive.
+  return { canSubscribe: !restriction?.deafened, canPublish: sources.length > 0, sources };
 }
 
 export function samePermission(a: LkPermission, b: LkPermission): boolean {

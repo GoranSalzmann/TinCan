@@ -10,6 +10,7 @@ import readState from "./read-state/index.js";
 import roles from "./roles/index.js";
 import textChat from "./text-chat/index.js";
 import voice from "./voice/index.js";
+import moderation from "./moderation/index.js";
 
 /**
  * Every module this build knows (04 §2). Features that arrive in later milestones (roles, channels,
@@ -26,4 +27,5 @@ export const ALL_MODULES: readonly AnyManifest[] = [
   uploads,
   search,
   voice,
+  moderation,
 ];
