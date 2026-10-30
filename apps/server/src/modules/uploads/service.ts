@@ -29,8 +29,8 @@ export interface UploadsSettings {
   memoryBudgetBytes: number;
 }
 
-/** Hard ceiling for one file: uploads are buffered in memory while they are checked and thumbnailed. */
-export const MAX_FILE_BYTES_CEILING = 512 * 1024 * 1024;
+/** Sanity ceiling for the owner's file limit. Uploads stream, so memory is not the bound; the backup archive format (8 GiB per entry) is, with margin. */
+export const MAX_FILE_BYTES_CEILING = 4 * 1024 * 1024 * 1024;
 
 export interface UploadLimits {
   maxBytes: number;
@@ -236,11 +236,18 @@ export class UploadsService implements UploadsApi {
     const contentType = sniffed ?? safeDeclaredType(file.declaredType);
     const stored = !sniffed && contentType.startsWith("image/") ? "application/octet-stream" : contentType;
 
+    // The person's room is known before the first byte is stored, so a body that would not fit stops part way.
+    const { usedBytes, quotaBytes } = await this.usage(userId);
     let size = 0;
     const hash = createHash("sha256");
     const count = (c: Buffer): Buffer => {
       size += c.length;
       if (size > maxBytes) throw new AppError("PAYLOAD_TOO_LARGE", "That file is too large.", { maxBytes });
+      if (usedBytes + size > quotaBytes)
+        throw new AppError("QUOTA_EXCEEDED", "You have used up your upload space. Delete some files first.", {
+          usedBytes,
+          quotaBytes,
+        });
       hash.update(c);
       return c;
     };
@@ -262,14 +269,6 @@ export class UploadsService implements UploadsApi {
       await this.#d.storage.delete(key).catch(() => undefined);
       throw err;
     };
-    const { usedBytes, quotaBytes } = await this.usage(userId);
-    if (usedBytes + size > quotaBytes)
-      return discard(
-        new AppError("QUOTA_EXCEEDED", "You have used up your upload space. Delete some files first.", {
-          usedBytes,
-          quotaBytes,
-        }),
-      );
 
     let dims: { width: number; height: number } | null = null;
     let thumb: Buffer | null = null;

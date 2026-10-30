@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { Writable } from "node:stream";
 import { Op, CloseCode } from "@tincan/shared";
 import sharp from "sharp";
@@ -337,11 +339,11 @@ describe("files cannot run as part of the app (S-07)", () => {
 describe("uploads cannot exhaust memory (15 §4.2, 18 §M)", () => {
   it("a big non-image goes to storage in chunks: the process does not grow by the file size", async () => {
     s = await startTestServer({
-      config: { modules: { accounts: { signup: "open" }, uploads: { maxBytes: 256 * 1024 * 1024 } } },
+      config: { modules: { accounts: { signup: "open" }, uploads: { maxBytes: 1024 * 1024 * 1024 } } },
     });
     await s.setupOwner();
     const ann = await s.register("aa");
-    const size = 200 * 1024 * 1024;
+    const size = 600 * 1024 * 1024; // more than the old 512 MiB ceiling
     const boundary = "----stream";
     const CRLF = "\r\n";
     const head = Buffer.from(
@@ -394,7 +396,102 @@ describe("uploads cannot exhaust memory (15 §4.2, 18 §M)", () => {
     const out = (await res.json()) as { size: number };
     expect(out.size).toBe(size);
     // The old path held the whole file (and a second copy while joining chunks); streaming stays well below half.
-    expect(peak - base).toBeLessThan(size / 2);
+    expect(peak - base).toBeLessThan(200 * 1024 * 1024);
+  });
+
+  const storedFiles = (dir: string): string[] => {
+    const out: string[] = [];
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(join(d, e.name));
+        else out.push(join(d, e.name));
+      }
+    };
+    if (existsSync(join(dir, "files"))) walk(join(dir, "files"));
+    return out;
+  };
+
+  /** A multipart body of `size` bytes that can be cut off after `cutAfter` bytes. */
+  function rawUpload(
+    url: string,
+    token: string,
+    size: number,
+    signal?: AbortSignal,
+    delayMs = 0,
+  ): Promise<Response> {
+    const boundary = "----cut";
+    const CRLF = "\r\n";
+    const head = Buffer.from(
+      [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="file"; filename="x.bin"',
+        "Content-Type: application/octet-stream",
+        "",
+        "",
+      ].join(CRLF),
+    );
+    const chunk = Buffer.alloc(64 * 1024, 3);
+    let sent = 0;
+    let phase = 0;
+    const body = new ReadableStream<Uint8Array>({
+      async pull(c) {
+        if (phase === 0) {
+          c.enqueue(head);
+          phase = 1;
+          return;
+        }
+        if (sent < size) {
+          if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+          c.enqueue(chunk);
+          sent += chunk.length;
+          return;
+        }
+        if (phase === 1) {
+          c.enqueue(Buffer.from(`${CRLF}--${boundary}--${CRLF}`));
+          phase = 2;
+          return;
+        }
+        c.close();
+      },
+    });
+    return fetch(`${url}/api/v1/uploads`, {
+      method: "POST",
+      duplex: "half",
+      ...(signal ? { signal } : {}),
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
+    } as RequestInit);
+  }
+
+  it("a connection cut part way leaves no partial file and no attachment", async () => {
+    s = await startTestServer({ config: { modules: { accounts: { signup: "open" } } } });
+    await s.setupOwner();
+    const ann = await s.register("aa");
+    const ctl = new AbortController();
+    setTimeout(() => ctl.abort(), 300);
+    await rawUpload(s.url, ann.token, 20 * 1024 * 1024, ctl.signal, 2).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(storedFiles(s.dir)).toEqual([]);
+    expect((await s.request("GET", "/api/v1/users/@me/storage", { token: ann.token })).body.usedBytes).toBe(
+      0,
+    );
+  });
+
+  it("a body that would pass the person's quota stops part way and leaves nothing", async () => {
+    s = await startTestServer({
+      config: { modules: { accounts: { signup: "open" }, uploads: { userQuotaBytes: 2 * 1024 * 1024 } } },
+    });
+    await s.setupOwner();
+    const ann = await s.register("aa");
+    const t0 = Date.now();
+    const res = await rawUpload(s.url, ann.token, 50 * 1024 * 1024);
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("QUOTA_EXCEEDED");
+    expect(Date.now() - t0).toBeLessThan(5000);
+    expect(storedFiles(s.dir)).toEqual([]);
   });
 
   it("refuses a body over the limit part way and leaves nothing behind", async () => {
