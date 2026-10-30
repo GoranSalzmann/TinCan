@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or "how do I ..."
+    url: https://github.com/GoranSalzmann/TinCan/discussions/categories/q-a
+    about: Ask in Discussions. Questions filed as issues are moved there.
+  - name: Report a security problem
+    url: https://github.com/GoranSalzmann/TinCan/security/advisories/new
+    about: Please do not open a public issue for a vulnerability. This form is private.

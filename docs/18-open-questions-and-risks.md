@@ -547,3 +547,54 @@ M5 cut scheduled and encrypted backups and never ran backup or restore on a real
 **Done on mkarl.io, 2026-10-30:** first encrypted backups (38 MB, 28 and 30 entries, the second with secrets), restore drill PASS on the real data (all checksums, row counts 4 users / 4 channels / 42 messages / 7 attachments, a throw-away server that knew the owner), wrong passphrase refused, and the `backup` service started with the passphrase file, `.env` and `livekit.yaml` mounted and `--include-secrets` on (first scheduled run 2026-10-31 03:30 UTC). The passphrase file had mode 664 and was set to 600.
 
 **Not done / for you:** where the off-site copies go and the passphrase's custody outside the server (your decisions; `pull-backups.sh` is ready), the rehearsal restore on a scratch machine (qa/backups.md §C step 7), and the encrypted-archive format being reviewed by someone who is not me. Backups made before this change stay valid: they are plain archives without row counts, so the count comparison is skipped for them.
+
+## P. M7 preparation: repository and release pipeline (2026-10-30)
+
+Prepared on a branch; nothing was pushed, published or changed on GitHub or the VPS. Checklist for you: [release-checklist.md](release-checklist.md). Decisions in §F were not touched.
+
+### Built
+
+| Ref | What | Note |
+|---|---|---|
+| P-1 | README, SECURITY.md (GitHub private reporting, contact placeholder), CONTRIBUTING.md (DCO, `pnpm check`, media test, dev server with a local LiveKit, module boundary, SPDX, doc conventions), CODE_OF_CONDUCT.md (Contributor Covenant 2.1 unmodified except the contact line, CC BY 4.0 attribution kept, excluded from Prettier so it stays unmodified), issue forms, pull request template, `dependabot.yml` (npm, Docker, Actions, weekly, grouped), CODEOWNERS | Placeholders are marked `OWNER TODO` |
+| P-2 | CHANGELOG.md (Keep a Changelog; "Unreleased" holds M1 to M5 and the later work) and `docs/release-notes-template.md` | The release workflow takes the section of the tagged version as the release text and fails without it |
+| P-3 | `.github/workflows/release.yml`: a `v*` tag (or a manual dry run) checks the version against both `package.json` files, finds the changelog section, repeats the PR checks, builds `tincan-server` and `tincan-web` for linux/amd64 and linux/arm64, pushes to GHCR, attests provenance, writes CycloneDX SBOMs (lockfile and both images, Syft through `anchore/sbom-action`), `SHA256SUMS`, a source archive and `IMAGES.txt`, and creates the GitHub Release. The facts come from `scripts/release-meta.mjs` (tested) | Beta tags push only `x.y.z-beta.n`; only a plain `x.y.z` also moves `x.y` and `latest`. Manual runs are **always** dry runs. BuildKit's own provenance is off so the index has no `unknown/unknown` entries; the GitHub attestation replaces it. **Written, not run.** All workflow actions (the three old workflows too) are pinned by commit SHA, resolved through the GitHub API on 2026-10-30, and kept on the major versions they used; Dependabot keeps them current |
+| P-4 | `tincan init --image <registry/name> [--version <release>]` writes a compose file that pulls `<name>-server:<tag>` and `<name>-web:<tag>`; the version defaults to the program's own; without `--image` and outside a checkout `init` now stops with a message instead of writing a file that cannot start; `TINCAN_INIT_HOST_DIR` makes the printed next steps show the folder as the host sees it when init runs in a container | Tests: `init.test.ts`, `templates.test.ts` |
+| P-5 | `tincan init` checks for Docker Engine 20.10+ (host-gateway) and Compose v2 and says what is missing; it only warns, because init may run in a container or on another machine | `prereqs.ts`, tested with a fake probe |
+| P-6 | `tools/clean-install/`: a privileged Ubuntu 24.04 container with its own dockerd (Docker-in-Docker), an ordinary user in the docker group, the images built from the checkout and loaded into it; the README's quickstart block is **extracted and run** (domain, image name and voice swapped, each swap checked) | See "Why Docker-in-Docker" below. Opt-in CI job `clean-install.yml` (manual and nightly) |
+| P-7 | `docs/guides/hosting.md`: VPS sizing from the load and soak numbers, home servers and CGNAT, DNS, firewall recipes (ufw, firewalld, provider panels), upgrade and rollback, troubleshooting table | Sizes are the design target plus the soak result; LiveKit's capacity per plan was never measured and the guide says so |
+| P-8 | `docs/security/public-readiness.md`, `.gitleaksignore`, `docs/release-checklist.md` | |
+
+**Why Docker-in-Docker.** The alternative, mounting the host's Docker socket, makes compose publish ports and bind-mount paths on the *host*, so the test would touch the machine it runs on and depend on its path layout. A privileged container with its own daemon is a real "new machine" with nothing preinstalled, the same on a laptop and on a GitHub runner. The cost: it needs `--privileged`, the first run builds three images (a few minutes), and voice cannot be tested in it (no public IP; the media test covers voice).
+
+### What the clean install found (and what was done)
+
+| Ref | A newcomer would have hit | Done |
+|---|---|---|
+| P-F1 | `tincan setup` (owner from the command line) while the server runs: the server kept answering `SETUP_REQUIRED` to every call, because it learns about the owner only at start, and the default roles and channels are created then too | The command now prints that the server must be restarted (`docker compose restart tincan`). Not made automatic: the owner's join hooks run inside the server. The browser setup flow (the README's main path) is not affected |
+| P-F2 | `tincan doctor` in a `--domain localhost` trial failed with a bare "fetch failed" (inside the container `localhost` is the container), and the voice checks failed when the voice profile is not started | The failure now explains it and gives the `curl` to run on the host; `doctor --no-voice` skips the voice checks |
+| P-F3 | A misaligned column in init's list of files; "Next" showed container paths when init runs in a container; the voice profile was not mentioned in the next steps | Fixed |
+| P-F4 | `pnpm audit --audit-level high` failed: root dev dependency `ws` 8.18.0 (GHSA-96hv-2xvq-fx4p, and a moderate one). The server's own `ws` was already 8.22.0 | Root pinned to 8.22.0 |
+| P-F5 | **Not fixed:** `tincan restore` run inside a container prints `Next: cd /scratch/restored && docker compose up -d` with the container's path. The admin guide runs restore on the host, where the path is right | Follow-up: print a hint when running in a container |
+| P-F6 | **Not fixed:** an existing install keeps the LiveKit tag it was made with; `tincan init` is not re-run on upgrade | The upgrade notes of a release must say when LiveKit's tag changes (the release-notes template has the place) |
+
+### Cuts and things not done
+
+| What | Why |
+|---|---|
+| Running the release workflow, GHCR visibility, SBOM content, the web image for arm64, real ARM hardware (the server image was built for arm64 under emulation and `tincan setup` ran in it) | No tag and no push were allowed. The workflow is the one thing in this section that was written without being run. Dry-run it (checklist step 7) |
+| Image scanning (Trivy) in the pipeline | Not asked for; the SBOMs make it possible later. CodeQL and `pnpm audit` run |
+| Signing images with cosign | GitHub's build-provenance attestation was used instead: no key to manage. Verify with `gh attestation verify` |
+| A website, an `install.sh` one-liner | Not for the beta. 14 §4 describes it as optional |
+| TURN and voice in the clean install | Need public ports and a second DNS name |
+| Firefox, Safari, phones, arm64 hardware, a second real VPS | Still untested; the hosting guide says so where it matters |
+| Rewriting history | Left to you, with commands (`security/public-readiness.md` §5) |
+
+### What I need from you
+
+[release-checklist.md](release-checklist.md): the name check (F4); two contact addresses; the decisions on your e-mail in the history, `mkarl.io` in the documents and the logo's origin; the GitHub settings; the dry run, the first tag and the package visibility.
+
+## Open items
+
+- Decisions and steps in the release checklist.
+- P-F5.

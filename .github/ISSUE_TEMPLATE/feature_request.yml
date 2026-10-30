@@ -1,0 +1,31 @@
+name: Feature request
+description: Something Tin Can does not do yet, or does awkwardly.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tin Can is built for small communities and is deliberately narrow. Check docs/01 (scope) and the backlog in docs/17 §7 first: many ideas are already listed there, and a few (desktop and mobile apps, federation) are decided against for now. A request that fits the scope is not a promise; it helps to say how much it matters to you.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation first, then the feature. "My community has 40 people and ..." is more useful than "add X".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today, and what else did you consider?
+  - type: dropdown
+    id: help
+    attributes:
+      label: Could you help build or test it?
+      options:
+        - I can test it
+        - I could send a pull request
+        - I can only suggest it

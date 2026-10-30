@@ -122,6 +122,8 @@ service option or a self-test instruction ("run this command from another machin
 
 Manual path (no script) is documented step by step for people who prefer it.
 
+> **As built in M7 (18 §P).** There is no signed bundle: the release is two container images on GHCR (`tincan-server`, `tincan-web`, amd64 and arm64) with checksums, SBOMs and build-provenance attestations. `tincan init` runs from the server image (`docker run … tincan-server node dist/cli.js init --image ghcr.io/<owner>/tincan --version <release>`, see the README) and writes a compose file that pulls those tags; without `--image` it builds from a checkout, as before. It checks for Docker Engine 20.10+ and Compose v2 and warns when they are missing. The tested path is exercised by `tools/clean-install`.
+
 ## 5. Configuration management
 
 - Single `config.yaml` (04 §9), env overrides, secrets via env / `*_FILE`.

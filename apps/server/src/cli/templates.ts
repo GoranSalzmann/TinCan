@@ -27,7 +27,10 @@ export interface InitValues {
   gid: number;
   /** Relative path from the output directory to the repository, when building images from source. */
   repoDir: string | null;
+  /** Image name without the target suffix: `tincan` (built locally) or e.g. `ghcr.io/goransalzmann/tincan`. */
   image: string;
+  /** Release tag for the `-server` and `-web` images; null leaves them untagged (images built from a checkout). */
+  imageTag: string | null;
 }
 
 export function envFile(v: InitValues): string {
@@ -74,6 +77,11 @@ log:
 `;
 }
 
+/** `tincan-server` or `ghcr.io/goransalzmann/tincan-server:0.2.0` (target is `server` or `web`). */
+export function imageRef(v: Pick<InitValues, "image" | "imageTag">, target: "server" | "web"): string {
+  return `${v.image}-${target}${v.imageTag ? `:${v.imageTag}` : ""}`;
+}
+
 export function composeFile(v: InitValues): string {
   const build = (target: string) =>
     v.repoDir
@@ -87,7 +95,7 @@ export function composeFile(v: InitValues): string {
 name: tincan
 services:
   tincan:
-${build("server")}    image: ${v.image}-server
+${build("server")}    image: ${imageRef(v, "server")}
     restart: unless-stopped
     user: "\${HOST_UID:-1000}:\${HOST_GID:-1000}"
     env_file: .env
@@ -114,7 +122,7 @@ ${build("server")}    image: ${v.image}-server
       start_period: 20s
 
   caddy:
-${build("web")}    image: ${v.image}-web
+${build("web")}    image: ${imageRef(v, "web")}
     restart: unless-stopped
     depends_on: [tincan]
     ports:
@@ -153,7 +161,7 @@ ${build("web")}    image: ${v.image}-web
   # machine (docs/14 §6.4); a backup on the same disk does not survive the disk.
   backup:
     profiles: [backup]
-    image: ${v.image}-server
+    image: ${imageRef(v, "server")}
     restart: unless-stopped
     user: "\${HOST_UID:-1000}:\${HOST_GID:-1000}"
     env_file: .env

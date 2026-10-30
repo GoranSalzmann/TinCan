@@ -1,0 +1,4 @@
+# Public LiveKit development credentials in the M3 spike (docs/security/public-readiness.md)
+75febeeb25006189851759e89569e5e99fb640ad:spikes/m3-voice/d6/livekit.yaml:generic-api-key:9
+75febeeb25006189851759e89569e5e99fb640ad:spikes/m3-voice/livekit/livekit.yaml:generic-api-key:11
+75febeeb25006189851759e89569e5e99fb640ad:spikes/m3-voice/probe/d1-api.mjs:generic-api-key:10

@@ -1,0 +1,7 @@
+# Everything is reviewed by the owner until there are more maintainers.
+*                       @GoranSalzmann
+# Security-relevant paths are listed on their own so they stay visible when the file grows.
+/.github/               @GoranSalzmann
+/deploy/                @GoranSalzmann
+/packages/auth/         @GoranSalzmann
+/docs/security/         @GoranSalzmann
