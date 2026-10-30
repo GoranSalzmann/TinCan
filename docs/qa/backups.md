@@ -19,13 +19,15 @@ Built 2026-10-30 (18 §O, 14 §6). Everything marked **(local)** was run during 
 
 ## C. First run on mkarl.io **(VPS)** (nothing here changes live data; steps 1 and 2 add files)
 
+**Run 2026-10-30 with your go-ahead:** steps 1 to 5 done (ticked below); 6 and 7 are yours. The server's backup service has the passphrase file mounted, `.env` and `livekit.yaml` mounted, and `--include-secrets` on, so every archive is complete. Daily at 03:30 UTC, 14 kept.
+
 Update the deployment first: the `backup` service is new in the compose file. Take the new `docker-compose.yml` from `tincan init` in a scratch directory and keep your own `context:` lines, as for the dashboards.
 
-1. [ ] Create the passphrase file on the server: `umask 077; printf '%s' 'YOUR PASSPHRASE' > ~/.tincan-backup-key`. Mount it into the `backup` service and set `TINCAN_BACKUP_PASSPHRASE_FILE` to it, **or** put `TINCAN_BACKUP_PASSPHRASE=…` in `.env`.
-2. [ ] One backup by hand: `docker compose --profile backup run --rm --no-deps backup node dist/cli.js backup --keep 14`. It prints "encrypted" and a `…tar.gz.enc` appears in `~/tincan/data/backups/`.
-3. [ ] `docker compose exec tincan node dist/cli.js doctor` says "Last backup … encrypted". After the dashboards' next scrape the metric `tincan_last_backup_timestamp_seconds` is non-zero and `BackupStale` clears.
-4. [ ] **Restore drill:** `cd ~/tincan && PASSPHRASE_FILE=~/.tincan-backup-key sh ~/tincan-src/deploy/backup/restore-drill.sh` prints **PASS** (it needs `curl` and `docker`; it uses port 3999 on loopback). Run it again with a deliberately wrong passphrase file: it must **fail**.
-5. [ ] Start the schedule: `docker compose --profile backup up -d`. Tomorrow morning a second archive exists and `doctor` says "… h ago".
+1. [x] Create the passphrase file on the server: `umask 077; printf '%s' 'YOUR PASSPHRASE' > ~/.tincan-backup-key`. Mount it into the `backup` service and set `TINCAN_BACKUP_PASSPHRASE_FILE` to it, **or** put `TINCAN_BACKUP_PASSPHRASE=…` in `.env`.
+2. [x] One backup by hand: `docker compose --profile backup run --rm --no-deps backup node dist/cli.js backup --keep 14`. It prints "encrypted" and a `…tar.gz.enc` appears in `~/tincan/data/backups/`.
+3. [x] `docker compose exec tincan node dist/cli.js doctor` says "Last backup … encrypted". After the dashboards' next scrape the metric `tincan_last_backup_timestamp_seconds` is non-zero and `BackupStale` clears.
+4. [x] **Restore drill:** `cd ~/tincan && PASSPHRASE_FILE=~/.tincan-backup-key sh ~/tincan-src/deploy/backup/restore-drill.sh` prints **PASS** (it needs `curl` and `docker`; it uses port 3999 on loopback). Run it again with a deliberately wrong passphrase file: it must **fail**.
+5. [~] Start the schedule (started 2026-10-30, first scheduled run 2026-10-31 03:30 UTC; tick this when that archive exists): `docker compose --profile backup up -d`. Tomorrow morning a second archive exists and `doctor` says "… h ago".
 6. [ ] **Off-site:** from your own machine, `sh pull-backups.sh mkarl.io:tincan/data/backups ~/tincan-backups`. The newest archive is there. Try the wrong passphrase on it (the drill's restore step does) and confirm it refuses.
 7. [ ] **Real restore rehearsal** (once, before you ever need it): in a scratch directory, `tincan restore <archive> --into <empty dir> --passphrase-file <key>`, copy your real `.env` (or use an archive made with `--include-secrets`), `docker compose up -d`, log in with your own account and look at a channel you know.
 
