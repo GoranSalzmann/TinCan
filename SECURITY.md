@@ -11,7 +11,7 @@ Only the **latest beta** (and, once there is one, the latest stable release) get
 **Please do not open a public issue or discussion for a security problem.**
 
 1. Preferred: use GitHub's private reporting. Open the [Security tab](../../security/advisories/new) of this repository and choose "Report a vulnerability". Only the maintainer can see it.
-2. If you cannot use GitHub, write to **[OWNER TODO: security contact address]**. If you want to send details encrypted, say so in a first short message and ask for a key.
+2. If you cannot use GitHub, write to **karl.mike2002@gmail.com**. If you want to send details encrypted, say so in a first short message and ask for a key.
 
 What helps most:
 

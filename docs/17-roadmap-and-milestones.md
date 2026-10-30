@@ -225,7 +225,7 @@ basics, docs.
 - [x] Docs 00–18 reviewed; open questions in 18 §A resolved (done) and technical open items triaged (2026-10-28; decisions in 18 §F)
 - [x] Roadmap and cut lines accepted (2026-10-28)
 - [x] Decided who is building: you plus Claude doing most coding (§5); dates depend on your review cadence, to be set when M0 starts
-- [ ] Name/trademark check done (F4)
+- [x] Name/trademark check done (F4), confirmed by the owner 2026-10-30
 - [x] Repo location & hosting chosen (GitHub: `GoranSalzmann/TinCan`), licence headers decided (F3: `AGPL-3.0-or-later` + DCO)
 
 ## Open items

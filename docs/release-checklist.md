@@ -12,7 +12,7 @@ Where things are: [public-readiness audit](security/public-readiness.md) (what i
 
 ## 1. Name and trademark check (docs/18 F4)
 
-- [ ] **(you)** Search for "Tin Can" and "tincan" in the trademark databases of the places you and your members live (EUIPO's TMview and the national office, USPTO, DPMA, and so on) for software, chat and communication services. I am not a lawyer and nor are you: this is a look for obvious conflicts, not a legal opinion. One known collision to look at: **"Tin Can API"** is the former name of the e-learning standard now called xAPI, and "Tin Can" is common as a product name.
+- [x] **(you, done 2026-10-30)** Search for "Tin Can" and "tincan" in the trademark databases of the places you and your members live (EUIPO's TMview and the national office, USPTO, DPMA, and so on) for software, chat and communication services. I am not a lawyer and nor are you: this is a look for obvious conflicts, not a legal opinion. One known collision to look at: **"Tin Can API"** is the former name of the e-learning standard now called xAPI, and "Tin Can" is common as a product name.
 - [ ] Check that the names are free where you will publish: the GitHub repository (taken by you), the npm scope `@tincan` (only matters if you ever publish packages; the packages are private), the container names `ghcr.io/goransalzmann/tincan-server` and `…/tincan-web` (they live under your account, so no clash), and a domain or website if you want one.
 - [ ] If you rename: change `DEFAULT_SOURCE_URL` in `apps/server/src/version.ts`, the URLs in `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/*`, `CHANGELOG.md`, the image names in `docs/guides/hosting.md`, `docs/release-notes-template.md` and `README.md`, and `tincan init --image`'s examples. The release workflow derives image names from the repository owner, not from a fixed string. Searching for `goransalzmann` and `TinCan` finds all of it.
 
@@ -22,8 +22,8 @@ Where things are: [public-readiness audit](security/public-readiness.md) (what i
 grep -rn "OWNER TODO" --include=*.md . --exclude-dir=node_modules
 ```
 
-- [ ] `SECURITY.md`: the security contact address.
-- [ ] `CODE_OF_CONDUCT.md`: the conduct contact address.
+- [x] `SECURITY.md`: the security contact address.
+- [x] `CODE_OF_CONDUCT.md`: the conduct contact address.
 - [ ] `README.md`: the `VERSION=` example in the quickstart (step 5 below sets the real one).
 - [ ] The `.github/CODEOWNERS` entries name `@GoranSalzmann`; change them if the account name differs.
 
