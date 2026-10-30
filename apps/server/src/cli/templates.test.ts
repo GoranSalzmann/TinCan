@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
-import { caddyfile, composeFile, livekitFile, LIVEKIT_IMAGE, type InitValues } from "./templates.js";
+import {
+  caddyfile,
+  composeFile,
+  imageRef,
+  livekitFile,
+  LIVEKIT_IMAGE,
+  type InitValues,
+} from "./templates.js";
 
 const values: InitValues = {
   domain: "chat.example.com",
@@ -20,6 +27,7 @@ const values: InitValues = {
   gid: 1000,
   repoDir: null,
   image: "tincan",
+  imageTag: null,
 };
 
 describe("caddyfile", () => {
@@ -85,5 +93,26 @@ describe("composeFile backup profile", () => {
       'command: ["node", "dist/cli.js", "backup", "--daemon", "--at", "03:30", "--keep", "14"]',
     );
     expect(text).toMatch(/\n {2}backup:\n[\s\S]*?read_only: true/);
+  });
+});
+
+describe("released images", () => {
+  const released = { ...values, image: "ghcr.io/goransalzmann/tincan", imageTag: "0.2.0-beta.1" };
+
+  it("names the tagged server and web images and has no build section", () => {
+    const text = composeFile(released);
+    expect(text).toContain("image: ghcr.io/goransalzmann/tincan-server:0.2.0-beta.1");
+    expect(text).toContain("image: ghcr.io/goransalzmann/tincan-web:0.2.0-beta.1");
+    expect(text).not.toContain("build:");
+    expect(imageRef(released, "web")).toBe("ghcr.io/goransalzmann/tincan-web:0.2.0-beta.1");
+  });
+
+  it("uses the same tagged server image for the backup service", () => {
+    const text = composeFile(released);
+    expect(text.match(/tincan-server:0\.2\.0-beta\.1/g)).toHaveLength(2);
+  });
+
+  it("leaves locally built images untagged", () => {
+    expect(imageRef(values, "server")).toBe("tincan-server");
   });
 });

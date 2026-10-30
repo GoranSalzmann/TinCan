@@ -11,7 +11,7 @@ import { resolveModules } from "../framework/loader.js";
 import { ALL_MODULES } from "../modules/index.js";
 import { VERSION } from "../version.js";
 import { readBackupStatus } from "./backup.js";
-import { runVoiceChecks } from "./voice-checks.js";
+import { inContainer, runVoiceChecks } from "./voice-checks.js";
 
 /** Glyphs of the design legend (docs/design/README.md): ok, failed, skipped. */
 export type CheckStatus = "ok" | "fail" | "warn" | "skip";
@@ -93,9 +93,24 @@ export function resolveDataDir(
   return { dir: direct };
 }
 
+/**
+ * Inside the app container `localhost` is the container itself, not the proxy a local trial publishes on the host,
+ * so a trial's public URL cannot be reached from where `doctor` runs. Says so instead of a bare "fetch failed".
+ */
+export function localhostHint(url: string, insideContainer: boolean): string | undefined {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
+  if (!insideContainer || !/^(localhost|127.0.0.1|[::1])$/.test(host)) return undefined;
+  return `${url} is this container itself. From the machine Docker runs on, check it with: curl ${url}/api/v1/capabilities`;
+}
+
 export async function runDoctor(
   config: CoreConfig,
-  opts: { url?: string; configDir?: string; turnDomain?: string } = {},
+  opts: { url?: string; configDir?: string; turnDomain?: string; noVoice?: boolean } = {},
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const url = opts.url ?? config.instance.publicUrl;
@@ -252,6 +267,9 @@ export async function runDoctor(
             fix: `this machine's clock differs from the server's by ${Math.round(skew / 1000)} s; enable time sync`,
           }
         : { status: "ok", detail: parts.join(", ") };
+    }).then((r) => {
+      const hint = r.status === "fail" ? localhostHint(url, inContainer()) : undefined;
+      return hint ? { ...r, fix: hint } : r;
     }),
   );
 
@@ -286,7 +304,15 @@ export async function runDoctor(
   );
 
   results.push(
-    ...(await runVoiceChecks(config, { url, ...(opts.turnDomain ? { turnDomain: opts.turnDomain } : {}) })),
+    ...(opts.noVoice
+      ? [
+          {
+            name: "Voice",
+            status: "skip" as const,
+            detail: "skipped (--no-voice); drop the flag once you start the voice profile",
+          },
+        ]
+      : await runVoiceChecks(config, { url, ...(opts.turnDomain ? { turnDomain: opts.turnDomain } : {}) })),
   );
   return results;
 }

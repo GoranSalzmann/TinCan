@@ -113,6 +113,10 @@ export async function cliSetup(config: CoreConfig, args: SetupArgs): Promise<str
       });
     });
     await deleteSetupToken(resolve(config.dataDir));
-    return `Created owner ${username}. The setup token was removed.`;
+    return [
+      `Created owner ${username}. The setup token was removed.`,
+      "If the server is already running, restart it now so it notices and creates the default roles and channels:",
+      "  docker compose restart tincan",
+    ].join("\n");
   });
 }

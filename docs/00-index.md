@@ -115,6 +115,8 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 
 ## Guides and reviews written during the build
 
-- [guides/admin-guide.md](guides/admin-guide.md) and [guides/user-guide.md](guides/user-guide.md) (drafts, M5)
+- [guides/admin-guide.md](guides/admin-guide.md) and [guides/user-guide.md](guides/user-guide.md) (drafts, M5); [guides/hosting.md](guides/hosting.md) (server size, home hosting, firewall, upgrades, troubleshooting)
+- [release-checklist.md](release-checklist.md) and [release-notes-template.md](release-notes-template.md): going public and cutting a release (M7)
+- [security/public-readiness.md](security/public-readiness.md): what is in the git history before the repository goes public
 - [security/m5-review.md](security/m5-review.md): the S-01 to S-16 checklist with evidence, and residual risks
 - Demo checklists: [qa/m1.md](qa/m1.md) to [qa/m5.md](qa/m5.md)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
-import { resolveDataDir } from "./doctor.js";
+import { localhostHint, resolveDataDir } from "./doctor.js";
 import { apiUrlOnHost, decideTurnReload, inContainer } from "./voice-checks.js";
 
 describe("resolveDataDir", () => {
@@ -63,5 +63,20 @@ describe("apiUrlOnHost", () => {
     expect(inContainer((p) => p === "/.dockerenv")).toBe(true);
     expect(inContainer((p) => p === "/run/.containerenv")).toBe(true);
     expect(inContainer(() => false)).toBe(false);
+  });
+});
+
+describe("localhostHint", () => {
+  it("explains that localhost inside a container is the container", () => {
+    expect(localhostHint("http://localhost:8080", true)).toMatch(
+      /this container itself.*curl http:\/\/localhost:8080/,
+    );
+    expect(localhostHint("http://127.0.0.1:8080", true)).toBeDefined();
+  });
+
+  it("says nothing for a real host name, or outside a container, or for garbage", () => {
+    expect(localhostHint("https://chat.example.com", true)).toBeUndefined();
+    expect(localhostHint("http://localhost:8080", false)).toBeUndefined();
+    expect(localhostHint("not a url", true)).toBeUndefined();
   });
 });

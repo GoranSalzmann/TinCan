@@ -1,6 +1,6 @@
 # Tin Can admin guide (draft, M5)
 
-For the person who runs the server. Design background is in docs 11 (permissions), 14 (deployment) and 15 (security); this page is the how-to. `tincan` below means `docker compose exec tincan node dist/cli.js` from your deploy directory, or `pnpm tincan --config <dir>/config.yaml` from a checkout.
+For the person who runs the server. Setting up a machine, ports, home hosting, upgrades and a longer troubleshooting table are in the [hosting guide](hosting.md). Design background is in docs 11 (permissions), 14 (deployment) and 15 (security); this page is the how-to. `tincan` below means `docker compose exec tincan node dist/cli.js` from your deploy directory, or `pnpm tincan --config <dir>/config.yaml` from a checkout.
 
 ## 1. What you are responsible for
 
@@ -151,3 +151,5 @@ Repeat on your own hardware (never against a live server): `pnpm load`, and `sh 
 | Rising `tincan_reconcile_repairs_total` | Webhooks not arriving | `livekit.yaml` webhook URL, `tincan doctor` |
 | Restore says "not empty" | It refuses non-empty targets | Use a new directory |
 | Old release will not start after an upgrade | Schema newer than it knows | Restore the pre-upgrade backup (§5) |
+| Every call answers "This server has not been set up yet" after `tincan setup` | The CLI wrote the owner behind the running server's back | `docker compose restart tincan` |
+| `tincan doctor` says "fetch failed" for a `localhost` trial | Inside the container `localhost` is the container | `curl http://localhost:8080/api/v1/capabilities` on the host; `doctor --no-voice` when the voice profile is not started |

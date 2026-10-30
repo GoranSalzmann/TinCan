@@ -41,7 +41,9 @@ Usage: tincan [admin] <command> [options]
 Common options:
   --config <file>         Configuration file (default: $TINCAN_CONFIG or ./config.yaml)
 
-init:    --dir <dir> --domain <host> [--email <addr>] [--name <community>] [--http-port <n>] [--turn-domain <name>] [--host-gateway-ip <ip>] [--yes] [--force]
+init:    --dir <dir> --domain <host> [--email <addr>] [--name <community>] [--http-port <n>] [--turn-domain <name>] [--host-gateway-ip <ip>]
+         [--image <registry/name> [--version <release>]] [--yes] [--force]
+         --image uses released images (<name>-server and <name>-web, tagged <release>, default this version) instead of building
 setup:   --username <name> [--display-name <name>] [--instance-name <name>] [--password-stdin]
 user create: --username <name> [--display-name <name>] [--password-stdin]
 user reset-password: --username <name> | --owner
@@ -51,7 +53,7 @@ backup:  [--out <dir>] [--include-secrets] [--keep <n>] [--encrypt] [--passphras
          --encrypt makes it an error when there is none. Without one, the archive is only as private as the secrets in it.
          --daemon stays running and backs up once a day at --at (the clock of the machine, UTC in the container).
 restore: <archive> --into <empty dir> [--passphrase-file <file>]
-doctor:  [--url <public url>] [--turn-domain <name>]
+doctor:  [--url <public url>] [--turn-domain <name>] [--no-voice]
 voice turn-reload: --turn-domain <name> [--apply]
 `;
 
@@ -74,9 +76,12 @@ async function main(argv: string[]): Promise<number> {
       "http-port": { type: "string" },
       "turn-domain": { type: "string" },
       "host-gateway-ip": { type: "string" },
+      image: { type: "string" },
+      version: { type: "string" },
       yes: { type: "boolean", short: "y" },
       force: { type: "boolean" },
       apply: { type: "boolean" },
+      "no-voice": { type: "boolean" },
       username: { type: "string" },
       "display-name": { type: "string" },
       "instance-name": { type: "string" },
@@ -118,6 +123,9 @@ async function main(argv: string[]): Promise<number> {
         ...(values["http-port"] ? { httpPort: Number(values["http-port"]) } : {}),
         ...(values["turn-domain"] ? { turnDomain: values["turn-domain"] } : {}),
         ...(values["host-gateway-ip"] ? { hostGatewayIp: values["host-gateway-ip"] } : {}),
+        ...(values.image ? { image: values.image } : {}),
+        ...(values.version ? { version: values.version } : {}),
+        ...(process.env.TINCAN_INIT_HOST_DIR ? { hostDir: process.env.TINCAN_INIT_HOST_DIR } : {}),
       });
       console.log(lines.join("\n"));
       return 0;
@@ -156,6 +164,7 @@ async function main(argv: string[]): Promise<number> {
       const results = await runDoctor(config, {
         ...(values.url ? { url: values.url } : {}),
         ...(values["turn-domain"] ? { turnDomain: values["turn-domain"] } : {}),
+        ...(values["no-voice"] ? { noVoice: true } : {}),
         ...(path ? { configDir: dirname(resolve(path)) } : {}),
       });
       console.log(formatReport(results));

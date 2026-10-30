@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Clean-install test (docs/18 §P): follows the README quickstart on a fresh Ubuntu machine with its own Docker and checks
+# owner, login, a message, /readyz, doctor, and a backup that restores. Slow (several minutes of image builds), so it runs
+# nightly and on demand, not on every pull request.
+name: Clean install
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clean-install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - run: sh tools/clean-install/run.sh

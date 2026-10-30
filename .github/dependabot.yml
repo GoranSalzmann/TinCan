@@ -1,0 +1,36 @@
+# Weekly dependency updates, one grouped pull request per ecosystem so they are cheap to review.
+# Runtime dependencies are pinned exactly or by range in package.json; the lockfile is what ships (pnpm-lock.yaml).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+    # Commits need a DCO sign-off (CONTRIBUTING.md); Dependabot adds it with this setting.
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker-base-images:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(docker)"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

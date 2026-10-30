@@ -14,6 +14,8 @@ import {
   prometheusConfig,
 } from "./monitoring.js";
 import { caddyfile, composeFile, configFile, envFile, livekitFile, type InitValues } from "./templates.js";
+import { insideContainer, prerequisiteFindings, realProbe } from "./prereqs.js";
+import { VERSION } from "../version.js";
 
 export interface InitOptions {
   dir: string;
@@ -30,8 +32,16 @@ export interface InitOptions {
   insecureHttp?: boolean;
   /** Where the repository is, for `build:` entries; found automatically when running from a checkout. */
   repoDir?: string;
+  /** Use released images (`<image>-server:<version>`, `<image>-web:<version>`) instead of building from a checkout. */
   image?: string;
+  /** Release tag for `image`; defaults to the version of this program. */
+  version?: string;
+  /** The folder as the person sees it, when `dir` is a mount inside a container (`TINCAN_INIT_HOST_DIR`). */
+  hostDir?: string;
 }
+
+const IMAGE_NAME = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::\d+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)*$/;
+const IMAGE_TAG = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
 
 const FILES = [
   ".env",
@@ -60,7 +70,24 @@ export function buildValues(
   const insecureHttp = o.insecureHttp ?? /^localhost(:\d+)?$/.test(o.domain);
   const domain = o.domain.replace(/:\d+$/, "");
   const httpPort = o.httpPort ?? 8080;
-  const repo = o.repoDir ?? findRepoRoot();
+  if (o.version && !o.image)
+    throw new Error(
+      "--version goes with --image, for example: --image ghcr.io/goransalzmann/tincan --version 0.2.0",
+    );
+  if (o.image && !IMAGE_NAME.test(o.image))
+    throw new Error(
+      `"${o.image}" is not an image name. Use lower case without a tag, for example ghcr.io/goransalzmann/tincan (the -server and -web parts and the version are added).`,
+    );
+  const imageTag = o.image ? (o.version ?? VERSION).replace(/^v(?=\d)/, "") : null;
+  if (imageTag !== null && !IMAGE_TAG.test(imageTag))
+    throw new Error(`"${imageTag}" is not a valid version tag. Use for example 0.2.0 or 0.2.0-beta.1.`);
+  // Released images and a checkout are alternatives: --image wins, so a checkout can still try a published release.
+  const repo = o.image ? null : (o.repoDir ?? findRepoRoot());
+  if (!o.image && !repo)
+    throw new Error(
+      "No Tin Can checkout was found here, so there is nothing to build the images from. Use released images instead: " +
+        "tincan init --image ghcr.io/goransalzmann/tincan --version <release> (docs/guides/hosting.md).",
+    );
   return {
     domain,
     acmeEmail: o.email ?? "",
@@ -79,6 +106,7 @@ export function buildValues(
     gid: typeof process.getgid === "function" ? process.getgid() : 1000,
     repoDir: repo ? (relative(outDir, repo) || ".").replace(/\\/g, "/") : null,
     image: o.image ?? "tincan",
+    imageTag,
   };
 }
 
@@ -109,13 +137,16 @@ export async function runInit(opts: InitOptions): Promise<string[]> {
   }
 
   say(`Tin Can init will write to ${dir}:`);
-  for (const f of FILES) say(`  ${f.padEnd(20)} ${describe(f)}`);
-  say(`  data/setup-token     one-time token for creating the owner (also printed below)`);
+  for (const f of FILES) say(`  ${f.padEnd(26)} ${describe(f)}`);
+  say(`  data/setup-token           one-time token for creating the owner (also printed below)`);
   say(
     `Public URL: ${values.publicUrl}${values.insecureHttp ? "  (plain HTTP: for trying it out only)" : ""}`,
   );
-  if (!values.repoDir)
-    say(`Images: ${values.image}-server and ${values.image}-web must exist (no repository checkout found).`);
+  if (values.imageTag)
+    say(
+      `Images: ${values.image}-server:${values.imageTag} and ${values.image}-web:${values.imageTag} (pulled by docker compose)`,
+    );
+  for (const f of prerequisiteFindings(realProbe(), insideContainer())) say(`! ${f}`);
   console.log(out.join("\n"));
   out.length = 0;
 
@@ -150,13 +181,21 @@ export async function runInit(opts: InitOptions): Promise<string[]> {
 
   say("");
   say("Done. Next:");
-  say(`  1. cd ${dir} && docker compose up -d --build`);
+  const shown = opts.hostDir ?? dir;
+  say(`  1. cd ${shown} && docker compose ${values.imageTag ? "up -d" : "up -d --build"}`);
+  say(
+    `     (voice: add --profile voice; it needs ports 7881/tcp and 7882/udp open, see docs/guides/hosting.md)`,
+  );
   say(`  2. Open ${values.publicUrl}/setup and enter this setup token:`);
   say("");
   say(`       ${token}`);
   say("");
   say("     It is also saved in data/setup-token and removed once the owner exists.");
-  say(`  3. Check the install any time with: tincan doctor --config ${join(dir, "config.yaml")}`);
+  say(
+    values.imageTag
+      ? `  3. Check the install any time with: docker compose exec tincan node dist/cli.js doctor`
+      : `  3. Check the install any time with: tincan doctor --config ${join(shown, "config.yaml")}`,
+  );
   if (!values.insecureHttp)
     say(`  DNS: point ${values.domain} at this machine first; ports 80 and 443 must be reachable (14 §3).`);
   return out;

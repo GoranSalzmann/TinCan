@@ -1,0 +1,69 @@
+name: Bug report
+description: Something does not work the way the guides say it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. If this could be a security problem, **do not** post it here: use the private form linked on the issue chooser page (see SECURITY.md).
+        Please do not paste passwords, setup tokens, invite codes or the contents of `.env`.
+  - type: input
+    id: version
+    attributes:
+      label: Tin Can version
+      description: "Open `https://YOUR-SERVER/api/v1/capabilities` in a browser and copy the `version` value, or run `docker compose exec tincan node dist/cli.js version`."
+      placeholder: "0.2.0-beta.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed?
+      options:
+        - VPS with a public IP and a domain
+        - Home server behind a router (port forwarding)
+        - Local trial (`--domain localhost`)
+        - Built from a git checkout (development)
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`tincan doctor` output"
+      description: "Run `docker compose exec tincan node dist/cli.js doctor --url https://YOUR-SERVER` and paste everything. It prints no secrets."
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Browser and operating system
+      description: "Of the person who sees the problem. Say if it is an installed web app (PWA) or a normal tab, and if a phone."
+      placeholder: "Firefox 141 on Fedora 43; Chrome 150 on Android 16 (installed app)"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can someone else make it happen?
+      placeholder: "1. Join the voice channel ...\n2. ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker compose logs --tail 200 tincan`. An error shown in the app carries a request id; the matching lines are the ones that help. Remove anything private."
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I looked at the troubleshooting table in docs/guides/hosting.md and the admin guide.
+        - label: I removed passwords, tokens, invite codes and `.env` contents from what I pasted.
+          required: true

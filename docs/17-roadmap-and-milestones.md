@@ -119,6 +119,7 @@ Invite a wider set of testers (other hosts, not only your friends), collect
 issues, burn down P0/P1, release notes, website/README,
 `SECURITY.md`, CONTRIBUTING (DCO), issue templates, example deployments for common providers.
 **Exit:** ≥ 3 independent Hosts run it successfully; no open P0/P1.
+**Status (2026-10-30): preparation done on a branch, nothing published.** Written: README, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CHANGELOG.md and a release-notes template, issue forms, pull request template, Dependabot and CODEOWNERS, the release workflow (multi-arch images, SBOMs, checksums, attestations, dry run), `tincan init --image/--version`, the clean-install test (passes locally; opt-in nightly job), the hosting guide, the public-readiness audit and the release checklist. **Still to do, by you:** the name check (F4), the contact placeholders, the history decisions, the GitHub settings, the dry run and the first tag ([release-checklist.md](release-checklist.md)); then recruit hosts and count to three. Facts and cuts: 18 §P.
 
 ### v1.0
 Tag, publish images/checksums/SBOM, announce.
