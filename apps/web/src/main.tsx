@@ -23,6 +23,13 @@ function Root() {
 }
 
 initAppearance();
+
+// Installable app (PWA): the worker caches the build files and the shell, never data (public/sw.js).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Root />

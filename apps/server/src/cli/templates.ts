@@ -165,6 +165,10 @@ export function caddyfile(v: InitValues): string {
 		uri strip_prefix /livekit
 		reverse_proxy host.docker.internal:7880
 	}
+	# Build files carry a hash in their name; the worker and manifest must be re-checked on every load.
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	@pwa path /sw.js /manifest.webmanifest
+	header @pwa Cache-Control "no-cache"
 	handle {
 		root * /srv/web
 		try_files {path} /index.html
