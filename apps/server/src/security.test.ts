@@ -463,7 +463,7 @@ describe("uploads cannot exhaust memory (15 §4.2, 18 §M)", () => {
         "content-type": `multipart/form-data; boundary=${boundary}`,
       },
       body,
-    } as RequestInit);
+    });
   }
 
   it("a connection cut part way leaves no partial file and no attachment", async () => {
