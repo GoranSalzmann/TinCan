@@ -4,9 +4,11 @@ import { connect as tcpConnect } from "node:net";
 import { connect as tlsConnect, type PeerCertificate } from "node:tls";
 import { lookup } from "node:dns/promises";
 import { networkInterfaces } from "node:os";
-import { RoomServiceClient } from "livekit-server-sdk";
+import { randomBytes } from "node:crypto";
+import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import type { CoreConfig } from "../config/schema.js";
 import type { CheckResult } from "./doctor.js";
+import { probeTls, probeUdp } from "./turn-probe.js";
 
 /**
  * Voice and network checks for `tincan doctor` (14 §9, 08 §10). Everything here runs from the machine the
@@ -102,6 +104,7 @@ export async function runVoiceChecks(config: CoreConfig, opts: VoiceCheckOptions
       "Webhook path",
       "Voice media ports",
       "Relay (TURN/TLS 5349)",
+      "Relay (TURN/UDP 3478)",
       "Public IP matches",
     ].map((name) => ({
       name,
@@ -199,13 +202,49 @@ export async function runVoiceChecks(config: CoreConfig, opts: VoiceCheckOptions
           detail: `the certificate on 5349 expired ${-left} day(s) ago`,
           fix: "restart LiveKit with `tincan voice turn-reload --apply`",
         };
+      // The certificate proves TLS; an unauthenticated Allocate proves LiveKit's TURN service is what answers.
+      const turn = await probeTls(domain, 5349, "allocate", domain);
+      if (!turn.ok)
+        return {
+          status: "fail",
+          detail: `TLS answers on ${domain}:5349 but TURN does not: ${turn.detail}`,
+          fix: "check `docker compose logs livekit` for the turn: block; LiveKit must be started after Caddy has the certificate",
+        };
       return {
         status: left < 14 ? "warn" : "ok",
-        detail: `TLS answers on ${domain}:5349, certificate valid for ${left} more day(s)`,
+        detail: `TURN answers on ${domain}:5349 (TLS), certificate valid for ${left} more day(s)`,
         ...(left < 14
           ? { fix: "run `tincan voice turn-reload` (restarts LiveKit when no room is active, 18 T30)" }
           : {}),
       };
+    }),
+  );
+
+  out.push(
+    await check("Relay (TURN/UDP 3478)", async () => {
+      const domain = opts.turnDomain ?? process.env.TURN_DOMAIN;
+      if (!domain) return { status: "skip", detail: "TURN is not configured (turn: enabled: false)" };
+      const r = await probeUdp(domain, 3478, "allocate");
+      const addrs = (await lookup(domain, { all: true }).catch(() => [])).map((i) => i.address);
+      const mine = new Set(
+        Object.values(networkInterfaces())
+          .flat()
+          .filter((i) => i && !i.internal)
+          .map((i) => i!.address),
+      );
+      // On the server itself the packet may never leave the machine, so a firewall in front of it is not tested.
+      const onThisMachine = addrs.some((a) => mine.has(a));
+      return r.ok
+        ? {
+            status: onThisMachine ? "warn" : "ok",
+            detail: `${r.detail} on ${domain}:3478/udp${onThisMachine ? "; asked from this machine, so a firewall in front of it is not tested" : ""}`,
+            fix: `run \`tincan doctor --turn-domain ${domain}\` from ANOTHER machine, or tools/turn-test; 3478/udp must be open in the host and provider firewalls`,
+          }
+        : {
+            status: "fail",
+            detail: r.detail,
+            fix: "open 3478/udp in the host and provider firewalls, and check that LiveKit runs with turn: enabled: true",
+          };
     }),
   );
 
@@ -264,5 +303,26 @@ export async function turnReloadReport(config: CoreConfig, turnDomain: string): 
           ? "A renewed certificate is waiting, but a call is running: not restarting now. Try again later."
           : "Restart is due.",
     ],
+  };
+}
+
+/**
+ * `tincan voice test-token`: a ten-minute token for a throwaway room that can listen but not publish, for
+ * tools/turn-test. The URL is the same signalling path the web client uses (through Caddy, 14 §2).
+ */
+export async function mintTestToken(
+  config: CoreConfig,
+  publicUrl: string,
+): Promise<{ url: string; token: string; room: string }> {
+  const lk = config.livekit;
+  if (!lk) throw new Error("no livekit: section in the configuration");
+  const u = new URL(publicUrl);
+  const room = `turntest_${randomBytes(6).toString("hex")}`;
+  const t = new AccessToken(lk.apiKey, lk.apiSecret, { identity: `${room}-probe`, ttl: "10m" });
+  t.addGrant({ roomJoin: true, room, canSubscribe: true, canPublish: false, canPublishData: false });
+  return {
+    url: `${u.protocol === "https:" ? "wss" : "ws"}://${u.host}/livekit`,
+    token: await t.toJwt(),
+    room,
   };
 }

@@ -13,7 +13,8 @@ import { readPassphrase } from "./cli/backup-crypto.js";
 import { runSchedule } from "./cli/backup-schedule.js";
 import { e2eeRotateSecret, permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
 import { runInit } from "./cli/init.js";
-import { turnReloadReport } from "./cli/voice-checks.js";
+import { mintTestToken, turnReloadReport } from "./cli/voice-checks.js";
+import { turnSnippets } from "./cli/templates.js";
 import { ConfigError } from "./config/errors.js";
 import { loadConfig } from "./config/load.js";
 import { VERSION } from "./version.js";
@@ -31,6 +32,8 @@ Usage: tincan [admin] <command> [options]
   user create             Add a member (the owner must exist)
   user reset-password     Print a one-time password-reset code for a user (or --owner)
   search reindex          Rebuild the search index from the messages, online
+  voice turn-snippets     Print the Caddyfile, .env and livekit.yaml lines that switch TURN on
+  voice test-token        Print a short-lived token for tools/turn-test (a throwaway room, no publishing)
   voice turn-reload       Restart LiveKit for a renewed TURN certificate when no call is running
   backup                  Write a consistent backup (database, uploads, config) as one .tar.gz, optionally encrypted
   restore <archive>       Unpack a backup into a new, empty directory and verify it
@@ -55,6 +58,8 @@ backup:  [--out <dir>] [--include-secrets] [--keep <n>] [--encrypt] [--passphras
 restore: <archive> --into <empty dir> [--passphrase-file <file>]
 doctor:  [--url <public url>] [--turn-domain <name>] [--no-voice]
 voice turn-reload: --turn-domain <name> [--apply]
+voice turn-snippets: --turn-domain <name>
+voice test-token: --url <public url>
 `;
 
 function configPath(given: string | undefined): string | undefined {
@@ -186,8 +191,20 @@ async function main(argv: string[]): Promise<number> {
     }
 
     case "voice": {
+      if (sub === "turn-snippets") {
+        if (!values["turn-domain"]) throw new Error("usage: tincan voice turn-snippets --turn-domain <name>");
+        console.log(turnSnippets(values["turn-domain"]));
+        return 0;
+      }
+      if (sub === "test-token") {
+        if (!values.url)
+          throw new Error("usage: tincan voice test-token --url <public url> [--config <file>]");
+        const config = loadConfig(configPath(values.config));
+        console.log(JSON.stringify(await mintTestToken(config, values.url)));
+        return 0;
+      }
       if (sub !== "turn-reload")
-        throw new Error("usage: tincan voice turn-reload --turn-domain <name> [--apply]");
+        throw new Error("usage: tincan voice turn-reload|turn-snippets|test-token (see tincan help)");
       const domain = values["turn-domain"] ?? process.env.TURN_DOMAIN;
       if (!domain) throw new Error("--turn-domain <name> is required");
       const config = loadConfig(configPath(values.config));

@@ -80,3 +80,18 @@ describe("localhostHint", () => {
     expect(localhostHint("not a url", true)).toBeUndefined();
   });
 });
+
+describe("TURN test token", () => {
+  it("is a short-lived, listen-only token for a throwaway room on the signalling path", async () => {
+    const { mintTestToken } = await import("./voice-checks.js");
+    const config = {
+      livekit: { apiKey: "k", apiSecret: "s".repeat(32), apiUrl: "http://127.0.0.1:7880" },
+    } as never;
+    const r = await mintTestToken(config, "https://chat.example.com/some/path");
+    expect(r.url).toBe("wss://chat.example.com/livekit");
+    expect(r.room).toMatch(/^turntest_[0-9a-f]{12}$/);
+    const body = JSON.parse(Buffer.from(r.token.split(".")[1]!, "base64url").toString());
+    expect(body.video).toMatchObject({ room: r.room, roomJoin: true, canPublish: false });
+    expect(body.exp - body.nbf).toBeLessThanOrEqual(600);
+  });
+});

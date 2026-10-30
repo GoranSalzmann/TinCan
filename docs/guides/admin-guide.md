@@ -133,7 +133,7 @@ Repeat on your own hardware (never against a live server): `pnpm load`, and `sh 
 
 ## 8. Host hardening checklist
 
-- Only these ports open: 80, 443, 7881/tcp, 7882/udp (and 5349/tcp, 3478/udp for TURN). Not 3000, 7880, 9090, 3001, or LiveKit's metrics port.
+- Only these ports open: 80, 443, 7881/tcp, 7882/udp (and 5349/tcp, 3478/udp for TURN, see the [TURN guide](turn.md)). Not 3000, 7880, 9090, 3001, or LiveKit's metrics port.
 - SSH keys only, no root login, unattended security updates; Docker updated.
 - Keep `signup: invite-only`. Review who holds Moderator and Admin.
 - `.env` is mode 0600 and in your backups (encrypted). Rotate the LiveKit key and the metrics token when someone with access leaves.

@@ -53,7 +53,7 @@ What to do about CGNAT: ask the provider for a public IPv4 address (often free o
 
 - Create an **A record** (and an AAAA record only if IPv6 really reaches the machine) for the name you will use, for example `chat.example.com`, pointing at the machine's public address. Do this *before* you start Tin Can: Caddy asks Let's Encrypt for a certificate at start and the check needs the name to resolve to this machine.
 - If you use a DNS service that can "proxy" traffic (an orange cloud or similar), set the record to **DNS only**. A web proxy cannot carry the UDP media, and it breaks Caddy's certificate check.
-- For the optional relay (TURN) add a second name, such as `turn.chat.example.com`, to the same address and give it to `tincan init --turn-domain`. TURN helps people behind firewalls that block UDP; it is **not yet tested on a real host** ([docs/18 §J](../18-open-questions-and-risks.md)).
+- For the optional relay (TURN) add a second name, such as `turn.chat.example.com`, to the same address and give it to `tincan init --turn-domain`. TURN helps people behind firewalls that block UDP. The exact steps, ports and checks are in the [TURN guide](turn.md).
 - Check with `dig +short chat.example.com` (or `nslookup`) from another machine.
 
 ## 4. Firewall
@@ -140,7 +140,7 @@ Start with `tincan doctor` and `docker compose ps`. Logs: `docker compose logs -
 | What you see | Likely cause | What to do |
 |---|---|---|
 | Joining a voice channel works but nobody hears anyone, or "Test connection" fails | **UDP 7882** is blocked in the provider's firewall or on the machine; or the router does not forward it | Open 7882/udp in both firewalls (§4). Also open 7881/tcp, the fallback. Retest from another network |
-| Voice works on mobile data but not at home or at work | A network that blocks UDP | Open 7881/tcp; set up the TURN relay (`--turn-domain`, 5349/tcp and 3478/udp) |
+| Voice works on mobile data but not at home or at work | A network that blocks UDP | Open 7881/tcp; set up the TURN relay ([TURN guide](turn.md)) |
 | No certificate; the browser warns, or Caddy logs an ACME error | **Port 80** is closed, or the DNS name does not point at this machine yet, or a DNS proxy sits in front | Fix DNS (§3), open 80 and 443, then `docker compose restart caddy`. Let's Encrypt limits repeated failures; wait before retrying many times |
 | "This call is end-to-end encrypted and this browser cannot join it" | An old browser, or one without the needed encryption support | Use a current Chrome or Edge (Firefox is expected to work, Safari untested); or set the channel to Never encrypt |
 | `tincan doctor` fails on the internal webhook path | The Caddyfile does not answer 404 for `/api/internal/*` and `/api/v1/internal/*` | Restore the Caddyfile `@internal` lines from a fresh `tincan init` |

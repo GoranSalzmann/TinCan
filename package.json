@@ -25,6 +25,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm check:headers && pnpm test && pnpm build && pnpm check:licenses && pnpm check:secrets",
     "dev": "pnpm --filter @tincan/server run dev",
     "tincan": "node apps/server/dist/cli.js",
+    "turn-test": "tsx tools/turn-test/run.ts",
     "media-test": "tsx --conditions=tincan-src tools/media-test/run.ts",
     "load": "tsx --conditions=tincan-src tools/load/run.ts"
   },

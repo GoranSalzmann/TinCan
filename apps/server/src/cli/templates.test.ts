@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import {
+  TURN_CADDY_SITE,
   caddyfile,
   composeFile,
   imageRef,
   livekitFile,
+  turnLivekitBlock,
+  turnSnippets,
   LIVEKIT_IMAGE,
   type InitValues,
 } from "./templates.js";
@@ -82,6 +85,22 @@ describe("voice files", () => {
     expect(livekitFile(v)).toContain("turn.example.com/turn.example.com.crt");
     expect(caddyfile(v)).toContain("{$TURN_DOMAIN} {");
     expect(composeFile(v)).toContain("caddy-data:/caddy:ro");
+  });
+});
+
+describe("turnSnippets", () => {
+  const text = turnSnippets("turn.example.com");
+  it("gives the same blocks that init writes, in the order the certificate needs", () => {
+    expect(text).toContain(turnLivekitBlock("turn.example.com"));
+    expect(text).toContain(TURN_CADDY_SITE);
+    expect(text).toContain("TURN_DOMAIN=turn.example.com");
+    expect(text.indexOf("Caddyfile")).toBeLessThan(text.indexOf("livekit.yaml"));
+  });
+  it("names the two ports to open", () => {
+    expect(text).toContain("5349/tcp and 3478/udp");
+  });
+  it("is what the disabled livekit.yaml points to", () => {
+    expect(livekitFile(values)).toContain("tincan voice turn-snippets --turn-domain turn.chat.example.com");
   });
 });
 

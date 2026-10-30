@@ -219,9 +219,7 @@ export function caddyfile(v: InitValues): string {
   const turnSite =
     v.turnDomain && !v.insecureHttp
       ? `
-{$TURN_DOMAIN} {
-	respond 404
-}
+${TURN_CADDY_SITE}
 `
       : "";
   const scheme = v.insecureHttp ? "ws" : "wss";
@@ -265,18 +263,28 @@ export const LIVEKIT_IMAGE = "livekit/livekit-server:v1.13.10";
 
 const CADDY_CERTS = "/caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory";
 
-export function livekitFile(v: InitValues): string {
-  const certs = v.turnDomain ? `${CADDY_CERTS}/${v.turnDomain}/${v.turnDomain}` : "";
-  const turn = v.turnDomain
-    ? `turn:
+/** The `turn:` block of livekit.yaml; the certificate is the one Caddy obtains for the TURN name. */
+export function turnLivekitBlock(turnDomain: string): string {
+  const certs = `${CADDY_CERTS}/${turnDomain}/${turnDomain}`;
+  return `turn:
   enabled: true
-  domain: ${v.turnDomain}
+  domain: ${turnDomain}
   tls_port: 5349
   udp_port: 3478
   cert_file: ${certs}.crt
-  key_file: ${certs}.key`
+  key_file: ${certs}.key`;
+}
+
+/** The Caddyfile site that only exists so Caddy obtains (and renews) a certificate for the TURN name. */
+export const TURN_CADDY_SITE = `{$TURN_DOMAIN} {
+	respond 404
+}`;
+
+export function livekitFile(v: InitValues): string {
+  const turn = v.turnDomain
+    ? turnLivekitBlock(v.turnDomain)
     : `# TURN is off until a second DNS name points at this machine and Caddy has a certificate for it (14 §2.3).
-# Re-run \`tincan init --turn-domain turn.${v.domain}\` in a new directory to see the lines to add:
+# \`tincan voice turn-snippets --turn-domain turn.${v.domain}\` prints the lines to add (docs/guides/hosting.md):
 turn:
   enabled: false`;
   return `# LiveKit configuration (14 §2.2), checked against ${LIVEKIT_IMAGE} in spikes D1 and D6.
@@ -300,5 +308,27 @@ webhook:
   api_key: ${v.livekitKey}
   urls:
     - http://127.0.0.1:3000/api/v1/internal/livekit/webhook
+`;
+}
+
+/** What to add to an existing installation to switch TURN on; the order matters (the certificate must exist first). */
+export function turnSnippets(turnDomain: string): string {
+  return `TURN for ${turnDomain}. Do the steps in this order; DNS for ${turnDomain} must already point at this machine.
+
+1. .env: set
+TURN_DOMAIN=${turnDomain}
+
+2. Caddyfile: add this site block at the end (Caddy then obtains a certificate for the name):
+${TURN_CADDY_SITE}
+
+   docker compose up -d caddy       # recreates Caddy with the new .env
+   docker compose logs caddy | grep -i "${turnDomain}"       # wait for "certificate obtained successfully"
+
+3. livekit.yaml: replace the \`turn:\` block (only once the certificate exists; LiveKit refuses to start without it):
+${turnLivekitBlock(turnDomain)}
+
+   docker compose --profile voice up -d livekit        # restarts LiveKit: it drops any call in progress
+
+4. Open 5349/tcp and 3478/udp in the host and provider firewalls, then verify (docs/qa/turn.md).
 `;
 }
