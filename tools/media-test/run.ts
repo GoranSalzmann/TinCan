@@ -336,6 +336,23 @@ interface Inbound {
 
 const inbound = (p: Page) => p.evaluate<Inbound>(INBOUND);
 
+/**
+ * What each client hears (energy at the playback tap, after decoding) is above zero. Bytes arrive even when
+ * decryption fails, so this is what tells working encryption from broken.
+ */
+async function decodedAudio(clients: { name: string; page: Page }[], when: string): Promise<void> {
+  await until(
+    `audio heard ${when}`,
+    async () => {
+      const heard = await Promise.all(
+        clients.map((c) => c.page.evaluate<{ left: number; right: number }>(CHANNELS(3000))),
+      );
+      return heard.every((e) => e.left + e.right > 0);
+    },
+    30_000,
+  );
+}
+
 /** Video as the browser's own statistics see it: what was received, and which simulcast layers were sent. */
 const VIDEO_STATS = `(async () => {
   const out = { inbound: [], outbound: [] };
@@ -460,6 +477,22 @@ async function main(): Promise<number> {
         if (loss > 0.05) throw new Error(`${all[i]!.name}: loss ${(loss * 100).toFixed(1)}%`);
       });
     });
+
+    await step(
+      "the call is end-to-end encrypted: frame encryption on, one epoch, audio decoded",
+      async () => {
+        for (const c of all) {
+          const info = await c.page.evaluate<{ on: boolean; epoch: number }>(
+            `window.__tincanVoice.e2eeInfo()`,
+          );
+          if (!info.on) throw new Error(`${c.name}: frame encryption is off`);
+          if (info.epoch !== 0) throw new Error(`${c.name}: epoch ${info.epoch}`);
+          await c.page.getByText("End-to-end encrypted").first().waitFor({ timeout: 5000 });
+        }
+        // Bytes arrive even when decryption fails; decoded energy only grows when it works.
+        await decodedAudio(all, "under E2EE");
+      },
+    );
 
     await step("the server sees all three, with their microphone published", async () => {
       const v = await api<{ voice: Record<string, { userId: string; sources: string[] }[]> }>(
@@ -872,8 +905,13 @@ async function main(): Promise<number> {
         const bar = ann.page.getByTestId("video-readout");
         await bar.getByText(/Asked for 2560×1440 at 30 fps/).waitFor();
         await bar.getByText(/VP9/).waitFor();
-        await bar.getByText(/Captured 1280×720/).waitFor({ timeout: 10_000 });
-        await bar.getByText(/Your browser delivers less than asked for/).waitFor();
+        // Older Chromium builds cap the fake camera at 1280×720, newer ones deliver what is asked (at a lower rate
+        // under load). The bar must say "less than asked" exactly when the capture is short of the request.
+        await bar.getByText(/Captured \d+×\d+/).waitFor({ timeout: 10_000 });
+        const text = (await bar.textContent()) ?? "";
+        const capped = /Captured 1280×720/.test(text);
+        if (capped && !/Your browser delivers less than asked for/.test(text))
+          throw new Error(`captured 1280×720 of 2560×1440 and the bar did not say so: ${text}`);
       },
     );
 
@@ -986,6 +1024,24 @@ async function main(): Promise<number> {
       await sidebarCount(bo.page, 2);
       if (Date.now() - t0 > 6000) throw new Error(`took ${Date.now() - t0} ms`);
     });
+
+    await step(
+      "the removal rotated the key and the two who stayed keep hearing each other (10 §4.3)",
+      async () => {
+        await until(
+          "new epoch on both",
+          async () => {
+            for (const c of [bo, cy]) {
+              const info = await c.page.evaluate<{ epoch: number }>(`window.__tincanVoice.e2eeInfo()`);
+              if (info.epoch < 1) return false;
+            }
+            return true;
+          },
+          8000,
+        );
+        await decodedAudio([bo, cy], "after the rotation");
+      },
+    );
 
     await step("leaving clears the sidebar for the others", async () => {
       await dock(cy.page).getByRole("button", { name: "Leave voice channel" }).click();

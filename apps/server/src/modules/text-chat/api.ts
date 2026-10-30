@@ -37,4 +37,6 @@ export interface TextChatApi {
   existingIds(ids: readonly string[]): Promise<Set<string>>;
   /** The text that goes into the search index for a message. */
   searchText(content: string): string;
+  /** Deletes an author's messages created at or after `sinceMs` (the ban purge window, 11 §3). Returns how many. */
+  purgeAuthor(authorId: string, sinceMs: number, requestId?: string): Promise<number>;
 }

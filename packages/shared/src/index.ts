@@ -9,3 +9,4 @@ export * from "./permissions.js";
 export * from "./community.js";
 export * from "./chat.js";
 export * from "./voice.js";
+export * from "./moderation.js";

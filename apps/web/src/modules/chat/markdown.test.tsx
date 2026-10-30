@@ -128,6 +128,58 @@ describe("untrusted text can only become text", () => {
   });
 });
 
+describe("a battery of known XSS payloads (S-06, 15 §4.3)", () => {
+  const payloads = [
+    "<img src=x onerror=alert(1)>",
+    "<script>alert(1)</script>",
+    "<svg onload=alert(1)>",
+    "<iframe src=javascript:alert(1)></iframe>",
+    "[click](javascript:alert(1))",
+    "[click](JaVaScRiPt:alert(1))",
+    "[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
+    "[click](vbscript:msgbox(1))",
+    "[click](  javascript:alert(1))",
+    '[x](https://a.test/"onmouseover="alert(1))',
+    "`<img src=x onerror=alert(1)>`",
+    "```html\n<script>alert(1)</script>\n```",
+    "> <b onmouseover=alert(1)>quote</b>",
+    '- <a href="javascript:alert(1)">x</a>',
+    "||<img src=x onerror=alert(1)>||",
+    "https://a.test/<script>alert(1)</script>",
+    '<@01ARZ3NDEKTSV4RRFFQ69G5FAV"onclick="alert(1)>',
+  ];
+  it.each(payloads)("renders %j as inert text", (payload) => {
+    const c = html(payload);
+    // Nothing but the fixed set of elements; no event handler attributes; no script-capable URL.
+    for (const el of Array.from(c.querySelectorAll("*"))) {
+      expect([
+        "DIV",
+        "P",
+        "SPAN",
+        "STRONG",
+        "EM",
+        "DEL",
+        "CODE",
+        "PRE",
+        "BLOCKQUOTE",
+        "UL",
+        "OL",
+        "LI",
+        "A",
+        "BUTTON",
+        "BR",
+        "BDI",
+      ]).toContain(el.tagName);
+      for (const attr of Array.from(el.attributes)) expect(attr.name).not.toMatch(/^on/i);
+    }
+    for (const a of Array.from(c.querySelectorAll("a"))) {
+      expect(a.getAttribute("href") ?? "").toMatch(/^(https?:|mailto:)/i);
+      expect(a.getAttribute("rel")).toContain("noopener");
+    }
+    expect(c.querySelector("script,img,svg,iframe")).toBeNull();
+  });
+});
+
 describe("rendering", () => {
   it("shows names for mentions, with deleted users and roles handled", () => {
     const c = html(`<@${USER}> and <@01ARZ3NDEKTSV4RRFFQ69G5FAY> and <@&${ROLE}>`);

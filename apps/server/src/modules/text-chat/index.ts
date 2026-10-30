@@ -88,6 +88,7 @@ export default defineModule({
       documents: (after, limit, tx) => svc.documents(after, limit, tx),
       existingIds: (ids) => svc.existingIds(ids),
       searchText,
+      purgeAuthor: (a, since, rid) => svc.purgeAuthor(a, since, rid),
     };
     ctx.api.provide("text-chat", api);
   },

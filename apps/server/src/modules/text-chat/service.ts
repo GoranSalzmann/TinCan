@@ -434,6 +434,36 @@ export class TextChatService {
     this.#d.events.emit("message.deleted", { messageId, channelId });
   }
 
+  async purgeAuthor(authorId: string, sinceMs: number, requestId?: string): Promise<number> {
+    let total = 0;
+    for (;;) {
+      const rows = await this.#d.db.query
+        .selectFrom("message")
+        .select(["id", "channel_id"])
+        .where("author_id", "=", authorId)
+        .where("created_at", ">=", sinceMs)
+        .where("deleted_at", "is", null)
+        .limit(200)
+        .execute();
+      if (rows.length === 0) return total;
+      await this.#d.db.transaction(async (tx) => {
+        const now = Date.now();
+        for (const r of rows) {
+          await tx.query.updateTable("message").set({ deleted_at: now }).where("id", "=", r.id).execute();
+          await this.#d.outbox.append(tx, "search.message", { op: "remove", id: r.id }, requestId);
+        }
+      });
+      for (const r of rows) {
+        this.#d.gateway.dispatchToChannel(r.channel_id, "MESSAGE_DELETE", {
+          channelId: r.channel_id,
+          messageId: r.id,
+        });
+        this.#d.events.emit("message.deleted", { messageId: r.id, channelId: r.channel_id });
+      }
+      total += rows.length;
+    }
+  }
+
   async setPinned(actorId: string, channelId: string, messageId: string, pinned: boolean): Promise<void> {
     await this.#channel(actorId, channelId, ["MANAGE_MESSAGES"]);
     const row = await this.#row(channelId, messageId);

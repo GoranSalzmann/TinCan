@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { randomBytes } from "node:crypto";
+import { openSqlite, sql } from "@tincan/db";
 import { AppError, namesOf, PERMISSION_NAMES } from "@tincan/shared";
 import type { CoreConfig } from "../config/schema.js";
 import type { AccountsApi } from "../modules/accounts/api.js";
@@ -34,6 +36,34 @@ export function searchReindex(
     }
     return `Reindexed ${queued} messages in ${((Date.now() - started) / 1000).toFixed(1)} s; removed ${removed} stale entries.`;
   });
+}
+
+/**
+ * `e2ee rotate-secret` (10 §4.1): replaces the random salt the room keys are derived from. The running server notices
+ * within 30 s and moves every encrypted call to a new key; calls that start later never use the old one. Works while
+ * the server runs. It does not replace the instance secret in the configuration: if that leaked, change it there.
+ */
+export async function e2eeRotateSecret(config: CoreConfig): Promise<string> {
+  const db = openSqlite({ path: config.adapters.database.path });
+  try {
+    const t = await sql<{
+      n: number;
+    }>`SELECT count(*) AS n FROM sqlite_master WHERE name = 'voice_secret'`.execute(db.query);
+    if (!t.rows[0]?.n)
+      throw new AppError(
+        "FEATURE_DISABLED",
+        "The voice module has never run on this database, so there is no key to rotate.",
+      );
+    const salt = randomBytes(32).toString("hex");
+    const now = Date.now();
+    await sql`INSERT INTO voice_secret (key, value, updated_at) VALUES ('e2ee_salt', ${salt}, ${now})
+              ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`.execute(
+      db.query,
+    );
+    return "Voice encryption salt replaced. A running server moves every encrypted call to a new key within 30 seconds.";
+  } finally {
+    await db.close();
+  }
 }
 
 /** `perms explain` (11 §4): every step of the permission computation for one member in one channel. */

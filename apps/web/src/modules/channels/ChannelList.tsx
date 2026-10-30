@@ -13,6 +13,7 @@ import { isUnread } from "../../core/state/window.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { joinVoice } from "../../core/voice/actions.js";
 import { useVoice } from "../../core/voice/store.js";
+import { ChannelLock } from "../voice/E2eeBadge.js";
 import { ParticipantRow } from "../voice/Participants.js";
 import { CreateChannelDialog } from "./CreateChannelDialog.js";
 
@@ -83,6 +84,7 @@ function ChannelRow({
       <bdi className={`min-w-0 flex-1 truncate ${unread || mentions > 0 ? "font-semibold" : ""}`}>
         {channel.name}
       </bdi>
+      {isVoice ? <ChannelLock channel={channel} /> : null}
     </>
   );
 

@@ -42,6 +42,8 @@ jobs:
         run: pnpm test:matrix
       - name: Build
         run: pnpm build
+      - name: Dependency audit (S-14)
+        run: pnpm audit --audit-level high
       - name: Licence scan
         run: pnpm check:licenses
       - name: Secret scan

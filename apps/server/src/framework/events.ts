@@ -20,8 +20,25 @@ export interface Events {
   "channel.created": { channelId: string };
   "channel.updated": { channelId: string };
   "channel.deleted": { channelId: string };
+  /** A moderator removed someone (11 §2.6): they are signed out everywhere and leave voice. */
+  "member.kicked": { userId: string };
+  "member.banned": { userId: string };
+  /** Anything may report an auditable fact; `moderation` stores it (11 §3, 06 §3.10). Never include secrets or message text. */
+  "audit.record": AuditInput;
+  /** An audit entry was stored (by the moderation module); for metrics. */
+  "audit.recorded": { action: string };
   /** Anything that can change what someone may do: roles, role assignment, overwrites, channels, timeouts. */
   "permissions.changed": { userIds: string[] | "all"; channelId?: string };
+}
+
+export interface AuditInput {
+  actorId: string | null;
+  /** Dotted name such as `role.update`. */
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  reason?: string | undefined;
+  data?: Record<string, unknown>;
 }
 
 export type EventName = keyof Events;

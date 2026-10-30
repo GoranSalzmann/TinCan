@@ -10,7 +10,7 @@ import type { Logger } from "../../framework/types.js";
 import { enforceRateLimit } from "../../http/rate-limit.js";
 import type { AccountsApi } from "../accounts/api.js";
 import type { RolesApi } from "../roles/api.js";
-import type { UploadsApi } from "./api.js";
+import type { UploadsApi, UploadsStats } from "./api.js";
 import {
   avatarImage,
   cleanFilename,
@@ -26,10 +26,11 @@ export interface UploadsSettings {
   userQuotaBytes: number;
   diskWarnPercent: number;
   thumbnailSize: number;
+  memoryBudgetBytes: number;
 }
 
-/** Hard ceiling for one file: uploads are buffered in memory while they are checked and thumbnailed. */
-export const MAX_FILE_BYTES_CEILING = 512 * 1024 * 1024;
+/** Sanity ceiling for the owner's file limit. Uploads stream, so memory is not the bound; the backup archive format (8 GiB per entry) is, with margin. */
+export const MAX_FILE_BYTES_CEILING = 4 * 1024 * 1024 * 1024;
 
 export interface UploadLimits {
   maxBytes: number;
@@ -49,6 +50,9 @@ export interface UploadsDeps {
 
 type Row = UploadsTables["attachment"];
 
+/** Images up to this size get a thumbnail and dimensions; bigger ones are stored and offered as a download. */
+export const THUMBNAIL_MAX_BYTES = 48 * 1024 * 1024;
+
 export const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
 const GC_AFTER_MS = 24 * 3_600_000;
 
@@ -65,6 +69,50 @@ const wire = (r: Row): Attachment => ({
 
 export class UploadsService implements UploadsApi {
   readonly #d: UploadsDeps;
+  readonly #stats = {
+    uploads: 0,
+    bytes: 0,
+    rejected: 0,
+    inFlight: 0,
+    inFlightBytes: 0,
+    peakInFlightBytes: 0,
+    peakInFlight: 0,
+    busy: 0,
+  };
+
+  #reserved = 0;
+
+  /**
+   * Sets aside memory for one upload before its body is read (18 §N). Throws RATE_LIMITED (try again shortly) when the
+   * uploads running now already hold the budget; returns the function that gives the memory back. A single file larger
+   * than the whole budget is still allowed on its own, so raising the file limit never makes uploads impossible.
+   */
+  reserve(bytes: number): () => void {
+    const budget = this.#d.settings.memoryBudgetBytes;
+    if (this.#reserved > 0 && this.#reserved + bytes > budget) {
+      this.#stats.busy++;
+      throw new AppError(
+        "RATE_LIMITED",
+        "The server is busy with other uploads. Try again in a few seconds.",
+        {
+          retryAfterMs: 5000,
+          reason: "upload_memory",
+        },
+      );
+    }
+    this.#reserved += bytes;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#reserved -= bytes;
+    };
+  }
+
+  /** Counters for the metrics module; `inFlightBytes` is the memory held by uploads being checked and stored right now. */
+  stats(): UploadsStats {
+    return { ...this.#stats };
+  }
 
   constructor(deps: UploadsDeps) {
     this.#d = deps;
@@ -122,47 +170,131 @@ export class UploadsService implements UploadsApi {
 
   // ---- upload --------------------------------------------------------------------------------
 
+  /**
+   * Stores one upload without holding it in memory (18 §M proposal, built): the body goes to storage chunk by chunk
+   * while it is counted and hashed, the first bytes decide the type, and only an image small enough to thumbnail is
+   * read back (inside the memory budget). Memory per upload is a few chunks, whatever the file size.
+   */
   async upload(
     userId: string,
-    file: { buffer: Buffer; filename: string | undefined; declaredType: string | undefined },
+    file: { stream: AsyncIterable<Buffer>; filename: string | undefined; declaredType: string | undefined },
+  ): Promise<Attachment> {
+    const s = this.#stats;
+    s.inFlight++;
+    s.peakInFlight = Math.max(s.peakInFlight, s.inFlight);
+    try {
+      const out = await this.#upload(userId, file);
+      s.uploads++;
+      s.bytes += out.size;
+      return out;
+    } catch (err) {
+      s.rejected++;
+      throw err;
+    } finally {
+      s.inFlight--;
+    }
+  }
+
+  async #upload(
+    userId: string,
+    file: { stream: AsyncIterable<Buffer>; filename: string | undefined; declaredType: string | undefined },
   ): Promise<Attachment> {
     await this.#d.roles.assert(userId, "ATTACH_FILES");
     // 07 §2.4: 10 uploads a minute.
     await enforceRateLimit(this.#d.kv, { key: `upload:${userId}`, max: 10, windowMs: 60_000 });
-    const { buffer } = file;
-    if (buffer.length === 0) throw new AppError("VALIDATION_FAILED", "That file is empty.");
-    if (buffer.length > this.#d.settings.maxBytes)
-      throw new AppError("PAYLOAD_TOO_LARGE", "That file is too large.", {
-        maxBytes: this.#d.settings.maxBytes,
-      });
-    const { usedBytes, quotaBytes } = await this.usage(userId);
-    if (usedBytes + buffer.length > quotaBytes)
-      throw new AppError("QUOTA_EXCEEDED", "You have used up your upload space. Delete some files first.", {
-        usedBytes,
-        quotaBytes,
-      });
-
-    const sniffed = sniffImage(buffer);
-    let contentType = sniffed ?? safeDeclaredType(file.declaredType);
-    let dims: { width: number; height: number } | null = null;
-    let thumb: Buffer | null = null;
-    if (sniffed) {
-      try {
-        dims = await inspectImage(buffer);
-        thumb = await thumbnail(buffer, this.#d.settings.thumbnailSize);
-      } catch {
-        // Claims to be an image but is not decodable: refuse rather than store something odd.
-        throw new AppError("UNSUPPORTED_MEDIA_TYPE", "That image could not be read.");
+    const it = file.stream[Symbol.asyncIterator]();
+    try {
+      return await this.#store(userId, file, it);
+    } catch (err) {
+      // Keep reading what is left of the body (and drop it), so the client receives the refusal instead of a stalled request.
+      for (;;) {
+        const r = await it.next().catch(() => ({ done: true }));
+        if (r.done) break;
       }
-    } else if (contentType.startsWith("image/")) {
-      // An image type we cannot vouch for (svg, bmp, tiff …) is stored as an opaque download.
-      contentType = "application/octet-stream";
+      throw err;
+    }
+  }
+
+  async #store(
+    userId: string,
+    file: { filename: string | undefined; declaredType: string | undefined },
+    it: AsyncIterator<Buffer>,
+  ): Promise<Attachment> {
+    const { maxBytes } = this.#d.settings;
+
+    // Peek at the first bytes: they decide the type before anything is stored.
+    const first: Buffer[] = [];
+    let have = 0;
+    while (have < 16) {
+      const r = await it.next();
+      if (r.done) break;
+      first.push(r.value);
+      have += r.value.length;
+    }
+    if (have === 0) throw new AppError("VALIDATION_FAILED", "That file is empty.");
+    const sniffed = sniffImage(Buffer.concat(first));
+    const contentType = sniffed ?? safeDeclaredType(file.declaredType);
+    const stored = !sniffed && contentType.startsWith("image/") ? "application/octet-stream" : contentType;
+
+    // The person's room is known before the first byte is stored, so a body that would not fit stops part way.
+    const { usedBytes, quotaBytes } = await this.usage(userId);
+    let size = 0;
+    const hash = createHash("sha256");
+    const count = (c: Buffer): Buffer => {
+      size += c.length;
+      if (size > maxBytes) throw new AppError("PAYLOAD_TOO_LARGE", "That file is too large.", { maxBytes });
+      if (usedBytes + size > quotaBytes)
+        throw new AppError("QUOTA_EXCEEDED", "You have used up your upload space. Delete some files first.", {
+          usedBytes,
+          quotaBytes,
+        });
+      hash.update(c);
+      return c;
+    };
+    async function* body(): AsyncGenerator<Buffer> {
+      for (const c of first) yield count(c);
+      for (;;) {
+        const r = await it.next();
+        if (r.done) return;
+        yield count(r.value);
+      }
     }
 
     const now = Date.now();
     const id = newId(now);
     const key = `att/${id}`;
-    await this.#d.storage.put(key, Readable.from([buffer]), { contentType, size: buffer.length });
+    // A body that fails half way (too large, connection lost) leaves nothing: the storage port removes its temporary file.
+    await this.#d.storage.put(key, Readable.from(body()), { contentType: stored });
+    const discard = async (err: AppError): Promise<never> => {
+      await this.#d.storage.delete(key).catch(() => undefined);
+      throw err;
+    };
+
+    let dims: { width: number; height: number } | null = null;
+    let thumb: Buffer | null = null;
+    if (sniffed && size <= THUMBNAIL_MAX_BYTES) {
+      // The one place a file is held in memory: an image to decode, bounded and counted against the shared budget.
+      let release: () => void;
+      try {
+        release = this.reserve(size * 2);
+      } catch (err) {
+        return discard(err as AppError);
+      }
+      this.#stats.inFlightBytes += size;
+      this.#stats.peakInFlightBytes = Math.max(this.#stats.peakInFlightBytes, this.#stats.inFlightBytes);
+      try {
+        const { stream } = await this.#d.storage.get(key);
+        const buffer = Buffer.concat(await stream.toArray());
+        dims = await inspectImage(buffer);
+        thumb = await thumbnail(buffer, this.#d.settings.thumbnailSize);
+      } catch {
+        // Claims to be an image but is not decodable: refuse rather than store something odd.
+        return discard(new AppError("UNSUPPORTED_MEDIA_TYPE", "That image could not be read."));
+      } finally {
+        this.#stats.inFlightBytes -= size;
+        release();
+      }
+    }
     if (thumb)
       await this.#d.storage.put(`${key}.thumb`, Readable.from([thumb]), { contentType: "image/webp" });
     const row: Row = {
@@ -172,12 +304,12 @@ export class UploadsService implements UploadsApi {
       uploader_id: userId,
       storage_key: key,
       filename: cleanFilename(file.filename),
-      content_type: contentType,
-      size: buffer.length,
+      content_type: stored,
+      size,
       width: dims?.width ?? null,
       height: dims?.height ?? null,
       has_thumb: thumb ? 1 : 0,
-      sha256: createHash("sha256").update(buffer).digest("hex"),
+      sha256: hash.digest("hex"),
       created_at: now,
       deleted_at: null,
     };

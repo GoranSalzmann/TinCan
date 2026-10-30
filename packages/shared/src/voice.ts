@@ -20,6 +20,9 @@ export const VoiceParticipantSchema = z.object({
   sources: z.array(z.enum(VOICE_SOURCES)),
   muted: z.boolean(),
   deafened: z.boolean(),
+  /** Set by a moderator; stays until cleared, also across rejoining (11 §3). */
+  serverMuted: z.boolean().optional(),
+  serverDeafened: z.boolean().optional(),
 });
 export type VoiceParticipant = z.infer<typeof VoiceParticipantSchema>;
 
@@ -28,6 +31,18 @@ export const VoiceStateSnapshotSchema = z.object({
   voice: z.record(z.string(), z.array(VoiceParticipantSchema)),
 });
 export type VoiceStateSnapshot = z.infer<typeof VoiceStateSnapshotSchema>;
+
+/** Body of the join call: whether this client can do frame encryption (10 §3). */
+export const VoiceJoinRequestSchema = z.strictObject({ e2ee: z.boolean().optional() });
+
+/** Key material for one epoch (10 §4.2). `key` is base64; the client keeps it in memory only. */
+export const E2eeKeySchema = z.object({
+  epoch: z.number().int().min(0),
+  keyIndex: z.number().int().min(0).max(15),
+  key: z.string(),
+});
+export type E2eeKey = z.infer<typeof E2eeKeySchema>;
+export const E2EE_KEYRING_SIZE = 16;
 
 export const VoiceJoinResponseSchema = z.object({
   /** Public WebSocket URL of the signalling endpoint (`wss://host/livekit`). */
@@ -49,6 +64,8 @@ export const VoiceJoinResponseSchema = z.object({
     }),
   }),
   userLimit: z.number().int(),
+  /** Present when the room is encrypted: the client must enable frame encryption before publishing. */
+  e2ee: E2eeKeySchema.nullable().optional(),
 });
 export type VoiceJoinResponse = z.infer<typeof VoiceJoinResponseSchema>;
 
@@ -69,4 +86,15 @@ export const VoiceStateArgsSchema = z.object({ muted: z.boolean(), deafened: z.b
 export type VoiceStateArgs = z.infer<typeof VoiceStateArgsSchema>;
 
 export type VoiceDisconnectReason =
-  "kicked" | "moved" | "joined_elsewhere" | "permission_lost" | "channel_deleted";
+  | "kicked"
+  | "moved"
+  | "moved_by_moderator"
+  | "disconnected"
+  | "joined_elsewhere"
+  | "permission_lost"
+  | "channel_deleted"
+  | "e2ee_mode_changed";
+
+/** `GET/PATCH /admin/voice/e2ee`: the server default that `inherit` channels follow (18 §F T17). */
+export const E2eeSettingSchema = z.object({ enabled: z.boolean() });
+export const E2eeSettingPatchSchema = z.strictObject({ enabled: z.boolean() });

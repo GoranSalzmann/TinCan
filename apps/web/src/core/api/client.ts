@@ -8,6 +8,8 @@ import {
   type ChannelCreate,
   type ChannelList,
   type ChannelPatch,
+  type AuditList,
+  type Ban,
   type ErrorCode,
   type Invite,
   type InviteCreate,
@@ -164,6 +166,9 @@ export const api = {
     request<{ name: string; ownerId: string | null }>("PATCH", "/admin/instance", { body: { name } }),
   videoLimits: () => request<VideoLimits>("GET", "/admin/voice"),
   setVideoLimits: (body: Partial<VideoLimits>) => request<VideoLimits>("PATCH", "/admin/voice", { body }),
+  e2eeDefault: () => request<{ enabled: boolean }>("GET", "/admin/voice/e2ee"),
+  setE2eeDefault: (enabled: boolean) =>
+    request<{ enabled: boolean }>("PATCH", "/admin/voice/e2ee", { body: { enabled } }),
   uploadLimits: () => request<UploadLimits>("GET", "/admin/uploads"),
   setUploadLimits: (body: { maxBytes?: number; userQuotaBytes?: number }) =>
     request<UploadLimits>("PATCH", "/admin/uploads", { body }),
@@ -189,6 +194,26 @@ export const api = {
   ownAttachments: (q: { sort: "size" | "date"; cursor?: string }) =>
     request<Page<OwnAttachment>>("GET", `/users/@me/attachments${qs(q)}`),
   deleteUpload: (id: string) => request<void>("DELETE", `/uploads/${encodeURIComponent(id)}`),
+
+  // moderation (11 §3)
+  kick: (id: string, reason?: string) =>
+    request<void>("POST", `/members/${encodeURIComponent(id)}/kick`, { body: { reason } }),
+  ban: (id: string, body: { reason?: string; purgeDays: number }) =>
+    request<{ purged: number }>("PUT", `/members/${encodeURIComponent(id)}/ban`, { body }),
+  unban: (id: string) => request<void>("DELETE", `/members/${encodeURIComponent(id)}/ban`),
+  bans: () => request<Ban[]>("GET", "/bans"),
+  timeout: (id: string, durationSecs: number | null, reason?: string) =>
+    request<void>("PUT", `/members/${encodeURIComponent(id)}/timeout`, { body: { durationSecs, reason } }),
+  serverVoice: (id: string, body: { muted?: boolean; deafened?: boolean }) =>
+    request<{ muted: boolean; deafened: boolean }>("PUT", `/members/${encodeURIComponent(id)}/voice`, {
+      body,
+    }),
+  moveMember: (id: string, channelId: string) =>
+    request<void>("POST", `/members/${encodeURIComponent(id)}/voice/move`, { body: { channelId } }),
+  disconnectMember: (id: string) =>
+    request<void>("POST", `/members/${encodeURIComponent(id)}/voice/disconnect`, { body: {} }),
+  auditLog: (q: { before?: string; action?: string }) =>
+    request<AuditList>("GET", `/audit-log${qs({ ...q, limit: 50 })}`),
 
   // channels
   channels: (archived = false) =>

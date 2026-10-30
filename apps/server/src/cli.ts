@@ -8,7 +8,8 @@ import { AppError } from "@tincan/shared";
 import { boot, createLogger } from "./boot.js";
 import { cliSetup, configCheck, moduleList, userCreate } from "./cli/admin.js";
 import { formatReport, runDoctor } from "./cli/doctor.js";
-import { permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
+import { createBackup, restoreBackup } from "./cli/backup.js";
+import { e2eeRotateSecret, permsExplain, resetPassword, searchReindex } from "./cli/ops.js";
 import { runInit } from "./cli/init.js";
 import { turnReloadReport } from "./cli/voice-checks.js";
 import { ConfigError } from "./config/errors.js";
@@ -29,6 +30,9 @@ Usage: tincan [admin] <command> [options]
   user reset-password     Print a one-time password-reset code for a user (or --owner)
   search reindex          Rebuild the search index from the messages, online
   voice turn-reload       Restart LiveKit for a renewed TURN certificate when no call is running
+  backup                  Write a consistent backup (database, uploads, config) as one .tar.gz
+  restore <archive>       Unpack a backup into a new, empty directory and verify it
+  e2ee rotate-secret      Give every encrypted voice call a new key from a fresh salt
   perms explain           Show how a member's permissions in a channel come about
   version
 
@@ -40,6 +44,8 @@ setup:   --username <name> [--display-name <name>] [--instance-name <name>] [--p
 user create: --username <name> [--display-name <name>] [--password-stdin]
 user reset-password: --username <name> | --owner
 perms explain: --user <username> --channel <name or id>
+backup:  [--out <dir>] [--include-secrets] [--keep <n>]    (the archive is only as private as the secrets in it)
+restore: <archive> --into <empty dir>
 doctor:  [--url <public url>] [--turn-domain <name>]
 voice turn-reload: --turn-domain <name> [--apply]
 `;
@@ -72,6 +78,10 @@ async function main(argv: string[]): Promise<number> {
       "password-stdin": { type: "boolean" },
       url: { type: "string" },
       owner: { type: "boolean" },
+      out: { type: "string" },
+      into: { type: "string" },
+      keep: { type: "string" },
+      "include-secrets": { type: "boolean" },
       user: { type: "string" },
       channel: { type: "string" },
       help: { type: "boolean", short: "h" },
@@ -177,6 +187,49 @@ async function main(argv: string[]): Promise<number> {
           return r.status ?? 1;
         }
       }
+      return 0;
+    }
+
+    case "backup": {
+      const path = configPath(values.config);
+      const config = loadConfig(path);
+      const keep = values.keep === undefined ? undefined : Number(values.keep);
+      if (keep !== undefined && (!Number.isInteger(keep) || keep < 1))
+        throw new Error("--keep needs a whole number of 1 or more");
+      const { path: file, manifest } = await createBackup(config, {
+        ...(values.out ? { outDir: values.out } : {}),
+        ...(path ? { configDir: dirname(resolve(path)) } : {}),
+        includeSecrets: values["include-secrets"] ?? false,
+        ...(keep !== undefined ? { keep } : {}),
+        log: (l) => console.log(l),
+      });
+      console.log(
+        `
+Backup written: ${file}
+${manifest.entries.length} entries, ${
+          manifest.secretsIncluded
+            ? "WITH secrets: keep it as private as the server itself"
+            : "without secrets (.env is not included)"
+        }.`,
+      );
+      return 0;
+    }
+
+    case "restore": {
+      const archive = sub;
+      if (!archive || !values.into)
+        throw new Error("Usage: tincan restore <archive> --into <empty directory>");
+      const r = await restoreBackup(archive, values.into, { log: (l) => console.log(l) });
+      console.log(`
+Restored ${r.files} file(s) and the database into ${r.into}`);
+      for (const w of r.warnings) console.log(`  ! ${w}`);
+      console.log(`Next: cd ${r.into} && docker compose up -d`);
+      return 0;
+    }
+
+    case "e2ee": {
+      if (sub !== "rotate-secret") throw new Error("Usage: tincan e2ee rotate-secret");
+      console.log(await e2eeRotateSecret(loadConfig(configPath(values.config))));
       return 0;
     }
 

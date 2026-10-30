@@ -392,8 +392,10 @@ describe("module off", () => {
     expect((await call(ann.token).patch("/admin/uploads", { maxBytes: 4096 })).status).toBe(403);
     const read = await call(owner).get("/admin/uploads");
     expect(read.status).toBe(200);
-    expect(read.body.ceilingBytes).toBe(512 * 1024 * 1024);
-    expect((await call(owner).patch("/admin/uploads", { maxBytes: 513 * 1024 * 1024 })).status).toBe(400);
+    expect(read.body.ceilingBytes).toBe(4 * 1024 * 1024 * 1024);
+    expect((await call(owner).patch("/admin/uploads", { maxBytes: 4 * 1024 * 1024 * 1024 + 1 })).status).toBe(
+      400,
+    );
     expect((await call(owner).patch("/admin/uploads", {})).status).toBe(400);
     expect((await call(owner).patch("/admin/uploads", { maxBytes: 10 })).status).toBe(400);
   });

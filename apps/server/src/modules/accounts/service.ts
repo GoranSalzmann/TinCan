@@ -24,7 +24,15 @@ import {
 import type { EventBus } from "../../framework/events.js";
 import type { Actor, Logger } from "../../framework/types.js";
 import { enforceRateLimit } from "../../http/rate-limit.js";
-import type { InviteRedeemer, JoinHook, JoinedHook, JoinInfo, PublicUser, ResetAuthorizer } from "./api.js";
+import type {
+  InviteRedeemer,
+  JoinHook,
+  JoinedHook,
+  JoinInfo,
+  LoginBlocker,
+  PublicUser,
+  ResetAuthorizer,
+} from "./api.js";
 import type { AccountsTables } from "./schema.js";
 import { deleteSetupToken, ensureSetupToken, matchesSetupToken } from "./setup-token.js";
 import {
@@ -102,6 +110,7 @@ export class AccountsService {
   readonly #joinedHooks: JoinedHook[] = [];
   #redeemer: InviteRedeemer | null = null;
   #resetAuthorizer: ResetAuthorizer = { canReset: () => Promise.resolve(false) };
+  #loginBlocker: LoginBlocker | null = null;
 
   constructor(deps: AccountsDeps) {
     this.#d = deps;
@@ -110,6 +119,32 @@ export class AccountsService {
 
   bindAuth(adapter: LocalAuthAdapter): void {
     this.#auth = adapter;
+  }
+
+  setLoginBlocker(blocker: LoginBlocker): void {
+    this.#loginBlocker = blocker;
+  }
+
+  /** Signs a user out everywhere: sessions are marked revoked and `session.revoked` closes their sockets. */
+  async revokeAllSessions(userId: string): Promise<number> {
+    const now = this.#now();
+    const live = await this.#d.db.transaction(async (tx) => {
+      const rows = await tx.query
+        .selectFrom("session")
+        .select("id")
+        .where("user_id", "=", userId)
+        .where("revoked_at", "is", null)
+        .execute();
+      await tx.query
+        .updateTable("session")
+        .set({ revoked_at: now })
+        .where("user_id", "=", userId)
+        .where("revoked_at", "is", null)
+        .execute();
+      return rows.map((r) => r.id);
+    });
+    for (const sessionId of live) this.#d.events.emit("session.revoked", { userId, sessionId });
+    return live.length;
   }
 
   addJoinHook(hook: JoinHook): void {
@@ -277,6 +312,12 @@ export class AccountsService {
     if (!target) throw new AppError("NOT_FOUND", "No such user.");
     if (!(await this.#resetAuthorizer.canReset(actorUserId, targetUserId)))
       throw new AppError("PERMISSION_DENIED", "You cannot reset that password.");
+    this.#d.events.emit("audit.record", {
+      actorId: actorUserId,
+      action: "member.reset_code",
+      targetType: "user",
+      targetId: targetUserId,
+    });
     return this.createResetCode(targetUserId, actorUserId);
   }
 
@@ -494,6 +535,9 @@ export class AccountsService {
     const row = await findUserById(this.#d.db, identity.subject);
     if (!row) throw new AppError("UNAUTHENTICATED", "Username or password is incorrect.");
     if (row.disabled_at !== null) throw new AppError("ACCOUNT_DISABLED", "This account has been disabled.");
+    const blocked = await this.#loginBlocker?.(row.id);
+    if (blocked)
+      throw new AppError("BANNED", blocked.message, blocked.reason ? { reason: blocked.reason } : undefined);
 
     await this.#d.kv.del(`rl:login:user:${username.slice(0, 64)}`);
     if (row.password_hash && needsRehash(row.password_hash, this.#d.settings.argon2)) {

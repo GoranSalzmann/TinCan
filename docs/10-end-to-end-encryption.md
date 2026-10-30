@@ -93,6 +93,8 @@ short grace delay.
 Cost: each rotation is one small gateway message per participant. At our scale,
 trivial.
 
+> **As built in M5 (18 §M).** An encrypted room (`required`, or `inherit` while the server default is on) **refuses** a client that cannot encrypt, so no room mixes the two (M5-3). The derivation uses a random salt kept in the database, and `tincan e2ee rotate-secret` replaces that salt (M5-5); key index is `epoch mod 16`, set explicitly (M5-6). Verified with simulcast, dynacast and VP9 scalable video in the media test; AV1, Firefox and Safari are untested.
+
 ## 5. Channel E2EE modes
 
 `channel.settings.e2ee` ∈ `inherit | required | off` and module config

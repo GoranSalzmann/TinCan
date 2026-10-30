@@ -403,6 +403,13 @@ export class RolesService {
     const role = (await this.getRole(id))!;
     this.#d.gateway.dispatchToAll("ROLE_CREATE", { role: wire(role) });
     await this.#changed("all");
+    this.#d.events.emit("audit.record", {
+      actorId,
+      action: "role.create",
+      targetType: "role",
+      targetId: id,
+      data: { name: role.name, permissions: String(role.permissions) },
+    });
     return role;
   }
 
@@ -456,6 +463,13 @@ export class RolesService {
         if (r.id !== id) this.#d.gateway.dispatchToAll("ROLE_UPDATE", { role: wire(r) });
     }
     await this.#changed("all");
+    this.#d.events.emit("audit.record", {
+      actorId,
+      action: "role.update",
+      targetType: "role",
+      targetId: id,
+      data: { name: updated.name, fields: Object.keys(patch), permissions: String(updated.permissions) },
+    });
     return updated;
   }
 
@@ -486,6 +500,13 @@ export class RolesService {
     for (const r of await this.listRoles())
       if (!r.isDefault) this.#d.gateway.dispatchToAll("ROLE_UPDATE", { role: wire(r) });
     await this.#changed("all");
+    this.#d.events.emit("audit.record", {
+      actorId,
+      action: "role.delete",
+      targetType: "role",
+      targetId: id,
+      data: { name: role.name },
+    });
   }
 
   async assignRole(actorId: string, userId: string, roleId: string): Promise<void> {
@@ -526,6 +547,13 @@ export class RolesService {
     this.markDirty();
     await this.#changed([userId]);
     this.#d.events.emit("permissions.changed", { userIds: [userId] });
+    this.#d.events.emit("audit.record", {
+      actorId,
+      action: kind,
+      targetType: "user",
+      targetId: userId,
+      data: { roleId },
+    });
     await this.announceMember(userId);
   }
 
@@ -547,6 +575,10 @@ export class RolesService {
       joinedAt: new Date(rec.joinedAt).toISOString(),
       roleIds,
       isOwner: rec.isOwner,
+      timeoutUntil:
+        rec.timeoutUntil !== null && rec.timeoutUntil > this.#now()
+          ? new Date(rec.timeoutUntil).toISOString()
+          : null,
     };
   }
 
@@ -592,6 +624,8 @@ export class RolesService {
     else this.#timeouts.set(userId, until);
     this.#cache.clear();
     await this.#changed([userId]);
+    this.#d.events.emit("permissions.changed", { userIds: [userId] });
+    await this.announceMember(userId);
   }
 
   // ---- propagation (11 §2.6) -----------------------------------------------------------------

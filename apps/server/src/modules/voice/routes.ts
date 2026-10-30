@@ -4,8 +4,12 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
   AppError,
+  E2eeKeySchema,
+  E2eeSettingPatchSchema,
+  E2eeSettingSchema,
   VideoLimitsPatchSchema,
   VideoLimitsSchema,
+  VoiceJoinRequestSchema,
   VoiceJoinResponseSchema,
   VoiceParticipantSchema,
 } from "@tincan/shared";
@@ -25,9 +29,45 @@ export function registerVoiceRoutes(app: FastifyInstance, svc: VoiceService, rol
     "/voice/channels/:id/join",
     {
       preHandler: app.authenticate,
-      schema: { params: z.object({ id: Id }), response: { 200: VoiceJoinResponseSchema } },
+      schema: {
+        params: z.object({ id: Id }),
+        response: { 200: VoiceJoinResponseSchema },
+      },
     },
-    async (req) => svc.join(req.actor!.userId, req.params.id),
+    async (req) => {
+      // The body is optional (older clients send none), so it is parsed here rather than by the route schema.
+      const body = VoiceJoinRequestSchema.safeParse(req.body ?? {});
+      if (!body.success) throw new AppError("VALIDATION_FAILED", "The join request is not valid.");
+      return svc.join(req.actor!.userId, req.params.id, body.data.e2ee === true);
+    },
+  );
+
+  // A client that missed a rekey asks again (10 §8). Only someone in the call gets a key.
+  http.get(
+    "/voice/channels/:id/e2ee-key",
+    {
+      preHandler: app.authenticate,
+      schema: { params: z.object({ id: Id }), response: { 200: E2eeKeySchema } },
+    },
+    async (req) => svc.keyFor(req.actor!.userId, req.params.id),
+  );
+
+  http.get(
+    "/admin/voice/e2ee",
+    { preHandler: app.requireOwner, schema: { response: { 200: E2eeSettingSchema } } },
+    () => ({ enabled: svc.e2eeEnabled() }),
+  );
+
+  http.patch(
+    "/admin/voice/e2ee",
+    {
+      preHandler: app.requireOwner,
+      schema: { body: E2eeSettingPatchSchema, response: { 200: E2eeSettingSchema } },
+    },
+    async (req) => {
+      await svc.setE2eeDefault(req.body.enabled);
+      return { enabled: svc.e2eeEnabled() };
+    },
   );
 
   // The owner's server-wide video caps (18 §L): they apply to the next join, with no restart.

@@ -428,7 +428,66 @@ describe("authorisation matrix: instance routes", () => {
       expect: row(200, 200, 200, 200, 200, 200),
       run: (as) => call(as, "PATCH", "/users/@me/settings", { locale: "en" }),
     },
+    // ---- moderation (M5, 11 §2.4, §3): every action on a fresh member so the cells are independent ----
+    {
+      name: "kick a member",
+      expect: row(204, 204, 204, 403, 403, 403),
+      run: async (as) => call(as, "POST", `/members/${(await fresh()).id}/kick`, {}),
+    },
+    {
+      name: "ban a member",
+      expect: row(200, 200, 403, 403, 403, 403),
+      run: async (as) => call(as, "PUT", `/members/${(await fresh()).id}/ban`, {}),
+    },
+    {
+      name: "unban someone who is not banned",
+      expect: row(404, 404, 403, 403, 403, 403),
+      run: async (as) => call(as, "DELETE", `/members/${(await fresh()).id}/ban`),
+    },
+    {
+      name: "time a member out",
+      expect: row(204, 204, 204, 403, 403, 403),
+      run: async (as) => call(as, "PUT", `/members/${(await fresh()).id}/timeout`, { durationSecs: 60 }),
+    },
+    {
+      name: "kick a moderator",
+      expect: row(204, 204, 403, 403, 403, 403),
+      run: async (as) => call(as, "POST", `/members/${(await fresh(roleId.mod)).id}/kick`, {}),
+    },
+    {
+      name: "ban an admin",
+      expect: row(200, 403, 403, 403, 403, 403),
+      run: async (as) => call(as, "PUT", `/members/${(await fresh(roleId.admin)).id}/ban`, {}),
+    },
+    {
+      name: "kick the owner",
+      expect: row(403, 403, 403, 403, 403, 403),
+      run: (as) => call(as, "POST", `/members/${userId.owner}/kick`, {}),
+    },
+    {
+      name: "time out the owner",
+      expect: row(403, 403, 403, 403, 403, 403),
+      run: (as) => call(as, "PUT", `/members/${userId.owner}/timeout`, { durationSecs: 60 }),
+    },
+    {
+      name: "read the audit log",
+      expect: row(200, 200, 200, 403, 403, 403),
+      run: (as) => call(as, "GET", "/audit-log"),
+    },
+    {
+      name: "read the ban list",
+      expect: row(200, 200, 403, 403, 403, 403),
+      run: (as) => call(as, "GET", "/bans"),
+    },
   ];
+
+  let freshN = 0;
+  /** A new member nobody else uses; optionally holding one role. */
+  async function fresh(role?: string): Promise<{ id: string }> {
+    const u = await s.register(`victim${++freshN}`);
+    if (role) await call("owner", "PUT", `/members/${u.id}/roles/${role}`);
+    return u;
+  }
 
   async function upload(as: Actor | "anon") {
     const f = new FormData();

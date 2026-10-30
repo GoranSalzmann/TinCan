@@ -47,7 +47,14 @@ export type VoiceNotice =
   | "screen_failed"
   | "denoiser_downgraded"
   | "disconnected"
+  | "e2ee_unsupported"
+  | "disconnected_by_moderator"
+  | "moved_by_moderator"
+  | "e2ee_mode_changed"
   | null;
+
+/** Frame encryption of the call this client is in (10): off, on, or asking the server for the current key again. */
+export type E2eeState = "off" | "on" | "resyncing";
 
 interface VoiceState {
   /** Who is in which voice channel, as the server tells it (READY, VOICE_STATE_UPDATE). */
@@ -92,6 +99,8 @@ interface VoiceState {
   watchNotice: string | null;
   /** Bumped when a video track arrives or goes, so surfaces re-attach. */
   rev: number;
+  e2ee: E2eeState;
+  e2eeEpoch: number | null;
   apply: (t: string, d: unknown) => void;
   patch: (p: Partial<VoiceState>) => void;
   reset: () => void;
@@ -123,6 +132,8 @@ const initial = {
   share: null as VoiceState["share"],
   watchNotice: null as string | null,
   rev: 0,
+  e2ee: "off" as E2eeState,
+  e2eeEpoch: null as number | null,
 };
 
 /** Applies one VOICE_STATE_UPDATE to the presence map. Idempotent (07 §5). */
@@ -160,17 +171,31 @@ export const useVoice = create<VoiceState>((set, get) => ({
       case "VOICE_STATE_UPDATE":
         set({ presence: applyVoiceUpdate(get().presence, d as Parameters<typeof applyVoiceUpdate>[1]) });
         return;
+      case "E2EE_KEY_UPDATE": {
+        void import("./actions.js").then((a) => a.applyE2eeKey(d as Parameters<typeof a.applyE2eeKey>[0]));
+        return;
+      }
       case "VOICE_SERVER_DISCONNECT": {
-        const reason = (d as { reason: string }).reason;
+        const m = d as { channelId: string; reason: string; to?: string };
+        if (get().channelId !== m.channelId) return;
+        // A moderator's move and a mode change put the person straight into a call again.
+        if ((m.reason === "moved_by_moderator" && m.to) || m.reason === "e2ee_mode_changed") {
+          const again = m.reason === "moved_by_moderator" ? m.to! : m.channelId;
+          const notice: VoiceNotice =
+            m.reason === "moved_by_moderator" ? "moved_by_moderator" : "e2ee_mode_changed";
+          void import("./actions.js").then((a) => a.rejoinVoice(again, notice));
+          return;
+        }
         const notice: VoiceNotice =
-          reason === "permission_lost"
+          m.reason === "permission_lost"
             ? "permission_lost"
-            : reason === "channel_deleted"
+            : m.reason === "channel_deleted"
               ? "channel_deleted"
-              : reason === "moved"
+              : m.reason === "moved"
                 ? null
-                : "removed";
-        if (get().channelId !== (d as { channelId: string }).channelId) return;
+                : m.reason === "disconnected"
+                  ? "disconnected_by_moderator"
+                  : "removed";
         set({ notice });
         void import("./actions.js").then((a) => a.leaveVoice({ keepNotice: true, silent: true }));
         return;

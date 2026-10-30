@@ -145,6 +145,15 @@ export default defineModule({
         await db.query.updateTable("member").set({ nickname }).where("user_id", "=", userId).execute();
       },
       setAvatarKey: (userId, key) => svc.setAvatarKey(userId, key),
+      revokeAllSessions: (userId) => svc.revokeAllSessions(userId),
+      async setTimeoutUntil(userId, until) {
+        await db.query
+          .updateTable("member")
+          .set({ timeout_until: until })
+          .where("user_id", "=", userId)
+          .execute();
+      },
+      setLoginBlocker: (b) => svc.setLoginBlocker(b),
       onMemberJoin: (hook) => svc.addJoinHook(hook),
       onMemberJoined: (hook) => svc.addJoinedHook(hook),
       setInviteRedeemer: (r) => svc.setRedeemer(r),

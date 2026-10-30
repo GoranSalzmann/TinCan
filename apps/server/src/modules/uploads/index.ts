@@ -40,12 +40,30 @@ const ConfigSchema = z.strictObject({
   /** Log a warning when the storage disk is fuller than this. */
   diskWarnPercent: z.number().int().min(1).max(100).default(85),
   thumbnailSize: z.number().int().min(64).max(2048).default(512),
+  /**
+   * Memory all running uploads may hold together (uploads are buffered while they are checked and thumbnailed; the load
+   * test measured about 2 × the file size each, 18 §N). A new upload that would go over waits as a "try again" answer.
+   */
+  memoryBudgetBytes: z
+    .number()
+    .int()
+    .min(16 * 1024 * 1024)
+    .default(384 * 1024 * 1024),
 });
 
 /** `Content-Disposition` with an ASCII fallback and the real name encoded (RFC 6266). */
 function disposition(kind: "inline" | "attachment", filename: string): string {
   const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return `${kind}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+/** Reads and drops what is left of a stream. */
+async function drain(stream: AsyncIterable<unknown>): Promise<void> {
+  try {
+    for await (const _chunk of stream) void _chunk;
+  } catch {
+    // the stream was already destroyed (limit, abort): nothing left to read
+  }
 }
 
 export default defineModule({
@@ -100,8 +118,33 @@ export default defineModule({
       "/uploads",
       { preHandler: ctx.http.authenticate, schema: { response: { 201: UploadResultSchema } } },
       async (req, reply) => {
-        const file = await readFile(req, svc.limits().maxBytes);
-        const a = await svc.upload(req.actor!.userId, file);
+        if (!req.isMultipart())
+          throw new AppError("UNSUPPORTED_MEDIA_TYPE", "Send the file as multipart/form-data.");
+        // Refuse an obviously oversized body before reading any of it.
+        const declared = Number(req.headers["content-length"]);
+        const { maxBytes } = svc.limits();
+        if (Number.isFinite(declared) && declared > maxBytes + 64 * 1024)
+          throw new AppError("PAYLOAD_TOO_LARGE", "That file is too large.", { maxBytes });
+        // Walk every part, so the whole body has been read when the answer goes out; only the first file is used.
+        let a;
+        for await (const part of req.parts({ limits: { fileSize: MAX_FILE_BYTES_CEILING, files: 1 } })) {
+          if (part.type !== "file" || a) {
+            if (part.type === "file") await drain(part.file);
+            continue;
+          }
+          try {
+            a = await svc.upload(req.actor!.userId, {
+              stream: part.file as AsyncIterable<Buffer>,
+              filename: part.filename,
+              declaredType: part.mimetype,
+            });
+          } catch (err) {
+            // Refused before or part way through: read and drop the rest so the client gets the answer instead of a hang.
+            await drain(part.file);
+            throw err;
+          }
+        }
+        if (!a) throw new AppError("VALIDATION_FAILED", "No file was sent.");
         return reply.status(201).send(a);
       },
     );
@@ -188,9 +231,14 @@ export default defineModule({
 
     // ---- avatars ----
     http.put("/users/@me/avatar", { preHandler: ctx.http.authenticate }, async (req, reply) => {
-      const file = await readFile(req, AVATAR_MAX_BYTES);
-      const avatarKey = await svc.setAvatar(req.actor!.userId, file.buffer);
-      return reply.send({ avatarKey });
+      const release = svc.reserve(AVATAR_MAX_BYTES);
+      try {
+        const file = await readFile(req, AVATAR_MAX_BYTES);
+        const avatarKey = await svc.setAvatar(req.actor!.userId, file.buffer);
+        return reply.send({ avatarKey });
+      } finally {
+        release();
+      }
     });
     http.delete("/users/@me/avatar", { preHandler: ctx.http.authenticate }, async (req, reply) => {
       await svc.clearAvatar(req.actor!.userId);

@@ -148,6 +148,8 @@ caddy-data/  ACME account & certificates
 - `tincan restore <archive>` into an empty directory; steps documented; **CI tests restore** (16).
 - Recommend off-host copies; docs include a 3-2-1 reminder.
 
+> **As built in M5 (18 §M).** `tincan backup [--out dir] [--keep n] [--include-secrets]` writes a `.tar.gz` (database via `VACUUM INTO`, uploads, config; secrets only on request) with a checksum manifest; `tincan restore <archive> --into <empty dir>` verifies it; `tincan e2ee rotate-secret`. Encryption of the archive, scheduled backups from inside the app and off-host upload are left to `age`, cron and `rclone` (guide §4). Metrics: `GET /api/v1/metrics` and the `dashboards` profile (guide §6). Pre-migration snapshots keep the newest five.
+
 ## 7. Upgrades
 
 - Images are tagged with explicit versions (`tincan:1.2.3`); `latest` not recommended. Pinned LiveKit version tested with each Tin Can release (compatibility matrix in release notes).
