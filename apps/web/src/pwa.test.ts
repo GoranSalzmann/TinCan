@@ -37,6 +37,14 @@ describe("web app manifest", () => {
     expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain('name="theme-color"');
+    for (const file of [
+      "favicon.ico",
+      "favicon.svg",
+      "favicon-dark.svg",
+      "brand/logo.svg",
+      "brand/logo-dark.svg",
+    ])
+      expect(existsSync(pub(file)), file).toBe(true);
   });
 });
 
