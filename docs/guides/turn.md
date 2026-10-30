@@ -2,6 +2,8 @@
 
 Voice and video normally flow straight between a person's device and your server over **7882/udp** (or **7881/tcp** when UDP is blocked). Some networks (schools, offices, some mobile carriers, some VPNs) block UDP _and_ do not let anything but port 443 through to unknown hosts. For those people the **TURN relay** inside LiveKit carries the media over TLS on **5349/tcp**. Without it they join the call and hear nothing.
 
+**Status (2026-10-30, mkarl.io): the UDP relay on 3478 is verified; the TLS relay is not usable by clients until port 443 is routed, see §6.**
+
 This page is the exact list of what the relay needs, how to switch it on for an existing installation, and how to prove it works. It is written from the point of view of the person who runs the server.
 
 ## 1. What it needs
@@ -10,7 +12,7 @@ This page is the exact list of what the relay needs, how to switch it on for an 
 |---|---|---|
 | A second DNS name | `turn.<your domain>`, an A record to the same address as the main name (DNS only, no proxy). A wildcard record `*.<your domain>` also does it | LiveKit's TURN/TLS presents a certificate, and a certificate needs its own name |
 | A certificate | Obtained by **Caddy** for that name (a site block that answers 404), read by LiveKit from the shared `caddy-data` volume | One ACME client, no extra tool. Needs 80/tcp and 443/tcp, which you already have |
-| **5349/tcp** | open in the host **and** provider firewall | TURN over TLS: the path for people who can only use TCP |
+| **5349/tcp** | open in the host **and** provider firewall | TURN over TLS. The server side works, but LiveKit tells clients to use port 443 for it, so clients do not use 5349 yet (§6) |
 | **3478/udp** | open in the host **and** provider firewall | TURN over UDP (also answers STUN): the path for people whose UDP works but who are behind a NAT that needs a relay |
 | The relay port range (default 30000–40000/udp) | **stays closed** | Tin Can's media server is on the same machine as the relay, so relayed packets never leave it. Only open it if the check in §4 shows relay-only calls failing and the LiveKit log shows relayed packets never arriving |
 | Order of steps | Caddy gets the certificate **before** LiveKit is told to use it | LiveKit refuses to start when the certificate file is missing |
@@ -67,6 +69,16 @@ It prints one line per mode: `direct` (baseline), `relay` (every TURN URL), `rel
 
 **c. The in-app test.** Settings → Voice & audio → Test connection, from a network that blocks UDP (a phone hotspot with a firewall, an office, a VPN that only carries TCP). The `relay` step goes green when TURN carried the call.
 
-## 5. Results on mkarl.io
+## 5. Results
 
 See [qa/turn.md](../qa/turn.md) for what was run, from where, and what is still untested.
+
+## 6. Known limit: LiveKit advertises the TLS relay on port 443
+
+Measured on a real host (2026-10-30): LiveKit hands clients `turn:<ip>:3478?transport=udp` and `turns:<turn domain>:443?transport=tcp`, whatever `tls_port` is. Its documentation says why: it expects a load balancer on 443 that forwards to `tls_port`. In Tin Can 443 belongs to Caddy, so a client that follows the advertised address reaches Caddy, not TURN, and the TLS relay never carries media. The relay on 5349 itself works (`TURN_TLS_PORT=5349 pnpm turn-test` passes in `relay-tls` mode with `relay/tls`).
+
+What that means today:
+
+- **3478/udp relay works** for clients that can use UDP but not a direct path to the media port.
+- **People who can only send TCP on 443** still have no relay. People who can reach 7881/tcp still connect over ICE/TCP without it.
+- Closing the gap needs a decision, not a bug fix: route 443 by SNI so the TURN name reaches LiveKit's TLS port (Caddy with the layer4 plugin, or a TCP router in front of Caddy; ADR T30 declined the custom Caddy build), or give the TURN name its own IP and bind LiveKit's `tls_port` to 443 there.

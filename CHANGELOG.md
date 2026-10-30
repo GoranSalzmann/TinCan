@@ -10,6 +10,7 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 
 ### Added
 
+- **TURN relay checks (M3 follow-up):** `tincan doctor` sends a TURN request over 5349/tls and 3478/udp instead of only checking the certificate; `tincan voice turn-snippets` prints the lines that switch TURN on for an existing installation; `tincan voice test-token` and `pnpm turn-test` prove relay-only media from a browser. Relay over UDP 3478 and TLS 5349 verified on a real host. **Known limit:** LiveKit tells clients to use the TLS relay on port 443, not 5349, so people who can reach only 443 do not benefit yet ([TURN guide §6](docs/guides/turn.md)).
 - **Text chat (M2):** channels and categories, messages with formatting, mentions, replies, reactions, edits, pins, typing indicators, read state and unread markers, full-text search, file and image uploads with thumbnails, per-person upload quota, avatars.
 - **Accounts and permissions (M1, M2):** owner setup with a one-time token (browser or `tincan setup`), invite links, password reset codes, roles and per-channel permission overwrites, sessions list with revoke. Passwords use argon2id.
 - **Voice (M3):** voice channels on LiveKit with permission-derived grants, presence, an audio pipeline (browser echo cancellation, RNNoise noise suppression, presets, microphone test, push to talk while the window has focus, per-person volume up to 300 %), a connection test, and an optional TURN relay (5349/tcp, 3478/udp) with `tincan voice turn-reload`.

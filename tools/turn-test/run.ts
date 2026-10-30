@@ -14,10 +14,11 @@
  *         relay-tls  relay only, TURN URLs over TLS only (5349/tcp): what a client behind a UDP-blocking firewall gets.
  *                    The restriction is applied to the ICE configuration, not to the network: it proves the TLS path
  *                    works, not that a particular firewall lets it through.
+
+ * TURN_TLS_PORT=5349 rewrites the advertised turns: port (LiveKit advertises 443, see docs/guides/turn.md §6).
  * Chromium: the one Playwright installed, or CHROMIUM_CHANNEL=chrome|msedge, or CHROMIUM_PATH.
  */
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { chromium } from "playwright-core";
@@ -30,6 +31,8 @@ interface Outcome {
   connected: boolean;
   candidate?: { type: string; protocol: string; relayProtocol?: string; url?: string; address?: string };
   rttMs?: number;
+  /** The ICE server URLs the page saw before filtering. */
+  offered?: string[];
   error?: string;
 }
 
@@ -56,9 +59,7 @@ if (!url || !token) {
   process.exit(2);
 }
 const modes = (values.modes?.split(",") ?? ALL) as Mode[];
-const livekitJs = createRequire(import.meta.url).resolve("livekit-client/dist/livekit-client.umd.js", {
-  paths: [resolve("apps/web")],
-});
+const livekitJs = resolve("apps/web/node_modules/livekit-client/dist/livekit-client.umd.js");
 
 /** Runs in the page before anything else: keeps only the wanted TURN URLs in every RTCPeerConnection. */
 const initScript = (mode: Mode): string => `(() => {
@@ -68,13 +69,25 @@ const initScript = (mode: Mode): string => `(() => {
     m === "relay-tls" ? u.startsWith("turns:")
     : m === "relay-udp" ? u.startsWith("turn:") && !u.includes("transport=tcp")
     : true;
-  window.RTCPeerConnection = function (cfg, ...rest) {
-    if (cfg && cfg.iceServers && m !== "direct" && m !== "relay") {
-      cfg = { ...cfg, iceServers: cfg.iceServers
-        .map((s) => ({ ...s, urls: [].concat(s.urls).filter(keep) }))
-        .filter((s) => s.urls.length > 0) };
+  // LiveKit advertises its TLS relay on 443 (it expects a load balancer there); TURN_TLS_PORT=5349 points the test at the port Tin Can opens.
+  const tlsPort = ${JSON.stringify(process.env.TURN_TLS_PORT ?? "")};
+  const retarget = (u) => (tlsPort && u.startsWith("turns:") ? u.replace(/:[0-9]+(?=[?]|$)/, ":" + tlsPort) : u);
+  const filter = (cfg) => {
+    if (cfg && cfg.iceServers) {
+      window.__ice = cfg.iceServers.flatMap((s) => [].concat(s.urls));
+      if (m !== "direct" && m !== "relay") {
+        cfg = { ...cfg, iceServers: cfg.iceServers
+          .map((s) => ({ ...s, urls: [].concat(s.urls).filter(keep).map(retarget) }))
+          .filter((s) => s.urls.length > 0) };
+      }
     }
-    return new Native(cfg, ...rest);
+    return cfg;
+  };
+  window.RTCPeerConnection = function (cfg, ...rest) {
+    const pc = new Native(filter(cfg), ...rest);
+    const set = pc.setConfiguration.bind(pc);
+    pc.setConfiguration = (c) => set(filter(c));
+    return pc;
   };
   window.RTCPeerConnection.prototype = Native.prototype;
 })()`;
@@ -87,7 +100,7 @@ const joinScript = (mode: Mode, u: string, t: string): string => `(async () => {
       mode === "direct" ? "{}" : '{ rtcConfig: { iceTransportPolicy: "relay" } }'
     });
   } catch (e) {
-    return { mode: ${JSON.stringify(mode)}, connected: false, error: String(e) };
+    return { mode: ${JSON.stringify(mode)}, connected: false, error: String(e), offered: window.__ice };
   }
   await new Promise((r) => setTimeout(r, 3000));
   const pcm = room.engine.pcManager;
@@ -104,6 +117,7 @@ const joinScript = (mode: Mode, u: string, t: string): string => `(async () => {
       if (typeof s.currentRoundTripTime === "number") out.rttMs = Math.round(s.currentRoundTripTime * 1000);
     }
   });
+  out.offered = window.__ice;
   await room.disconnect();
   return out;
 })()`;
@@ -147,5 +161,6 @@ for (const mode of modes) {
         : `not connected: ${(o.error ?? "").split("\n")[0]}`
     }`,
   );
+  if (!ok && o.offered) console.log(`     ICE servers offered: ${o.offered.join(", ")}`);
 }
 process.exit(failed ? 1 : 0);
