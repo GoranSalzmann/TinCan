@@ -392,6 +392,7 @@ describe("module off", () => {
           "text-chat": { enabled: false },
           "read-state": { enabled: false },
           search: { enabled: false },
+          "link-previews": { enabled: false },
         },
       },
     });

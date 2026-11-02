@@ -69,7 +69,7 @@ One function, `fileKind(contentType, filename)` in `apps/web/src/modules/chat/fi
 
 ### 8.1 Shape
 
-A new module `link-preview` (manifest `link-preview`, depends on `roles`, `text-chat`) with a reusable service `fetchPreview(url)` that other modules could call (a Watch Together channel, 20). It owns three tables: `link_preview_cache`, `link_preview_suppressed`, `link_preview_setting`.
+A new module `link-previews` (the id planned in 04 §2, depends on `roles`, `text-chat`) with a reusable service `fetchPreview(url)` that other modules could call (a Watch Together channel, 20). It owns three tables: `link_preview_cache`, `link_preview_suppressed`, `link_preview_setting`.
 
 **The client asks, the server unfurls.** `GET /api/v1/link-previews/messages/:messageId` returns the previews for at most three distinct URLs in that message's text. The server loads the message itself, checks the caller can see the channel, and takes the URLs from the stored text. *Why not `GET /preview?url=`:* that would make the server an open fetcher for any member and could not carry a per-message removal. The cost is one request per message that has a link (cached, so after the first view it is a database read).
 
@@ -77,7 +77,7 @@ E2EE: only text messages carry URLs and the server reads text messages by design
 
 ### 8.2 Default: **off**
 
-The owner turns it on in Server settings. Reasons: 15 §4.3 already says "off by default"; every enabled preview makes this server contact whatever site a member posts (revealing the server's IP and that the link was posted, and giving a link-poster a way to make the server fetch a URL of their choosing); and a self-hosted server for friends can ask once. The setting is stored in the database, takes effect at once and is shown in capabilities (`features.linkPreviews.enabled`).
+The owner turns it on in Server settings. Reasons: 15 §4.3 already says "off by default"; every enabled preview makes this server contact whatever site a member posts (revealing the server's IP and that the link was posted, and giving a link-poster a way to make the server fetch a URL of their choosing); and a self-hosted server for friends can ask once. The setting is stored in the database, takes effect at once and is shown in capabilities (`features["link-previews"].enabled`).
 
 ### 8.3 Fetching safely (`safeFetch`)
 
@@ -100,7 +100,7 @@ The owner turns it on in Server settings. Reasons: 15 §4.3 already says "off by
 ### 8.5 Control
 
 - **Owner:** `GET/PATCH /admin/link-previews` (owner only): `enabled`, `allowDomains` (when non-empty, only these and their subdomains), `denyDomains` (always wins). Shown in Server settings.
-- **Per message:** the author or anyone with `MANAGE_MESSAGES` can remove previews (`DELETE …/messages/:id`); stored in `link_preview_suppressed`, honoured for everyone. A removal by someone other than the author writes an audit entry `message.link_preview_remove`. Writing `<https://…>` in a message (angle brackets) also suppresses a preview, as in other chat apps.
+- **Per message:** the author or anyone with `MANAGE_MESSAGES` can remove previews (`DELETE …/messages/:id`); stored in `link_preview_suppressed`, honoured for everyone. A removal by someone other than the author writes an audit entry `message.preview.remove`. Writing `<https://…>` in a message (angle brackets) also suppresses a preview, as in other chat apps.
 - Cache: positive 24 h, negative (no metadata, blocked, error) 1 h; a daily job removes expired rows and unreferenced images. The cache is keyed by URL, shared between members; a preview carries no member data.
 
 ## 9. Open questions for the owner
