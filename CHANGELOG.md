@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "new version" banner now shows up more reliably in a window that stays open:** a check that hung on a dead connection could swallow the check made when the connection returned, a check made while the server was still starting was never repeated, and a window that stays in the foreground (an installed app) never looked again. Checks now time out after 10 seconds, are retried a few times, are also made when the window is focused, the network returns and every 5 minutes while the tab is shown.
+
 ## [1.0.3] - 2026-11-02
 
 Nothing to do when upgrading. Build and pipeline updates only; a tab that is open during the update shows the new-version banner.
