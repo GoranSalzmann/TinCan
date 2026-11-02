@@ -15,17 +15,24 @@ interface Group {
   members: Member[];
 }
 
-/** Groups of the member list (design U12): roles marked "show separately" by rank, then Online, then Offline. */
+/**
+ * Groups of the member list (design U12): the owner, roles marked "show separately" by rank, then Online, then Offline.
+ * The owner is not a role (a flag on the member), and like the role groups the group holds only members who are
+ * present: an owner who is offline is listed under Offline.
+ */
 export function groupMembers(
   members: readonly Member[],
   roles: readonly Role[],
   presence: Record<string, PresenceStatus>,
-  labels: { online: string; offline: string },
+  labels: { owner: string; online: string; offline: string },
 ): Group[] {
   const hoisted = roles.filter((r) => r.hoist && !r.isDefault).sort((a, b) => b.position - a.position);
   const byName = (a: Member, b: Member) => memberName(a).localeCompare(memberName(b));
   const placed = new Set<string>();
   const groups: Group[] = [];
+  const owners = members.filter((m) => m.isOwner && presence[m.userId]).sort(byName);
+  owners.forEach((m) => placed.add(m.userId));
+  if (owners.length) groups.push({ key: "owner", title: labels.owner, members: owners });
   for (const role of hoisted) {
     const list = members.filter(
       (m) => !placed.has(m.userId) && presence[m.userId] && m.roleIds.includes(role.id),
@@ -118,6 +125,7 @@ export function MemberList() {
   const groups = useMemo(
     () =>
       groupMembers(all, roles, presence, {
+        owner: t("member.group.owner"),
         online: t("member.group.online"),
         offline: t("member.group.offline"),
       }),
