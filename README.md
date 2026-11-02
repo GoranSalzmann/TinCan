@@ -47,7 +47,7 @@ Point your domain's DNS at the server and open the ports above in the provider's
 
 ```bash
 mkdir -p ~/tincan && cd ~/tincan
-VERSION=1.0.0    # replace with the newest version on the Releases page
+VERSION=1.0.1    # replace with the newest version on the Releases page
 docker run --rm --user "$(id -u):$(id -g)" -e TINCAN_INIT_HOST_DIR="$PWD" -v "$PWD:/out" \
   ghcr.io/goransalzmann/tincan-server:$VERSION \
   node dist/cli.js init --dir /out --domain chat.example.com --email you@example.com \

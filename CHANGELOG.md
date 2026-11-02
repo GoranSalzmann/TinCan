@@ -6,9 +6,18 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-02
+
+Nothing to do when upgrading. This is the first release that was rolled out by the automatic deployment.
+
 ### Added
 
 - **Automatic deployment (optional):** a Deploy workflow that, after each release, connects to your server with a restricted ssh key and runs `deploy/deploy.sh`: verified backup first, images pulled by version, only the image lines of `docker-compose.yml` changed, health, reported version and `tincan doctor` checked, and a rollback (including restoring the pre-migration snapshot, with the lost data window stated) when the new version does not come up. Set-up, exit codes and security notes in [docs/guides/deploy.md](docs/guides/deploy.md). Nothing changes for installations that do not set it up.
+
+### Changed
+
+- Dependency updates (development tools and minor/patch versions of the libraries).
+- CI: nightly media and clean-install tests run on Ubuntu 24.04; CodeQL is skipped on Dependabot pull requests (it cannot upload results there); the deploy test for the lock no longer depends on the environment.
 
 ## [1.0.0] - 2026-10-30
 
@@ -52,5 +61,6 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/GoranSalzmann/TinCan/releases/tag/v1.0.0
