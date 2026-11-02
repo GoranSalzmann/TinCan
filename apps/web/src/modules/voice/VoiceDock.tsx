@@ -9,7 +9,7 @@ import { useVoice } from "../../core/voice/store.js";
 import { Banner } from "../../ui/Banner.js";
 import { toastError } from "../../ui/toast.js";
 
-const btn = "rounded-md p-1.5 hover:bg-bg-hover focus-visible:outline-2";
+const btn = "shrink-0 rounded-md p-1.5 hover:bg-bg-hover focus-visible:outline-2";
 
 /** Voice panel at the bottom of the channel list (W-06): state, mute, deafen, leave; notices when a call ends. */
 export function VoiceDock() {
@@ -48,18 +48,20 @@ export function VoiceDock() {
           ? t("voice.dock.failed")
           : t("voice.dock.connected");
 
+  const detail = `${title} · ${channelName}`;
+
   return (
     <section
       aria-label={t("voice.dock")}
       className="flex flex-col gap-2 border-t border-border bg-bg-sidebar p-2"
     >
       {notices}
-      <div className="flex items-center gap-1">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium" role="status">
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+        <div className="min-w-24 flex-1" title={detail}>
+          <div className="line-clamp-2 text-sm font-medium break-words" role="status">
             {title}
           </div>
-          <div className="truncate text-xs text-text-muted">
+          <div className="line-clamp-2 text-xs break-words text-text-muted">
             <Link
               to={channelId ? `/voice/${channelId}` : "/"}
               className="text-text-muted no-underline hover:underline"
@@ -79,45 +81,47 @@ export function VoiceDock() {
         {status === "failed" && channelId ? (
           <button
             type="button"
-            className="rounded-md px-2 py-1 text-sm hover:bg-bg-hover"
+            className="shrink-0 rounded-md px-2 py-1 text-sm hover:bg-bg-hover"
             onClick={() => void joinVoice(channelId).catch(toastError)}
           >
             {t("voice.dock.rejoin")}
           </button>
         ) : null}
-        <button
-          type="button"
-          className={btn}
-          aria-pressed={muted}
-          aria-label={muted ? t("voice.dock.unmute") : t("voice.dock.mute")}
-          onClick={() => void toggleMute()}
-        >
-          {muted ? <MicOff aria-hidden="true" size={18} /> : <Mic aria-hidden="true" size={18} />}
-        </button>
-        <button
-          type="button"
-          className={btn}
-          aria-pressed={deafened}
-          aria-label={deafened ? t("voice.dock.undeafen") : t("voice.dock.deafen")}
-          onClick={() => void toggleDeafen()}
-        >
-          {deafened ? (
-            <HeadphoneOff aria-hidden="true" size={18} />
-          ) : (
-            <Headphones aria-hidden="true" size={18} />
-          )}
-        </button>
-        <Link to="/settings/voice" aria-label={t("voice.dock.settings")} className={btn}>
-          <Settings aria-hidden="true" size={18} />
-        </Link>
-        <button
-          type="button"
-          className={`${btn} text-danger-text`}
-          aria-label={t("voice.dock.leave")}
-          onClick={() => void leaveVoice()}
-        >
-          <PhoneOff aria-hidden="true" size={18} />
-        </button>
+        <div className="ms-auto flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            className={btn}
+            aria-pressed={muted}
+            aria-label={muted ? t("voice.dock.unmute") : t("voice.dock.mute")}
+            onClick={() => void toggleMute()}
+          >
+            {muted ? <MicOff aria-hidden="true" size={18} /> : <Mic aria-hidden="true" size={18} />}
+          </button>
+          <button
+            type="button"
+            className={btn}
+            aria-pressed={deafened}
+            aria-label={deafened ? t("voice.dock.undeafen") : t("voice.dock.deafen")}
+            onClick={() => void toggleDeafen()}
+          >
+            {deafened ? (
+              <HeadphoneOff aria-hidden="true" size={18} />
+            ) : (
+              <Headphones aria-hidden="true" size={18} />
+            )}
+          </button>
+          <Link to="/settings/voice" aria-label={t("voice.dock.settings")} className={btn}>
+            <Settings aria-hidden="true" size={18} />
+          </Link>
+          <button
+            type="button"
+            className={`${btn} text-danger-text`}
+            aria-label={t("voice.dock.leave")}
+            onClick={() => void leaveVoice()}
+          >
+            <PhoneOff aria-hidden="true" size={18} />
+          </button>
+        </div>
       </div>
     </section>
   );
