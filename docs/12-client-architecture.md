@@ -69,8 +69,8 @@ A module exports `ClientModule` (04 §10). The shell loads
 ```
 ┌───┬──────────────┬───────────────────────────────┬──────────────┐
 │ S │ Channel list │  Channel header (name, topic) │ Member list  │
-│ e │  Text        │───────────────────────────────│ (online/off, │
-│ r │   # general  │  Message list (virtualised)   │  roles)      │
+│ e │  Text        │───────────────────────────────│ (owner/roles)│
+│ r │   # general  │  Message list (virtualised)   │  online/off) │
 │ v │   # random   │                               │              │
 │ e │  Voice       │                               │              │
 │ r │   🔊 Lounge  │                               │              │
@@ -237,7 +237,11 @@ contrast checks and the component inventory: [design/style-guide.md](design/styl
 
 Breakpoints collapse the layout: channel list as a drawer, member list as a
 sheet, voice panel as a bottom bar. The member list docks only at ≥ 1280 px and is
-an overlay below that (design U8). Mobile browsers limit background audio and
+an overlay below that (design U8): the overlay has its own close button, closes with Escape and hands the focus back to
+the toggle. The channel list and the member list are resizable by a handle on their inner edge (a separator with
+arrow keys, Home/End, Enter to reset; 200 to 480 px, 240 by default, saved per browser); the drawer on a phone is not.
+The member list groups are the owner (a flag on the member, not a role), then roles shown separately, then Online and
+Offline; the owner of an offline account is listed under Offline. Mobile browsers limit background audio and
 screenshare publishing (not supported on most mobile browsers); the UI hides
 unsupported controls using capability detection. Native mobile remains a future
 option (Q10); keep audio and E2EE code free of desktop-only assumptions.

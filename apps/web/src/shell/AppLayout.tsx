@@ -20,6 +20,7 @@ const SettingsLayer = lazy(() =>
   import("../modules/settings/SettingsLayer.js").then((m) => ({ default: m.SettingsLayer })),
 );
 import { Avatar, PresenceDot } from "../ui/Avatar.js";
+import { ResizeHandle, usePanelWidth } from "../ui/ResizeHandle.js";
 import { ToastHost } from "../ui/toast.js";
 import { UpdateBanner, useVersionWatch } from "./UpdateBanner.js";
 
@@ -67,6 +68,21 @@ function useMediaQuery(query: string): boolean {
   }, [query]);
   return matches;
 }
+
+function useViewportWidth(): number {
+  const [w, setW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const on = () => setW(window.innerWidth);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return w;
+}
+
+/** Side panel widths in px: what a fresh viewer gets, and how far the handles go (the main column keeps at least 360). */
+const SIDEBAR = { def: 240, min: 200, max: 480, key: "tincan.sidebarWidth" } as const;
+const MEMBERS = { def: 240, min: 200, max: 480, key: "tincan.membersWidth" } as const;
+const MAIN_MIN = 360;
 
 function AppearanceItems() {
   const t = useT();
@@ -121,7 +137,7 @@ function AppearanceItems() {
   );
 }
 
-function ConnectionStatus() {
+function ConnectionStatus({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const gw = useSession((s) => s.gateway);
   const key: MessageKey =
@@ -134,12 +150,17 @@ function ConnectionStatus() {
           : "layout.connection.offline";
   // Shape plus text, never colour alone: filled circle when connected, hollow ring otherwise.
   return (
-    <span role="status" className="flex items-center gap-1.5 text-xs text-text-muted">
+    <span
+      role="status"
+      title={compact ? t(key) : undefined}
+      className="flex items-center gap-1.5 text-xs text-text-muted"
+    >
       <span
         aria-hidden="true"
-        className={`inline-block size-2.5 rounded-full border-2 ${gw === "ready" ? "border-presence-online bg-presence-online" : "border-presence-offline"}`}
+        className={`inline-block size-2.5 shrink-0 rounded-full border-2 ${gw === "ready" ? "border-presence-online bg-presence-online" : "border-presence-offline"}`}
       />
-      {t(key)}
+      {/* In the page corner only the shape shows, so it never runs into a header's own labels. */}
+      <span className={compact ? "sr-only" : undefined}>{t(key)}</span>
     </span>
   );
 }
@@ -235,12 +256,39 @@ export function AppLayout() {
   const showMembers = (members ?? wide) && !inSettings;
   const sidebarVisible = medium || drawer;
   const drawerButton = useRef<HTMLButtonElement>(null);
+  const membersToggle = useRef<HTMLButtonElement>(null);
+  const viewport = useViewportWidth();
+  const sidebarMax = Math.min(SIDEBAR.max, viewport - (showMembers && wide ? MEMBERS.def : 0) - MAIN_MIN);
+  const sidebarPanel = usePanelWidth(SIDEBAR.key, SIDEBAR.def, SIDEBAR.min, sidebarMax);
+  const membersMax = Math.min(
+    MEMBERS.max,
+    wide ? viewport - (medium ? sidebarPanel.width : 0) - MAIN_MIN : viewport - 120,
+  );
+  const membersPanel = usePanelWidth(MEMBERS.key, MEMBERS.def, MEMBERS.min, membersMax);
+  const overlayMembers = showMembers && !wide;
+  const closeMembers = () => {
+    setMembers(false);
+    membersToggle.current?.focus();
+  };
   useTabBadge(instanceName);
   useVersionWatch();
 
   useEffect(() => {
     if (medium) setDrawer(false);
   }, [medium]);
+  // The member list floats over the page below 1280 px: Escape closes it, and the toggle gets the focus back.
+  useEffect(() => {
+    if (!overlayMembers) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // A dialog or menu on top of the list takes the key first.
+      if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      setMembers(false);
+      membersToggle.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overlayMembers]);
   // Choosing a channel closes the drawer; remember it for next time.
   useEffect(() => {
     setDrawer(false);
@@ -279,8 +327,18 @@ export function AppLayout() {
           id="region-sidebar"
           tabIndex={-1}
           aria-label={t("layout.sidebar")}
-          className={`flex w-60 shrink-0 flex-col bg-bg-sidebar ${medium ? "border-e border-border" : "elev-2 fixed inset-y-0 start-0 z-50 rounded-none"}`}
+          style={medium ? { width: sidebarPanel.width } : undefined}
+          className={`flex shrink-0 flex-col bg-bg-sidebar ${medium ? "relative border-e border-border" : "elev-2 fixed inset-y-0 start-0 z-50 w-60 rounded-none"}`}
         >
+          {medium ? (
+            <ResizeHandle
+              label={t("layout.sidebar.resize")}
+              edge="end"
+              panel={sidebarPanel}
+              min={SIDEBAR.min}
+              max={sidebarMax}
+            />
+          ) : null}
           <Menu.Root>
             <Menu.Trigger
               aria-label={t("instance.menu")}
@@ -415,11 +473,12 @@ export function AppLayout() {
         </div>
         <div className="hidden h-0 md:block" />
         <main id="main" tabIndex={-1} className="relative flex min-h-0 flex-1 flex-col">
-          <div className="absolute end-14 top-3 z-10 hidden md:block">
-            <ConnectionStatus />
+          <div className="absolute end-14 top-0 z-10 hidden h-12 items-center md:flex">
+            <ConnectionStatus compact />
           </div>
           {!inSettings ? (
             <button
+              ref={membersToggle}
               type="button"
               aria-label={t("layout.members.toggle")}
               aria-pressed={showMembers}
@@ -439,10 +498,30 @@ export function AppLayout() {
           id="region-members"
           tabIndex={-1}
           aria-label={t("layout.members")}
-          className={`flex w-60 shrink-0 flex-col bg-bg-sidebar ${wide ? "border-s border-border" : "elev-2 fixed inset-y-0 end-0 z-50 rounded-none"}`}
+          style={medium ? { width: membersPanel.width } : undefined}
+          className={`flex shrink-0 flex-col bg-bg-sidebar ${wide ? "relative border-s border-border" : "elev-2 fixed inset-y-0 end-0 z-50 rounded-none"} ${medium ? "" : "w-60"}`}
         >
-          <div className="flex h-12 items-center border-b border-border px-4 text-sm font-semibold">
+          {medium ? (
+            <ResizeHandle
+              label={t("layout.members.resize")}
+              edge="start"
+              panel={membersPanel}
+              min={MEMBERS.min}
+              max={membersMax}
+            />
+          ) : null}
+          <div className="flex h-12 items-center justify-between gap-2 border-b border-border ps-4 pe-2 text-sm font-semibold">
             {t("layout.members")}
+            {overlayMembers ? (
+              <button
+                type="button"
+                aria-label={t("layout.members.close")}
+                onClick={closeMembers}
+                className="rounded-md p-1.5 hover:bg-bg-hover"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            ) : null}
           </div>
           <MemberList />
         </aside>

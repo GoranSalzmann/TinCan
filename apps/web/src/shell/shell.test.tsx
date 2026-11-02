@@ -276,3 +276,67 @@ describe("first-run setup (W-30)", () => {
     expect(server.name).toBe("Friends of Tin");
   });
 });
+
+describe("side panels", () => {
+  /** matchMedia for a window of the given width, using the breakpoints of the layout (768 and 1280). */
+  function windowOf(width: number) {
+    vi.stubGlobal("matchMedia", (query: string) => {
+      const min = Number(/min-width:\s*(\d+)px/.exec(query)?.[1] ?? 0);
+      return {
+        matches: width >= min,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      };
+    });
+  }
+  beforeEach(() => localStorage.clear());
+
+  it("docks both panels on a wide window, each with a keyboard-operable resize handle", async () => {
+    windowOf(1440);
+    const user = userEvent.setup();
+    fakeServer({ setupRequired: false, loggedIn: true });
+    renderApp("/login");
+    const channels = await screen.findByRole("separator", { name: "Resize the channel list" });
+    expect(channels).toHaveAttribute("aria-valuenow", "240");
+    channels.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(channels).toHaveAttribute("aria-valuenow", "256");
+    expect(localStorage.getItem("tincan.sidebarWidth")).toBe("256");
+    expect(screen.getByRole("navigation", { name: "Channels" })).toHaveStyle({ width: "256px" });
+
+    const members = screen.getByRole("separator", { name: "Resize the member list" });
+    members.focus();
+    await user.keyboard("{ArrowLeft}");
+    expect(members).toHaveAttribute("aria-valuenow", "256");
+    expect(screen.queryByRole("button", { name: "Close the member list" })).not.toBeInTheDocument();
+  });
+
+  it("does not resize the channel list while it is a drawer on a phone", async () => {
+    windowOf(400);
+    fakeServer({ setupRequired: false, loggedIn: true });
+    renderApp("/login");
+    await screen.findByRole("button", { name: "Open the channel list" });
+    expect(screen.queryByRole("separator", { name: "Resize the channel list" })).not.toBeInTheDocument();
+  });
+
+  it("opens the member list over the page below 1280 px, closes it with its own button or Escape, and returns the focus to the toggle", async () => {
+    windowOf(1000);
+    const user = userEvent.setup();
+    fakeServer({ setupRequired: false, loggedIn: true });
+    renderApp("/login");
+    const toggle = await screen.findByRole("button", { name: "Show or hide the member list" });
+    expect(screen.queryByRole("complementary", { name: "Members" })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByRole("complementary", { name: "Members" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close the member list" }));
+    expect(screen.queryByRole("complementary", { name: "Members" })).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+
+    await user.click(toggle);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary", { name: "Members" })).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+});

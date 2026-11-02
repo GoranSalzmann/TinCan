@@ -6,6 +6,18 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- **The channel list and the member list can be resized:** drag the edge between a panel and the page, or focus the edge and use the arrow keys (Home and End for the smallest and largest, Enter or a double click for the default). The width is remembered in your browser. On a phone the channel list stays a drawer of fixed width.
+- **The owner has a group of their own at the top of the member list.**
+
+### Fixed
+
+- **The voice status in the channel list is no longer cut off:** "Voice connected" and the channel name now wrap onto a second line, and the buttons move below them when the panel is narrow.
+- **In a call, "End-to-end encrypted" and the connection indicator no longer overlap at the top right.** The connection indicator in the corner is now a dot (its text is a tooltip and for screen readers), and the lock label becomes an icon on a phone.
+- **The member list can always be closed:** below 1280 px the open list covered its own toggle. It now has a close button, closes with Escape, and puts the focus back on the toggle.
+- **The channel menu (the three dots) stays next to the channel name** when people join or leave a voice channel instead of sliding down with the list of participants. A long voice channel name also no longer makes the channel list scroll sideways.
+
 ## [1.0.4] - 2026-11-02
 
 Nothing to do when upgrading. Open windows (also the installed app) now notice an update reliably; windows that run 1.0.3 or older need one reload to get this.

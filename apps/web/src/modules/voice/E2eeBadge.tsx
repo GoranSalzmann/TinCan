@@ -46,7 +46,9 @@ export function CallLock() {
   return (
     <span role="status" title={t(tip)} className="flex shrink-0 items-center gap-1 text-sm text-text-muted">
       <Icon aria-hidden="true" size={14} />
-      {state === "resyncing" ? t("voice.e2ee.resyncing") : t("voice.e2ee.on")}
+      <span className="max-sm:sr-only">
+        {state === "resyncing" ? t("voice.e2ee.resyncing") : t("voice.e2ee.on")}
+      </span>
     </span>
   );
 }

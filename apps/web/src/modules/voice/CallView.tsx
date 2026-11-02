@@ -102,7 +102,7 @@ export function CallView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border ps-4 pe-16">
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border ps-4 pe-4 md:pe-20">
         <h1 className="m-0 min-w-0 flex-1 truncate text-lg font-semibold">
           <bdi>{t("voice.call.title", { name: channel.name, count: people.length })}</bdi>
         </h1>
