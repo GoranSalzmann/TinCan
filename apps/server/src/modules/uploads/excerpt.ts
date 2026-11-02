@@ -30,7 +30,7 @@ export function looksLikeText(filename: string, declaredType: string | undefined
 }
 
 /** Zero-width and bidirectional controls that can make text read differently from how it is stored. */
-const SPOOFING = /[​-‏‪-‮⁦-⁩﻿]/g;
+const SPOOFING = /\p{Cf}/gu;
 
 /** Decodes a sample as text, or returns null when it is binary or in an encoding we do not guess. */
 function decode(sample: Buffer, cut: boolean): string | null {
@@ -107,7 +107,7 @@ export function makeExcerpt(sample: Buffer, fileSize: number): Excerpt | null {
   const clean = decoded
     .replace(/\r\n?/g, "\n")
     .replace(SPOOFING, "")
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+    .replace(/\p{Cc}/gu, (c) => (c === "\t" || c === "\n" ? c : ""));
   const lines = clean.split("\n");
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   if (lines.length === 0) return null;

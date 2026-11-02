@@ -130,7 +130,6 @@ function request(u: URL, ip: string, limits: FetchLimits, deadline: number, user
     const host = hostOf(u);
     const mod = secure ? https : http;
     let settled = false;
-    let timer: NodeJS.Timeout | undefined;
     const done = (fn: () => void) => {
       if (settled) return;
       settled = true;
@@ -205,7 +204,7 @@ function request(u: URL, ip: string, limits: FetchLimits, deadline: number, user
       },
     );
     // One timer for the whole exchange, so a server that dribbles bytes cannot hold the connection open.
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       req.destroy();
       done(() => reject(new FetchError("timeout", "too slow")));
     }, left);

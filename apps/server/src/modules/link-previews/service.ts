@@ -273,7 +273,7 @@ export class LinkPreviewService implements LinkPreviewApi {
       this.#d.log.info({ reason, ms: Date.now() - started }, "link preview not made");
     }
     const now = Date.now();
-    const { imageHash, ...stored } = result ?? ({} as Stored & { imageHash: string | null });
+    const { imageHash: _unused, ...stored } = result ?? { imageHash: null };
     const row: LinkPreviewTables["link_preview_cache"] = {
       url_hash: hash,
       url,
@@ -376,7 +376,7 @@ export class LinkPreviewService implements LinkPreviewApi {
     }
     if (!j || typeof j !== "object") return null;
     const o = j as Record<string, unknown>;
-    const str = (k: string): string | null => (typeof o[k] === "string" ? (o[k] as string) : null);
+    const str = (k: string): string | null => (typeof o[k] === "string" ? o[k] : null);
     const author = cleanText(str("author_name"), SITE_NAME_MAX);
     const isPost = provider?.name === "X";
     const html = str("html");

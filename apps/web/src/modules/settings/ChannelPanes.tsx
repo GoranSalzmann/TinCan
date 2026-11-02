@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../../ui/Dialog.js";
 import { Field } from "../../ui/Field.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { CreateChannelDialog } from "../channels/CreateChannelDialog.js";
+import { LinkPreviewsCard } from "./LinkPreviewsCard.js";
 import {
   TEXT_PERMISSIONS,
   VOICE_PERMISSIONS,
@@ -66,6 +67,7 @@ export function ServerPane() {
       {owner ? <E2eeCard /> : null}
       {owner ? <VideoLimitsCard /> : null}
       {owner ? <UploadLimitsCard /> : null}
+      {owner ? <LinkPreviewsCard /> : null}
       <p className="text-sm text-text-muted">
         {t("settings.server.source")}:{" "}
         <a href={caps?.server.sourceUrl} target="_blank" rel="noreferrer noopener">

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { memo, useMemo, useState } from "react";
-import { Copy, CornerUpLeft, FileText, Pencil, Pin, Trash2 } from "lucide-react";
-import { has, type Attachment, type Message } from "@tincan/shared";
-import { api, fileUrl } from "../../core/api/client.js";
+import { Copy, CornerUpLeft, Pencil, Pin, Trash2 } from "lucide-react";
+import { has, type Message } from "@tincan/shared";
+import { api } from "../../core/api/client.js";
 import { useT } from "../../core/i18n/index.js";
 import { useChat, type PendingMessage } from "../../core/state/chat.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
@@ -11,19 +11,16 @@ import { Avatar } from "../../ui/Avatar.js";
 import { Button } from "../../ui/Button.js";
 import { ConfirmDialog } from "../../ui/Dialog.js";
 import { toast, toastError } from "../../ui/toast.js";
+import { AttachmentView } from "./AttachmentView.js";
 import { useLinkGate } from "./linkGate.js";
+import { LinkPreviews } from "./LinkPreviews.js";
 import { Markdown, type RenderContext } from "./markdown.js";
 import { decodeMentions, encodeMentions, type InsertedMention } from "./mentions.js";
 
 const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 const full = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "medium" });
 
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10_240 ? 1 : 0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-}
+export { formatSize } from "./media.js";
 
 /** The names a message needs to render its mentions, read from the community store. */
 export function useRenderContext(selfId: string): RenderContext {
@@ -42,60 +39,6 @@ export function useRenderContext(selfId: string): RenderContext {
       openLink: request,
     }),
     [members, roles, channels, selfId, request],
-  );
-}
-
-function AttachmentView({ a }: { a: Attachment }) {
-  const t = useT();
-  if (a.removed) {
-    return (
-      <div className="my-1 inline-block rounded-md border border-border px-3 py-2 text-sm text-text-muted">
-        {t("message.fileRemoved")}
-      </div>
-    );
-  }
-  const href = fileUrl(a.id, a.filename);
-  const isImage = a.hasThumbnail && a.width && a.height;
-  if (isImage) {
-    // Width and height are known, so the box is reserved before the image loads (no layout shift).
-    const maxW = 360;
-    const w = Math.min(a.width!, maxW);
-    const h = Math.round((a.height! * w) / a.width!);
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="my-1 inline-block max-w-full no-underline"
-      >
-        <img
-          src={fileUrl(a.id, a.filename, true)}
-          alt={a.filename}
-          width={w}
-          height={h}
-          loading="lazy"
-          style={{ aspectRatio: `${a.width} / ${a.height}` }}
-          className="max-h-80 max-w-full rounded-md bg-bg-input object-contain"
-        />
-        <span className="block text-xs text-text-muted">
-          {a.filename} · {a.width} × {a.height}
-        </span>
-      </a>
-    );
-  }
-  return (
-    <a
-      href={href}
-      download={a.filename}
-      className="my-1 flex max-w-sm items-center gap-3 rounded-md border border-border bg-bg-sidebar px-3 py-2 no-underline"
-    >
-      <FileText aria-hidden="true" size={24} className="shrink-0 text-text-muted" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-text-link underline">{a.filename}</span>
-        <span className="block text-xs text-text-muted">{formatSize(a.size)}</span>
-      </span>
-      <span className="text-sm text-accent-text">{t("message.download")}</span>
-    </a>
   );
 }
 
@@ -292,6 +235,12 @@ export const MessageItem = memo(function MessageItem({
             {m.attachments.map((a) => (
               <AttachmentView key={a.id} a={a} />
             ))}
+            <LinkPreviews
+              messageId={m.id}
+              content={m.content}
+              editedAt={m.editedAt}
+              canRemove={own || canManage}
+            />
           </>
         )}
       </div>

@@ -497,7 +497,9 @@ describe("link previews in a running server", () => {
       allowDomains: [],
       denyDomains: [],
     });
-    expect((await call(owner).get("/capabilities")).body.features["link-previews"]).toEqual({ enabled: false });
+    expect((await call(owner).get("/capabilities")).body.features["link-previews"]).toEqual({
+      enabled: false,
+    });
     const id = await say(ann.token, link("/article"));
     expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body).toEqual({ previews: [] });
     expect(hits.size).toBe(0);
@@ -510,7 +512,9 @@ describe("link previews in a running server", () => {
       400,
     );
     expect((await enable()).status).toBe(200);
-    expect((await call(owner).get("/capabilities")).body.features["link-previews"]).toEqual({ enabled: true });
+    expect((await call(owner).get("/capabilities")).body.features["link-previews"]).toEqual({
+      enabled: true,
+    });
     expect(await audit("linkpreviews.settings", 1)).toHaveLength(1);
   });
 

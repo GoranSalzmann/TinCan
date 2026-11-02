@@ -37,7 +37,7 @@ export function decodeEntities(s: string): string {
 }
 
 /** Controls, zero-width characters and bidirectional overrides: nothing a preview needs, and some can mislead. */
-const INVISIBLE = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁩﻿]/g;
+const INVISIBLE = /[\p{Cc}\p{Cf}]/gu;
 
 /**
  * Turns text from a third-party page into one short plain line: tags dropped, references decoded, whitespace
