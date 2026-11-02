@@ -112,12 +112,48 @@ describe("useVersionWatch", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it("looks now and then while the window stays in the foreground", async () => {
+  it("a tab that stays visible gets the banner with no gateway event and no visibilitychange", async () => {
     const spy = vi.spyOn(api, "capabilities").mockResolvedValue(caps("9.9.9"));
     renderHook(() => useVersionWatch());
     await act(() => vi.advanceTimersByTimeAsync(PERIODIC_CHECK_MS));
     expect(spy).toHaveBeenCalledTimes(1);
     expect(useUpdate.getState().reason).toBe("version");
+  });
+
+  it("retries a failed check on the next tick", async () => {
+    const spy = vi
+      .spyOn(api, "capabilities")
+      .mockRejectedValueOnce(new Error("502"))
+      .mockResolvedValue(caps("9.9.9"));
+    renderHook(() => useVersionWatch());
+    await act(() => vi.advanceTimersByTimeAsync(PERIODIC_CHECK_MS));
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    await act(() => vi.advanceTimersByTimeAsync(PERIODIC_CHECK_MS));
+    expect(useUpdate.getState().reason).toBe("version");
+  });
+
+  it("fetches nothing while hidden, and looks again when it can", async () => {
+    const visible = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const spy = vi.spyOn(api, "capabilities").mockResolvedValue(caps("9.9.9"));
+    renderHook(() => useVersionWatch());
+    await act(() => vi.advanceTimersByTimeAsync(5 * PERIODIC_CHECK_MS));
+    expect(spy).not.toHaveBeenCalled();
+    visible.mockReturnValue("visible");
+    await act(() => vi.advanceTimersByTimeAsync(PERIODIC_CHECK_MS));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes one request per minute, never overlapping, and stops once the banner shows", async () => {
+    const spy = vi.spyOn(api, "capabilities").mockResolvedValue(caps(APP_VERSION));
+    renderHook(() => useVersionWatch());
+    await act(() => vi.advanceTimersByTimeAsync(3 * PERIODIC_CHECK_MS));
+    expect(spy).toHaveBeenCalledTimes(3);
+    spy.mockResolvedValue(caps("9.9.9"));
+    await act(() => vi.advanceTimersByTimeAsync(PERIODIC_CHECK_MS));
+    expect(useUpdate.getState().reason).toBe("version");
+    const seen = spy.mock.calls.length;
+    await act(() => vi.advanceTimersByTimeAsync(10 * PERIODIC_CHECK_MS));
+    expect(spy).toHaveBeenCalledTimes(seen);
   });
 
   it("looks when the window is focused or the network returns, within the rate limit", async () => {

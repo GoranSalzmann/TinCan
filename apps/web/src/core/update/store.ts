@@ -22,8 +22,8 @@ interface UpdateState {
   check: (opts?: { force?: boolean; now?: number; attempt?: number }) => Promise<void>;
 }
 
-/** Visibility changes can come in bursts; ask at most this often. */
-export const CHECK_INTERVAL_MS = 60_000;
+/** Focus and visibility events come in bursts, and a once-a-minute tick must not be skipped by timer jitter: ask at most this often. */
+export const CHECK_INTERVAL_MS = 30_000;
 /** A request that has not answered by now is given up on (a dead connection can hang for minutes). */
 export const CHECK_TIMEOUT_MS = 10_000;
 /** After a failed check (the server is still starting): try again after these waits, then leave it to the periodic check. */

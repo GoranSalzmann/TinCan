@@ -8,7 +8,7 @@ import { useVoice } from "../core/voice/store.js";
 import { Button } from "../ui/Button.js";
 
 /** How often a tab that is shown looks for a new release without anything else prompting it. */
-export const PERIODIC_CHECK_MS = 5 * 60_000;
+export const PERIODIC_CHECK_MS = 60_000;
 
 /** Asks for the server's version when the gateway comes back after a drop and when the tab is shown again. */
 export function useVersionWatch(): void {
@@ -26,10 +26,13 @@ export function useVersionWatch(): void {
     }
   }, [gateway]);
   // A window that stays in the foreground never changes visibility, so it also asks when it is
-  // focused or back online, and now and then while it is shown.
+  // focused or back online, and once a minute while it is shown. One small GET per minute; it stops
+  // once the banner is up for a different version, and nothing is fetched while the tab is hidden.
   useEffect(() => {
     const ask = () => {
-      if (document.visibilityState === "visible") void useUpdate.getState().check();
+      if (document.visibilityState !== "visible") return;
+      if (useUpdate.getState().reason === "version") return;
+      void useUpdate.getState().check();
     };
     const timer = setInterval(ask, PERIODIC_CHECK_MS);
     document.addEventListener("visibilitychange", ask);
