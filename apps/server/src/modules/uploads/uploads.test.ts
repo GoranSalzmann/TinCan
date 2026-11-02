@@ -178,6 +178,9 @@ describe("attaching to messages", () => {
         width: 40,
         height: 30,
         hasThumbnail: true,
+        animated: false,
+        excerpt: null,
+        excerptTruncated: false,
         removed: false,
       },
     ]);

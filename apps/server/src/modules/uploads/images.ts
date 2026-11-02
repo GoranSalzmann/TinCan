@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import sharp from "sharp";
+import { isApng } from "./media.js";
 
 /** Raster types that are safe to show inline and that `sharp` can thumbnail. SVG is deliberately absent. */
 export const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
@@ -50,6 +51,8 @@ export function cleanFilename(name: string | undefined): string {
 export interface ImageInfo {
   width: number;
   height: number;
+  /** More than one frame (GIF, WebP) or an animated PNG. */
+  animated: boolean;
 }
 
 const MAX_PIXELS = 100_000_000;
@@ -60,7 +63,10 @@ export async function inspectImage(buf: Buffer): Promise<ImageInfo> {
   if (!meta.width || !meta.height) throw new Error("not an image");
   // EXIF orientations 5–8 are rotated a quarter turn when shown.
   const turned = (meta.orientation ?? 1) >= 5;
-  return turned ? { width: meta.height, height: meta.width } : { width: meta.width, height: meta.height };
+  const animated = (meta.pages ?? 1) > 1 || (meta.format === "png" && isApng(buf));
+  return turned
+    ? { width: meta.height, height: meta.width, animated }
+    : { width: meta.width, height: meta.height, animated };
 }
 
 /** A WebP preview that fits in a square of `size`, upright, first frame only. */

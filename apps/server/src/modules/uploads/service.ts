@@ -19,6 +19,8 @@ import {
   sniffImage,
   thumbnail,
 } from "./images.js";
+import { EXCERPT_SAMPLE_BYTES, looksLikeText, makeExcerpt } from "./excerpt.js";
+import { sniffMedia } from "./media.js";
 import type { UploadsTables } from "./schema.js";
 
 export interface UploadsSettings {
@@ -64,6 +66,9 @@ const wire = (r: Row): Attachment => ({
   width: r.deleted_at === null ? r.width : null,
   height: r.deleted_at === null ? r.height : null,
   hasThumbnail: r.deleted_at === null && r.has_thumb === 1,
+  animated: r.deleted_at === null && r.animated === 1,
+  excerpt: r.deleted_at === null ? r.excerpt : null,
+  excerptTruncated: r.deleted_at === null && r.excerpt_truncated === 1,
   removed: r.deleted_at !== null,
 });
 
@@ -232,9 +237,15 @@ export class UploadsService implements UploadsApi {
       have += r.value.length;
     }
     if (have === 0) throw new AppError("VALIDATION_FAILED", "That file is empty.");
-    const sniffed = sniffImage(Buffer.concat(first));
-    const contentType = sniffed ?? safeDeclaredType(file.declaredType);
-    const stored = !sniffed && contentType.startsWith("image/") ? "application/octet-stream" : contentType;
+    const head = Buffer.concat(first);
+    const sniffed = sniffImage(head);
+    // Audio and video are recognised by their container header too, so a label alone never makes a file "media".
+    const media = sniffed ? null : sniffMedia(head, file.filename);
+    const contentType = sniffed ?? media ?? safeDeclaredType(file.declaredType);
+    const stored =
+      !sniffed && !media && /^(image|audio|video)\//.test(contentType)
+        ? "application/octet-stream"
+        : contentType;
 
     // The person's room is known before the first byte is stored, so a body that would not fit stops part way.
     const { usedBytes, quotaBytes } = await this.usage(userId);
@@ -270,7 +281,8 @@ export class UploadsService implements UploadsApi {
       throw err;
     };
 
-    let dims: { width: number; height: number } | null = null;
+    let dims: { width: number; height: number; animated: boolean } | null = null;
+    let animated = false;
     let thumb: Buffer | null = null;
     if (sniffed && size <= THUMBNAIL_MAX_BYTES) {
       // The one place a file is held in memory: an image to decode, bounded and counted against the shared budget.
@@ -286,6 +298,7 @@ export class UploadsService implements UploadsApi {
         const { stream } = await this.#d.storage.get(key);
         const buffer = Buffer.concat(await stream.toArray());
         dims = await inspectImage(buffer);
+        animated = dims.animated;
         thumb = await thumbnail(buffer, this.#d.settings.thumbnailSize);
       } catch {
         // Claims to be an image but is not decodable: refuse rather than store something odd.
@@ -297,18 +310,34 @@ export class UploadsService implements UploadsApi {
     }
     if (thumb)
       await this.#d.storage.put(`${key}.thumb`, Readable.from([thumb]), { contentType: "image/webp" });
+
+    // A text file gets its first lines stored with it (23 §7): only a 4 KiB range is read, and it is kept as plain text.
+    const filename = cleanFilename(file.filename);
+    let excerpt: { text: string; truncated: boolean } | null = null;
+    if (!sniffed && !media && looksLikeText(filename, file.declaredType)) {
+      try {
+        const n = Math.min(size, EXCERPT_SAMPLE_BYTES);
+        const { stream } = await this.#d.storage.get(key, { range: { start: 0, end: n - 1 } });
+        excerpt = makeExcerpt(Buffer.concat(await stream.toArray()), size);
+      } catch (err) {
+        this.#d.log.warn({ err }, "text excerpt failed");
+      }
+    }
     const row: Row = {
       id,
       message_id: null,
       channel_id: null,
       uploader_id: userId,
       storage_key: key,
-      filename: cleanFilename(file.filename),
+      filename,
       content_type: stored,
       size,
       width: dims?.width ?? null,
       height: dims?.height ?? null,
       has_thumb: thumb ? 1 : 0,
+      animated: animated ? 1 : 0,
+      excerpt: excerpt?.text ?? null,
+      excerpt_truncated: excerpt?.truncated ? 1 : 0,
       sha256: hash.digest("hex"),
       created_at: now,
       deleted_at: null,

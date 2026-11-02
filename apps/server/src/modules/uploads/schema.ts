@@ -18,6 +18,11 @@ export interface UploadsTables {
     height: number | null;
     /** 1 when a `<storage_key>.thumb` object exists. */
     has_thumb: number;
+    /** 1 for an animated GIF, WebP or APNG. */
+    animated: number;
+    /** First lines of a text file (23 §7), shown escaped; null for anything else. */
+    excerpt: string | null;
+    excerpt_truncated: number;
     sha256: string;
     created_at: number;
     deleted_at: number | null;
@@ -73,6 +78,21 @@ export const uploadsMigrations: ModuleMigrations = {
           .addColumn("key", "text", (c) => c.primaryKey())
           .addColumn("value", "integer", (c) => c.notNull())
           .addColumn("updated_at", "integer", (c) => c.notNull())
+          .execute();
+      },
+    },
+    {
+      version: 3,
+      name: "animation and text excerpt",
+      async up(db) {
+        await db.schema
+          .alterTable("attachment")
+          .addColumn("animated", "integer", (c) => c.notNull().defaultTo(0))
+          .execute();
+        await db.schema.alterTable("attachment").addColumn("excerpt", "text").execute();
+        await db.schema
+          .alterTable("attachment")
+          .addColumn("excerpt_truncated", "integer", (c) => c.notNull().defaultTo(0))
           .execute();
       },
     },
