@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-02
+
+Nothing to do when upgrading. Members with a tab open during the update see a banner with a Reload button.
+
 ### Added
 
 - **Open tabs recover from a server update:** a tab that stayed open across a release now shows a "new version" banner with a Reload button (checked when the connection returns and when the tab is shown again), and a page that cannot load a file of its old build reloads itself once instead of failing, except during a call, where only the banner appears. Unsent messages are kept. See [docs/guides/deploy.md](docs/guides/deploy.md).
@@ -65,6 +69,7 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/GoranSalzmann/TinCan/releases/tag/v1.0.0
