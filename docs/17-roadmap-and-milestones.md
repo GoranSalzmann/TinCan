@@ -138,6 +138,18 @@ Tag `v1.0.0`, publish images/checksums/SBOM. No announcement campaign.
 
 **After 1.0:** bugs and wishes are GitHub Issues (P0 to P3); the owner decides what is fixed. A future minor release may revive the shelved items.
 
+### M8. Watch Together (proposed, post-1.0; planning only, 2026-11-02)
+**Proposal, not a commitment.** A `watch` channel type: a shared queue of videos that plays in sync for everyone who joined (play, pause, seek, next, who is watching). Decision record [19](19-watch-together-adr.md) (own sync engine, HTML5 player first, YouTube as an opt-in second adapter, screenshare as the fallback), design [20](20-watch-together-design.md), plan [21](21-watch-together-plan.md), owner decisions [22](22-watch-together-owner-memo.md), security review [security/watch-together-review.md](security/watch-together-review.md), demo checklist [qa/watch-together.md](qa/watch-together.md).
+| Slice | Size | Outcome |
+|---|---|---|
+| Spikes S1 to S8 | M | Clock and latency, drift control, YouTube sync and privacy capture, mobile, Range serving, policy text, `safe-fetch`; go/no-go for the YouTube and upload slices |
+| W0 Foundations | S | `safe-fetch`, permission bits 27 to 30 and the `CHANNEL_SCOPED` fix, `watch` channel kind, config |
+| W1 Core and HTML5 | L | Module, protocol, sync controller, HTML5 adapter, queue, phone layout |
+| W2 YouTube (opt-in) | M | Adapter, notice and consent, CSP per provider, doctor checks |
+| W3 Member uploads (optional) | M | Range serving, claim/release, takedown tooling |
+| W4 Hardening | M | Simulator suite, two-browser media test, security re-review, QA, docs |
+Rough total 8 to 12 weeks (7 to 10 without W3). Off by default (`modules.watch.enabled: false`); each slice can ship as a minor release. Cut lines: W3 first, then W2. **Exit:** the checklist in qa/watch-together.md passes on desktop and phone and the security requirements SW-01 to SW-12 have evidence.
+
 ## 4. Dependencies & critical path
 
 ```
@@ -202,6 +214,7 @@ basics, docs.
 | Admin UI for module toggles | Q8 |
 | Kubernetes/Helm | 14 §10 |
 | Auto-moderation, reports | 15 §7 |
+| Watch Together channel (M8, proposed) | 19 to 22 |
 
 ## 8. Risks to the schedule
 
