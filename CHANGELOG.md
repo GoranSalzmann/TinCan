@@ -6,6 +6,14 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-02
+
+Nothing to do when upgrading. Build and pipeline updates only; a tab that is open during the update shows the new-version banner.
+
+### Changed
+
+- The build and release pipeline uses newer versions of GitHub Actions (checkout, Node and pnpm setup, Docker build, CodeQL). The images themselves are built from the same code as 1.0.2.
+
 ## [1.0.2] - 2026-11-02
 
 Nothing to do when upgrading. Members with a tab open during the update see a banner with a Reload button.
@@ -69,7 +77,8 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/GoranSalzmann/TinCan/releases/tag/v1.0.0
