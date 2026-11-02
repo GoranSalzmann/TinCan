@@ -8,6 +8,7 @@ import { directionOf, useLocale } from "./core/i18n/index.js";
 import { ErrorBoundary } from "./shell/ErrorBoundary.js";
 import { AppRoutes } from "./shell/AuthGate.js";
 import { initAppearance } from "./theme/store.js";
+import { installChunkRecovery } from "./core/update/recovery.js";
 
 function Root() {
   const locale = useLocale((s) => s.locale);
@@ -23,6 +24,7 @@ function Root() {
 }
 
 initAppearance();
+installChunkRecovery();
 
 // Installable app (PWA): the worker caches the build files and the shell, never data (public/sw.js).
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

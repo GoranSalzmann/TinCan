@@ -21,6 +21,7 @@ const SettingsLayer = lazy(() =>
 );
 import { Avatar, PresenceDot } from "../ui/Avatar.js";
 import { ToastHost } from "../ui/toast.js";
+import { UpdateBanner, useVersionWatch } from "./UpdateBanner.js";
 
 /**
  * The main layout (W-01, 12 §4): channel list with the instance menu and user panel, a main column that
@@ -235,6 +236,7 @@ export function AppLayout() {
   const sidebarVisible = medium || drawer;
   const drawerButton = useRef<HTMLButtonElement>(null);
   useTabBadge(instanceName);
+  useVersionWatch();
 
   useEffect(() => {
     if (medium) setDrawer(false);
@@ -396,6 +398,7 @@ export function AppLayout() {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <UpdateBanner />
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
           <button
             ref={drawerButton}

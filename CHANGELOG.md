@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- **Open tabs recover from a server update:** a tab that stayed open across a release now shows a "new version" banner with a Reload button (checked when the connection returns and when the tab is shown again), and a page that cannot load a file of its old build reloads itself once instead of failing, except during a call, where only the banner appears. Unsent messages are kept. See [docs/guides/deploy.md](docs/guides/deploy.md).
+
 ## [1.0.1] - 2026-11-02
 
 Nothing to do when upgrading. This is the first release that was rolled out by the automatic deployment.

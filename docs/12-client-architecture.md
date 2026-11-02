@@ -216,7 +216,7 @@ limits ("Push-to-talk only works while Tin Can is focused in the browser").
 - Global error boundary per module slot, so a crashing voice panel doesn't take down text.
 - REST errors mapped by `error.code` to localised messages; unknown errors show a generic message with a copyable request ID.
 - Offline state: banner, send queue disabled with clear explanation, auto-recover.
-- Version skew: on `CLIENT_TOO_OLD` show an upgrade screen (desktop: trigger update; web: refresh); on server newer-but-compatible, continue silently.
+- Version skew: on `CLIENT_TOO_OLD` show an upgrade screen (desktop: trigger update; web: refresh); on server newer-but-compatible, the page keeps working and shows a **"new version" banner with a Reload button** (checked when the gateway reconnects and when the tab becomes visible, at most once a minute). A lazy chunk that no longer exists after a deploy (`vite:preloadError`, failed dynamic import) reloads the page once automatically (guarded against loops), but never during a call: there only the banner appears. Drafts live in local storage and survive the reload.
 - Crash/diagnostics: local log ring buffer exportable from Advanced settings; no remote telemetry by default.
 
 ## 12. Accessibility & localisation

@@ -81,6 +81,12 @@ To **update the script itself**, download it again (the command in step 1). The 
 
 To **stop automatic deploys**, disable the Deploy workflow, or remove the line from `~/.ssh/authorized_keys`.
 
+## What members notice
+
+- The connection drops for a short time while the app restarts (the status in the corner shows "Reconnecting"); the page reconnects by itself. A call in progress is not ended by the restart of the app; people rejoin the gateway.
+- A tab that stayed open across the deploy keeps the old page in memory. When it reconnects, or when the person comes back to the tab, it compares its version with the server's. If they differ, a **banner with a Reload button** appears at the top; it takes no focus, and Dismiss hides it until the next check.
+- If the old page needs a file that the new release no longer has (opening settings, for example), the page reloads itself once. It does not do that during a call: there the banner says that reloading will leave the call. An unsent message in the box is kept.
+
 ## 4. What a rollback does
 
 The new version is judged by three things: the container becomes healthy, `/api/v1/capabilities` reports the new version, and `tincan doctor` shows no failed check that was fine before the deploy (warnings are fine). If any fails:

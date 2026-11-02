@@ -103,6 +103,12 @@ export function Composer({
     const id = setTimeout(() => saveDraft(channel.id, text), 300);
     return () => clearTimeout(id);
   }, [text, channel.id]);
+  // A reload (also the automatic one after a server update) must not lose the last 300 ms of typing.
+  useEffect(() => {
+    const flush = () => saveDraft(channel.id, text);
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [text, channel.id]);
 
   // Replying focuses the box.
   useEffect(() => {
