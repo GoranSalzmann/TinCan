@@ -216,7 +216,7 @@ describe.skipIf(!hasSh)("deploy/deploy.sh", { timeout: 60_000 }, () => {
     const h = host();
     mkdirSync(join(h.dir, ".deploy.lock"));
     // a process that is alive as far as sh can tell (its pid is the shell's own, not the OS's)
-    const sleeper = spawn("sh", ["-c", "echo $; exec sleep 60"], { stdio: ["ignore", "pipe", "ignore"] });
+    const sleeper = spawn("sh", ["-c", "echo $$; exec sleep 60"], { stdio: ["ignore", "pipe", "ignore"] });
     const pid = await new Promise<string>((res) => sleeper.stdout.once("data", (d) => res(String(d).trim())));
     try {
       writeFileSync(join(h.dir, ".deploy.lock", "pid"), pid);

@@ -15,6 +15,7 @@ permissions:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]' || github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3.39.1
