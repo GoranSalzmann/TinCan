@@ -140,7 +140,15 @@ Each record: context, options, decision, consequences. Status is one of
 - Third-party notices file generated at build and bundled in desktop installers.
 - The Electron installers and Docker images carry the licence text and a source offer.
 
+## ADR-019: Watch Together channel type
+**Status:** Proposed (planning only, 2026-11-02; the owner decides, 22)
+**Context:** A channel type where a queue of videos plays in sync for everyone in it. Full record, evidence and scoring in 19.
+**Options:** Adopt an existing app (SyncTube), embed-only providers, HTML5-only own player, LiveKit screenshare only, hybrid.
+**Decision (recommended):** Own server-authoritative sync engine behind a `PlayerAdapter` interface; HTML5 adapter first (own files, allow-listed hosts); YouTube second, off by default and opt-in per server, channel and member, privacy-enhanced host; screenshare stays the fallback. The server never fetches a member-supplied URL and never relays provider media.
+**Consequences:** New module `watch`, channel kind `watch`, permission bits 27 to 30 (and `CHANNEL_SCOPED` becomes an explicit set), a shared `safe-fetch` package, CSP entries per enabled provider, no E2EE promise for the channel. What would change it: 19 §8.
+
 ## Open items
+- ADR-019 awaits the owner (22).
 - ~~ADR-005 Fastify vs Hono~~ Resolved: Fastify (18 T1).
 - ~~ADR-007 Kysely vs Drizzle~~ Resolved: Kysely (18 T2).
 - ~~ADR-014 cert sharing between Caddy and LiveKit~~ Resolved: shared certificate, deferred reload (18 T30; confirm in D6).

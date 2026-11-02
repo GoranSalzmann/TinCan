@@ -110,6 +110,11 @@ Likelihood (L) and impact (I): H/M/L.
 | K-35 | Desktop renderer (`app://`, bearer token) cannot load `/files/*` through `<img>`: no header, and no cookie cross-site. Avatars (R-006) and inline images return 401 in the primary client | H | M | T31 |
 | K-36 | Pre-migration backup is a plain file copy (06 §8, 14 §7); after an unclean stop it misses committed transactions still in the WAL, so an upgrade rollback loses recent data | L | M | T28 |
 | K-37 | A search cannot be cancelled once running: better-sqlite3 has no `interrupt()` or progress handler. A query shape that escapes the bounds in 05 §3.1 holds the DB worker for seconds (D5: 43 s for an UNINDEXED channel filter), queuing every other search behind it | L | M | Bounded query shapes (05 §3.1), search only on the DB worker, per-user search rate limit; add the worst shapes to the event-loop perf test (16) |
+| K-38 | Watch Together: Google's IFrame API script runs inside our origin when YouTube is on (19 §2, security review §3.3); isolating it in our own frame is reported as forbidden (unverified) | M | H | Opt-in at Host, channel and member level; load only after Join; minimal CSP; spike S7 reads the policy text; YouTube behind its own flag |
+| K-39 | Watch Together: YouTube terms may change or be enforced against synchronised control (the consent rule for remote play, pause and seek is unclear) | M | M | Per-provider flag; HTML5 adapter independent; optional API compliance audit (22 D4) |
+| K-40 | Watch Together: ads, region locks and discrete playback rates make YouTube sync poor | H | L | Spike S3; "best effort" label; HTML5 carries the sync promise |
+| K-41 | Watch Together: member uploads make the Host a host of copyrighted files | L | H | Uploads off by default and out of `@everyone`; not for open signup; audit and takedown procedure; counsel (22 D5, D6) |
+| K-42 | Watch Together: hardened outbound fetch (`safe-fetch`) is a new SSRF surface shared with link previews | L | H | Member input never a host; fixed provider hosts; the suite of security review §3.1; second reader or external review (22 D8) |
 
 ## D. Assumptions to validate early (spike list)
 
@@ -627,7 +632,32 @@ Owner decisions: deploy only when a release is made, no approval step, the serve
 
 Guide: [guides/deploy.md](guides/deploy.md).
 
+## S. Watch Together planning (2026-11-02)
+
+Planning only, no product code; a post-1.0 proposal (17 M8). Recommended decision and evidence: [19](19-watch-together-adr.md); design [20](20-watch-together-design.md); plan, spikes and tests [21](21-watch-together-plan.md); owner memo [22](22-watch-together-owner-memo.md); security [security/watch-together-review.md](security/watch-together-review.md); checklist [qa/watch-together.md](qa/watch-together.md).
+
+| Ref | Item | State |
+|---|---|---|
+| Q-W1 | Approach: hybrid (own engine, HTML5 first, YouTube opt-in, screenshare fallback) | **Proposed**, awaiting the owner (22 D1) |
+| Q-W2 | Providers to support | Proposed: HTML5, YouTube; PeerTube later (22 D2) |
+| Q-W3 | Privacy defaults (everything off, three opt-in levels, no thumbnails) | Proposed (22 D3) |
+| Q-W4 | YouTube compliance stance and API audit | Needs the owner (22 D4) |
+| Q-W5 | Legal reading for the Host | Needs the owner and counsel (22 D5) |
+| Q-W6 | Member uploads in scope | Proposed: optional slice, off by default (22 D6) |
+| Q-W7 | Direct URLs on any host | Proposed: no (22 D7) |
+| Q-W8 | Review budget for `safe-fetch` | Needs the owner (22 D8) |
+| T35 | `CHANNEL_SCOPED` is the contiguous mask of bits 0 to 14, all taken; new channel-scoped bits (27 to 30) need it to become an explicit set | To do in W0 (20 §5.2) |
+| T36 | Referrer-Policy `no-referrer` (15 §5) conflicts with YouTube's Referer requirement (error 153); proposed fix is a per-iframe `referrerpolicy`, unverified that the API honours it | Spike S3 |
+| T37 | Generated Caddy CSP needs per-provider entries and a way to regenerate it from config (`tincan config apply`); doctor must compare header and config | W0, W2 |
+| T38 | The file route has no `Range` support (chunked, no `Content-Length`, 07 M2 note); needed for uploaded video | Spike S6, W3 |
+| T39 | `UploadsApi` needs claim/release so a queued file is not collected as an orphan | W3 |
+| T40 | YouTube-derived text may only be kept 30 days (unverified summary of III.E.4) | Spike S7, retention job in W2 |
+| T41 | `text-chat` accepts only `text` channels; chat beside the video uses a linked text channel | Proposed (22 D10) |
+
+Spikes S1 to S8 are in 21 §3. Facts that could not be verified are listed in 19 §9 and 22.
+
 ## Open items
 
+- Watch Together decisions (22) and spikes (21 §3).
 - Decisions and steps in the release checklist.
 - P-F5.

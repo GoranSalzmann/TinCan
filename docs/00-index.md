@@ -41,6 +41,10 @@ The docs go top-down. Each level assumes the one above it.
 | 16 | Testing & CI | Written |
 | 17 | Roadmap & milestones | Written |
 | 18 | Open questions & risks (living) | Written; updated each batch |
+| 19 | Watch Together: embed or build (ADR-019) | **Proposed** (planning only, 2026-11-02) |
+| 20 | Watch Together: feature design | Proposed |
+| 21 | Watch Together: milestone plan, spikes, test plan (M8) | Proposed |
+| 22 | Watch Together: decision memo for the owner | Awaiting the owner |
 | design/ | UI design: wireframes and style guide ([README](design/README.md)) | Approved 2026-10-28 (18 T23) |
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:
@@ -102,6 +106,7 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 | D9 | One instance = one community (schema allows more) | Settled |
 | D11 | Name "Tin Can"; licence AGPL-3.0 | Settled |
 | D10 | Neural denoiser (DeepFilterNet) in client | Proposed |
+| D12 | Watch Together channel type: own sync engine, HTML5 adapter first, YouTube opt-in second (ADR-019, 19) | Proposed (post-1.0, M8) |
 
 "Proposed" means I made the call from our discussion and you should challenge it.
 "Needs your call" means I could not infer your preference. See 18.
@@ -120,3 +125,4 @@ Full reasoning lives in 03. One-line summary here so it is visible.
 - [security/public-readiness.md](security/public-readiness.md): what is in the git history before the repository goes public
 - [security/m5-review.md](security/m5-review.md): the S-01 to S-16 checklist with evidence, and residual risks
 - Demo checklists: [qa/m1.md](qa/m1.md) to [qa/m5.md](qa/m5.md)
+- Post-1.0 proposal, **Watch Together** (planning only): [19](19-watch-together-adr.md) decision, [20](20-watch-together-design.md) design, [21](21-watch-together-plan.md) plan, [22](22-watch-together-owner-memo.md) owner memo, [security/watch-together-review.md](security/watch-together-review.md), [qa/watch-together.md](qa/watch-together.md)
