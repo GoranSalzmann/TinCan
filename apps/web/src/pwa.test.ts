@@ -82,6 +82,7 @@ describe("service worker", () => {
       "/api/v1/channels",
       "/gateway",
       "/files/abc/x.png",
+      "/api/v1/link-previews/image/abc",
       "/avatars/a.webp",
       "/livekit/rtc",
     ]) {

@@ -26,6 +26,11 @@ export const AttachmentSchema = z.object({
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
   hasThumbnail: z.boolean(),
+  /** An animated GIF, WebP or APNG: the web client may show the original instead of the still thumbnail (23 §3). */
+  animated: z.boolean(),
+  /** The first lines of a text file, as plain text to be shown escaped; null for anything else (23 §7). */
+  excerpt: z.string().nullable(),
+  excerptTruncated: z.boolean(),
   /** Deleted by its uploader (design U16): the message shows "File removed". */
   removed: z.boolean(),
 });

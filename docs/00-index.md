@@ -45,6 +45,7 @@ The docs go top-down. Each level assumes the one above it.
 | 20 | Watch Together: feature design | Proposed |
 | 21 | Watch Together: milestone plan, spikes, test plan (M8) | Proposed |
 | 22 | Watch Together: decision memo for the owner | Awaiting the owner |
+| 23 | Media and link previews (attachments, link cards) | Written; built 2026-11-02 |
 | design/ | UI design: wireframes and style guide ([README](design/README.md)) | Approved 2026-10-28 (18 T23) |
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:

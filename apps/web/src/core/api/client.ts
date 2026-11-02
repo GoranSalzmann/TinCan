@@ -14,6 +14,8 @@ import {
   type Invite,
   type InviteCreate,
   type LoginResponse,
+  type LinkPreview,
+  type LinkPreviewSettings,
   type UploadLimits,
   type VideoLimits,
   type Member,
@@ -172,6 +174,13 @@ export const api = {
   uploadLimits: () => request<UploadLimits>("GET", "/admin/uploads"),
   setUploadLimits: (body: { maxBytes?: number; userQuotaBytes?: number }) =>
     request<UploadLimits>("PATCH", "/admin/uploads", { body }),
+  linkPreviewSettings: () => request<LinkPreviewSettings>("GET", "/admin/link-previews"),
+  setLinkPreviewSettings: (body: Partial<LinkPreviewSettings>) =>
+    request<LinkPreviewSettings>("PATCH", "/admin/link-previews", { body }),
+  linkPreviews: (messageId: string) =>
+    request<{ previews: LinkPreview[] }>("GET", `/link-previews/messages/${encodeURIComponent(messageId)}`),
+  removeLinkPreviews: (messageId: string) =>
+    request<void>("DELETE", `/link-previews/messages/${encodeURIComponent(messageId)}`),
   sessions: () => request<SessionInfo[]>("GET", "/auth/sessions"),
   revokeSession: (id: string) => request<void>("DELETE", `/auth/sessions/${encodeURIComponent(id)}`),
   changePassword: (currentPassword: string, newPassword: string) =>
@@ -323,4 +332,5 @@ export function uploadFile(
 /** URL of a stored file; the session cookie authorises the request (07 §3.7). */
 export const fileUrl = (id: string, filename: string, thumb = false): string =>
   `${API_PREFIX}/files/${encodeURIComponent(id)}/${encodeURIComponent(filename || "file")}${thumb ? "?thumb=1" : ""}`;
+export const linkPreviewImageUrl = (hash: string): string => `${API_PREFIX}/link-previews/image/${hash}`;
 export const avatarUrl = (key: string): string => `${API_PREFIX}/avatars/${encodeURIComponent(key)}`;

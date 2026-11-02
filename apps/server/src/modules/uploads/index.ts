@@ -21,6 +21,8 @@ import type { AccountsApi } from "../accounts/api.js";
 import type { RolesApi } from "../roles/api.js";
 import type { UploadsApi } from "./api.js";
 import { INLINE_IMAGE_TYPES } from "./images.js";
+import { INLINE_MEDIA_TYPES } from "./media.js";
+import { parseRange } from "./range.js";
 import { uploadsMigrations, type UploadsTables } from "./schema.js";
 import { AVATAR_MAX_BYTES, MAX_FILE_BYTES_CEILING, UploadsService } from "./service.js";
 
@@ -182,13 +184,23 @@ export default defineModule({
     async function send(
       reply: FastifyReply,
       key: string,
-      opts: { disposition: string; immutable: boolean },
+      opts: { disposition: string; immutable: boolean; range?: { start: number; end: number; size: number } },
     ): Promise<FastifyReply> {
       try {
-        const { stream, meta } = await storage.get(key);
+        const { stream, meta } = await storage.get(
+          key,
+          opts.range ? { range: { start: opts.range.start, end: opts.range.end } } : {},
+        );
+        if (opts.range)
+          reply
+            .status(206)
+            .header("Content-Range", `bytes ${opts.range.start}-${opts.range.end}/${opts.range.size}`)
+            .header("Content-Length", meta.size);
         return (
           reply
             .header("Content-Type", meta.contentType)
+            // Seeking in audio and video, and Safari's willingness to play them at all, depend on this (23 §4).
+            .header("Accept-Ranges", "bytes")
             .header("Content-Disposition", opts.disposition)
             // Even if a type slipped through, nothing here can script the app's origin (18 T20).
             .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
@@ -221,10 +233,19 @@ export default defineModule({
             immutable: true,
           });
         }
-        const inline = INLINE_IMAGE_TYPES.has(row.content_type);
+        const inline = INLINE_IMAGE_TYPES.has(row.content_type) || INLINE_MEDIA_TYPES.has(row.content_type);
+        const range = parseRange(req.headers.range, row.size);
+        if (range === "unsatisfiable") {
+          return reply
+            .status(416)
+            .header("Content-Range", `bytes */${row.size}`)
+            .header("Accept-Ranges", "bytes")
+            .send();
+        }
         return send(reply, row.storage_key, {
           disposition: disposition(inline ? "inline" : "attachment", row.filename),
           immutable: true,
+          ...(range ? { range: { ...range, size: row.size } } : {}),
         });
       },
     );

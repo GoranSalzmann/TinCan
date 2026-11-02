@@ -5,6 +5,7 @@ import channels from "./channels/index.js";
 import core from "./core/index.js";
 import search from "./search/index.js";
 import uploads from "./uploads/index.js";
+import linkPreviews from "./link-previews/index.js";
 import invites from "./invites/index.js";
 import readState from "./read-state/index.js";
 import roles from "./roles/index.js";
@@ -26,6 +27,7 @@ export const ALL_MODULES: readonly AnyManifest[] = [
   readState,
   invites,
   uploads,
+  linkPreviews,
   search,
   voice,
   moderation,
