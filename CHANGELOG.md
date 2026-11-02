@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-02
+
+Nothing to do when upgrading. Open windows (also the installed app) now notice an update reliably; windows that run 1.0.3 or older need one reload to get this.
+
 ### Fixed
 
 - **The "new version" banner now shows up more reliably in a window that stays open:** a check that hung on a dead connection could swallow the check made when the connection returned, a check made while the server was still starting was never repeated, and a window that stays in the foreground (an installed app) never looked again. Checks now time out after 10 seconds, are retried a few times, are also made when the window is focused, when the network returns and once a minute while the tab is shown (one small request, paused while the tab is hidden, and stopped once the banner is showing).
@@ -81,7 +85,8 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.0...v1.0.1
