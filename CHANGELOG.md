@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-02
+
+Nothing to do when upgrading. Layout fixes and resizable side panels; a window that was open during the update should show the new-version banner within about a minute.
+
 ### Added
 
 - **The channel list and the member list can be resized:** drag the edge between a panel and the page, or focus the edge and use the arrow keys (Home and End for the smallest and largest, Enter or a double click for the default). The width is remembered in your browser. On a phone the channel list stays a drawer of fixed width.
@@ -97,7 +101,8 @@ First release (1.0.0). There was no public beta. Everything below was built befo
 - One server per community, SQLite only, no desktop or native mobile app, no two-factor login, no email.
 - The host can read text, files and, through the key derivation, voice.
 
-[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/GoranSalzmann/TinCan/compare/v1.0.1...v1.0.2
