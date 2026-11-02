@@ -96,7 +96,7 @@ function ChannelRow({
           onClick={() => void joinVoice(channel.id).catch(toastError)}
           aria-label={t("channel.voice.join", { name: channel.name })}
           className={({ isActive }) =>
-            `flex min-h-8 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""}`
+            `flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""}`
           }
         >
           {label}
@@ -105,7 +105,7 @@ function ChannelRow({
         <NavLink
           to={`/channels/${channel.id}`}
           className={({ isActive }) =>
-            `flex min-h-8 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""} ${muted ? "text-text-muted" : ""}`
+            `flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""} ${muted ? "text-text-muted" : ""}`
           }
           aria-label={
             mentions > 0
@@ -132,7 +132,7 @@ function ChannelRow({
       <Menu.Root>
         <Menu.Trigger
           aria-label={t("channel.menu", { name: channel.name })}
-          className="absolute end-1 rounded-md p-1 opacity-0 hover:bg-bg-hover focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+          className="absolute end-1 top-1 rounded-md p-1 opacity-0 hover:bg-bg-hover focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
         >
           <MoreHorizontal aria-hidden="true" size={16} />
         </Menu.Trigger>
