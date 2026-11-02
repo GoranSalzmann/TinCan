@@ -72,7 +72,7 @@ catalogue, and the security process.
 | Malicious files | Size limits; content-type sniffing; serve with `nosniff`; non-image types as attachments; user content from a separate origin or with `Content-Security-Policy: sandbox`; optional AV hook (ClamAV) later |
 | SVG scripts | SVG treated as downloadable attachment or rasterised, never inline-rendered from untrusted source |
 | Image parser exploits | Thumbnailing in a worker with `sharp`/libvips and pixel limits; keep dependencies patched |
-| SSRF via link previews | Off by default; fetcher blocks private/loopback/link-local ranges and metadata IPs, DNS-rebinding safe (resolve once, connect to IP), redirect limits, size/time limits, no cookies |
+| SSRF via link previews | Off by default; fetcher blocks private/loopback/link-local ranges and metadata IPs, DNS-rebinding safe (resolve once, connect to IP), redirect limits, size/time limits, no cookies. **Built:** [23 §8](23-media-previews.md), reviewed in [security/media-previews-review.md](security/media-previews-review.md) |
 | Phishing links | Link confirmation for lookalike/IDN domains; no auto-opening; show real host |
 | Path traversal | Storage keys are generated IDs, not user filenames; filename sanitised for `Content-Disposition` only |
 

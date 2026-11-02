@@ -32,9 +32,16 @@ export function sniffMedia(buf: Buffer, filename?: string): string | null {
   if (buf.length >= 12 && ascii(buf, 0, 4) === "RIFF" && ascii(buf, 8, 12) === "WAVE") return "audio/wav";
   if (buf.length >= 4 && ascii(buf, 0, 4) === "fLaC") return "audio/flac";
   if (buf.length >= 3 && ascii(buf, 0, 3) === "ID3") return "audio/mpeg";
-  // MPEG audio frame sync (11 set bits) with a valid layer, or ADTS AAC (also FFFx).
-  if (buf.length >= 2 && buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0 && (buf[1]! & 0x06) !== 0)
-    return "audio/mpeg";
+  // MPEG audio frame: 11 sync bits, a real version, Layer II or III (Layer I is rare and its header is what a UTF-16
+  // byte-order mark looks like), and a usable bitrate and sample rate.
+  if (buf.length >= 3 && buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0) {
+    const version = (buf[1]! >> 3) & 3;
+    const layer = (buf[1]! >> 1) & 3;
+    const bitrate = buf[2]! >> 4;
+    const rate = (buf[2]! >> 2) & 3;
+    if (version !== 1 && (layer === 1 || layer === 2) && bitrate !== 0 && bitrate !== 15 && rate !== 3)
+      return "audio/mpeg";
+  }
   return null;
 }
 

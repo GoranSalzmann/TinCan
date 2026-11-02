@@ -110,7 +110,7 @@ function AnimatedImage({ a }: { a: Attachment }) {
           className="elev-2 absolute start-2 bottom-2 flex min-h-8 items-center gap-1 rounded-md bg-bg-sidebar px-2 text-xs font-semibold text-text"
         >
           <Icon aria-hidden="true" size={14} />
-          {t("file.gif.label")}
+          {a.contentType.slice(6).toUpperCase()}
           {playing ? null : <span className="font-normal text-text-muted">{formatSize(a.size)}</span>}
         </button>
       </div>

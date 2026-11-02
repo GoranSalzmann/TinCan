@@ -235,7 +235,6 @@
   "file.kind.other": "File",
   "file.gif.play": "Play animation: {name}",
   "file.gif.pause": "Pause animation: {name}",
-  "file.gif.label": "GIF",
   "file.video.unsupported": "Your browser can't play this video. You can download it instead.",
   "file.video.download": "Download video",
   "file.video.fallback": "Your browser can't show this video.",

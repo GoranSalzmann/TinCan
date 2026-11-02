@@ -41,6 +41,7 @@ The docs go top-down. Each level assumes the one above it.
 | 16 | Testing & CI | Written |
 | 17 | Roadmap & milestones | Written |
 | 18 | Open questions & risks (living) | Written; updated each batch |
+| 23 | Media and link previews (attachments, link cards) | Written; built 2026-11-02 |
 | design/ | UI design: wireframes and style guide ([README](design/README.md)) | Approved 2026-10-28 (18 T23) |
 
 All documents are now drafted. Remaining work before sign-off is **review**, not writing:

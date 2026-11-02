@@ -627,6 +627,35 @@ Owner decisions: deploy only when a release is made, no approval step, the serve
 
 Guide: [guides/deploy.md](guides/deploy.md).
 
+## S. Media and link previews (2026-11-02)
+
+Design in [23](23-media-previews.md); checks in [qa/media-previews.md](qa/media-previews.md); review in [security/media-previews-review.md](security/media-previews-review.md).
+
+### Built
+
+- S-1 Animated GIF/WebP/APNG play in place (click to play above 8 MiB, still frame under reduced motion); videos and audio have native players, `Range` requests work on the file endpoint, one player at a time; file-type icons with a visible type word; the first lines of text files as escaped text; link previews in a new `link-previews` module behind an SSRF-safe fetcher.
+- S-2 Audio and video are recognised by container header; a media label on other bytes is stored as a download.
+
+### Calls I made that you may want to change
+
+- S-3 **Link previews are off by default** (the owner switches them on in Server settings). Reason: 15 §4.3 and R-019 say so, every preview makes this server contact a site a member chose, and a friends' server can decide once. Recommendation stays "off until you want them".
+- S-4 No server-made video posters: it needs `ffmpeg` (a heavy native dependency in the image). The browser's first frame is used (`#t=0.1`). Say if you want `ffmpeg` added.
+- S-5 Text excerpts are made at upload time and stored with the attachment (600 characters / 8 lines), not read by each viewer.
+- S-6 The 8 MiB animation threshold and the 1 GiB inline video limit are constants in the web client, not owner settings.
+- S-7 X/Twitter previews use `publish.twitter.com/oembed` without a key; X can change that at any time, and then the message just has no card.
+- S-8 Preview data is fetched when a member views a message, not when it is posted, so a link nobody opens is never fetched; the cost is the first viewer waits a moment.
+
+### Not done or not verified
+
+- AVIF is not accepted as an inline image. Previews are not pushed live: a removal shows for other members after a reload.
+- Real YouTube/X/Vimeo fetches, Safari/Firefox codecs, a phone, and Caddy's `Range` handling are unchecked (qa rows marked "you").
+- Follow-up: the audit-log `action` filter cannot match actions containing `_` (escape without an `ESCAPE` clause); the storage port's temporary file name (`pid` + millisecond) can collide for two writers of one key (worked around for previews).
+
+### What I need from you
+
+- Whether to switch link previews on for mkarl.io, and with which allow list.
+- Whether you want `ffmpeg` for video posters and durations.
+
 ## Open items
 
 - Decisions and steps in the release checklist.

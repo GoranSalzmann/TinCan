@@ -403,9 +403,22 @@ export class LinkPreviewService implements LinkPreviewApi {
       .toBuffer({ resolveWithObject: true });
     const hash = sha256(data);
     const key = `lp/${hash}`;
-    if (!(await this.#d.storage.exists(key)))
-      await this.#d.storage.put(key, Readable.from([data]), { contentType: "image/webp" });
+    await this.#store(key, data);
     return { hash, width: info.width, height: info.height };
+  }
+
+  /** Two links can carry the same picture; their writes of one key must not run at once (they share a temporary file). */
+  readonly #writing = new Map<string, Promise<void>>();
+
+  #store(key: string, data: Buffer): Promise<void> {
+    const running = this.#writing.get(key);
+    if (running) return running;
+    const job = (async () => {
+      if (!(await this.#d.storage.exists(key)))
+        await this.#d.storage.put(key, Readable.from([data]), { contentType: "image/webp" });
+    })().finally(() => this.#writing.delete(key));
+    this.#writing.set(key, job);
+    return job;
   }
 
   // ---- housekeeping --------------------------------------------------------------------------

@@ -24,6 +24,9 @@ describe("sniffMedia", () => {
     expect(sniffMedia(Buffer.from("<html><script>alert(1)</script>"))).toBeNull();
     expect(sniffMedia(Buffer.from("hello world, this is text"))).toBeNull();
     expect(sniffMedia(Buffer.alloc(0))).toBeNull();
+    // UTF-16 text starts with a byte-order mark that looks like an MPEG Layer I frame header.
+    expect(sniffMedia(Buffer.from([0xff, 0xfe, 0x57, 0x00, 0x69, 0x00]))).toBeNull();
+    expect(sniffMedia(Buffer.from([0xfe, 0xff, 0x00, 0x57]))).toBeNull();
   });
 });
 

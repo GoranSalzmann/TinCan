@@ -544,6 +544,18 @@ describe("link previews in a running server", () => {
     expect((await call(bo.token).get("/link-previews/image/..%2f..%2fetc")).status).toBe(400);
   });
 
+  it("keeps both cards when two links at once carry the same picture", async () => {
+    await enable();
+    const a = await say(ann.token, link("/article-one"));
+    const b = await say(ann.token, link("/article-two"));
+    const [ra, rb] = await Promise.all([
+      call(bo.token).get(`/link-previews/messages/${a}`),
+      call(cy.token).get(`/link-previews/messages/${b}`),
+    ]);
+    expect(ra.body.previews[0].image).toMatch(/^[0-9a-f]{64}$/);
+    expect(rb.body.previews[0].image).toBe(ra.body.previews[0].image);
+  });
+
   it("caches, including the answer 'nothing here', and shares the answer between members", async () => {
     await enable();
     const id = await say(ann.token, link("/article"));
