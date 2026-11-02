@@ -22,6 +22,23 @@ export function extractPreviewUrls(content: string): string[] {
   return out;
 }
 
+/**
+ * The sites previews are made for unless the owner changes the list. Each entry covers the domain and its
+ * subdomains and nothing else (`youtube.com` covers `m.youtube.com`, not `notyoutube.com`).
+ */
+export const LINK_PREVIEW_DEFAULT_ALLOW: readonly string[] = [
+  "youtube.com",
+  "youtu.be",
+  "youtube-nocookie.com",
+  "vimeo.com",
+  "soundcloud.com",
+  "spotify.com",
+  "bsky.app",
+  "x.com",
+  "twitter.com",
+  "github.com",
+];
+
 export const LinkPreviewSchema = z.object({
   /** The link as written in the message. */
   url: z.string(),
@@ -47,6 +64,12 @@ const Domain = z
 
 export const LinkPreviewSettingsSchema = z.object({
   enabled: z.boolean(),
+  /**
+   * Off by default. When on, the allow list is ignored and every public site is fetched. It is the only way to
+   * switch the allow list off: an empty list allows nothing.
+   */
+  allowAll: z.boolean(),
+  /** The only sites fetched (with their subdomains) while `allowAll` is off. */
   allowDomains: z.array(Domain).max(200),
   denyDomains: z.array(Domain).max(200),
 });

@@ -68,3 +68,19 @@ export function domainMatches(host: string, domain: string): boolean {
   const h = host.toLowerCase().replace(/\.$/, "");
   return h === domain || h.endsWith(`.${domain}`);
 }
+
+/**
+ * Hosts that serve the pictures of the default sites. A preview image is fetched only from an allowed site or one of
+ * these (and never from a denied one), so a YouTube card can get its thumbnail without the owner listing `ytimg.com`.
+ */
+export const IMAGE_HOSTS: readonly string[] = [
+  "ytimg.com",
+  "ggpht.com",
+  "vimeocdn.com",
+  "sndcdn.com",
+  "scdn.co",
+  "twimg.com",
+  "bsky.app",
+  "githubassets.com",
+  "githubusercontent.com",
+];

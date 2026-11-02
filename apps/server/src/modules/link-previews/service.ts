@@ -4,7 +4,13 @@ import { Readable } from "node:stream";
 import sharp from "sharp";
 import type { Db } from "@tincan/db";
 import type { Kv } from "@tincan/pubsub";
-import { AppError, extractPreviewUrls, type LinkPreview, type LinkPreviewSettings } from "@tincan/shared";
+import {
+  AppError,
+  extractPreviewUrls,
+  LINK_PREVIEW_DEFAULT_ALLOW,
+  type LinkPreview,
+  type LinkPreviewSettings,
+} from "@tincan/shared";
 import type { Storage } from "@tincan/storage";
 import type { EventBus } from "../../framework/events.js";
 import type { Logger } from "../../framework/types.js";
@@ -25,7 +31,7 @@ import {
   TITLE_MAX,
   type Unfurled,
 } from "./parse.js";
-import { domainMatches, providerFor, type OembedProvider } from "./providers.js";
+import { domainMatches, IMAGE_HOSTS, providerFor, type OembedProvider } from "./providers.js";
 import type { LinkPreviewTables } from "./schema.js";
 
 /** Limits of the fetcher (23 §8.3). */
@@ -67,7 +73,12 @@ const IMAGE: FetchLimits = {
   types: ["image/png", "image/jpeg", "image/gif", "image/webp"],
 };
 
-export const DEFAULT_SETTINGS: LinkPreviewSettings = { enabled: false, allowDomains: [], denyDomains: [] };
+export const DEFAULT_SETTINGS: LinkPreviewSettings = {
+  enabled: false,
+  allowAll: false,
+  allowDomains: [...LINK_PREVIEW_DEFAULT_ALLOW],
+  denyDomains: [],
+};
 
 export interface LinkPreviewsDeps {
   db: Db<LinkPreviewTables>;
@@ -126,7 +137,11 @@ export class LinkPreviewService implements LinkPreviewApi {
       const v = JSON.parse(row.value) as Partial<LinkPreviewSettings>;
       this.#settings = {
         enabled: v.enabled === true,
-        allowDomains: Array.isArray(v.allowDomains) ? v.allowDomains.map(String) : [],
+        allowAll: v.allowAll === true,
+        // A stored value without a list gets the default, never "everything".
+        allowDomains: Array.isArray(v.allowDomains)
+          ? v.allowDomains.map(String)
+          : [...LINK_PREVIEW_DEFAULT_ALLOW],
         denyDomains: Array.isArray(v.denyDomains) ? v.denyDomains.map(String) : [],
       };
     } catch {
@@ -146,7 +161,12 @@ export class LinkPreviewService implements LinkPreviewApi {
     this.#d.events.emit("audit.record", {
       actorId,
       action: "linkpreviews.settings",
-      data: { enabled: next.enabled, allow: next.allowDomains.length, deny: next.denyDomains.length },
+      data: {
+        enabled: next.enabled,
+        allowAll: next.allowAll,
+        allow: next.allowDomains.length,
+        deny: next.denyDomains.length,
+      },
     });
     return this.settings();
   }
@@ -154,15 +174,27 @@ export class LinkPreviewService implements LinkPreviewApi {
   /** The owner's policy for one address: previews on, not denied, and on the allow list when there is one. */
   allowed(url: string): boolean {
     if (!this.#settings.enabled) return false;
+    return this.#siteAllowed(url, false);
+  }
+
+  /**
+   * The owner's rule for one address. The deny list always wins. With `allowAll` off only listed sites pass (an empty
+   * list passes nothing); `images` also lets the built-in picture hosts through.
+   */
+  #siteAllowed(url: string | URL, images: boolean): boolean {
     let host: string;
     try {
-      host = new URL(url).hostname;
+      host = (typeof url === "string" ? new URL(url) : url).hostname;
     } catch {
       return false;
     }
-    const { allowDomains, denyDomains } = this.#settings;
+    const { allowAll, allowDomains, denyDomains } = this.#settings;
     if (denyDomains.some((d) => domainMatches(host, d))) return false;
-    return allowDomains.length === 0 || allowDomains.some((d) => domainMatches(host, d));
+    if (allowAll) return true;
+    return (
+      allowDomains.some((d) => domainMatches(host, d)) ||
+      (images && IMAGE_HOSTS.some((d) => domainMatches(host, d)))
+    );
   }
 
   // ---- per message ---------------------------------------------------------------------------
@@ -343,9 +375,7 @@ export class LinkPreviewService implements LinkPreviewApi {
 
   /** The page's own tags, then an oEmbed address the page advertises when it has no usable tags. */
   async #page(url: string): Promise<Unfurled | null> {
-    const res = await this.#get(url, HTML);
-    // The owner's deny list also applies to where the link ended up.
-    if (!this.allowed(res.finalUrl)) return null;
+    const res = await this.#get(url, { ...HTML, allowHop: (u) => this.#siteAllowed(u, false) });
     const head = parseHead(decodeBody(res.body, res.charset));
     const meta = fromMeta(head, res.finalUrl);
     if (!meta.title && !meta.imageUrl && head.oembedHref) {
@@ -367,7 +397,13 @@ export class LinkPreviewService implements LinkPreviewApi {
     pageUrl: string,
     provider: OembedProvider | null,
   ): Promise<Unfurled | null> {
-    const res = await this.#get(endpoint, JSON_LIMITS);
+    // A built-in provider's endpoint host is fixed in code and needs no entry in the list; every hop must stay on
+    // that host (or on an allowed site). A discovered address must pass the owner's rule on every hop.
+    const fixed = provider ? new URL(endpoint).hostname : null;
+    const res = await this.#get(endpoint, {
+      ...JSON_LIMITS,
+      allowHop: (u) => u.hostname === fixed || this.#siteAllowed(u, false),
+    });
     let j: unknown;
     try {
       j = JSON.parse(res.body.toString("utf8"));
@@ -395,7 +431,7 @@ export class LinkPreviewService implements LinkPreviewApi {
 
   /** Fetches an image through the same checks and keeps only a small re-encoded copy on this server. */
   async #image(url: string): Promise<{ hash: string; width: number; height: number } | null> {
-    const res = await this.#get(url, IMAGE);
+    const res = await this.#get(url, { ...IMAGE, allowHop: (u) => this.#siteAllowed(u, true) });
     const { data, info } = await sharp(res.body, { limitInputPixels: 24_000_000, failOn: "error" })
       .rotate()
       .resize(IMAGE_FIT_PX, IMAGE_FIT_PX, { fit: "inside", withoutEnlargement: true })

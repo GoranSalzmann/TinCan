@@ -2,7 +2,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import sharp from "sharp";
-import { extractPreviewUrls } from "@tincan/shared";
+import { extractPreviewUrls, LINK_PREVIEW_DEFAULT_ALLOW } from "@tincan/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { startTestServer, type TestServer, type TestUser } from "../../testing/harness.js";
 import type { LinkPreviewApi } from "./api.js";
@@ -156,6 +156,47 @@ describe("providers and policy", () => {
     expect(x.endpoint(new URL("https://x.com/a/status/1"))).toContain(
       encodeURIComponent("https://twitter.com/a/status/1"),
     );
+  });
+  it("matches the default list and its subdomains, and no look-alikes", () => {
+    const hit = (h: string) => {
+      try {
+        const host = new URL(`https://${h}/`).hostname;
+        return LINK_PREVIEW_DEFAULT_ALLOW.some((d) => domainMatches(host, d));
+      } catch {
+        return false; // not a valid address at all: nothing is fetched
+      }
+    };
+    for (const h of [
+      "youtube.com",
+      "www.youtube.com",
+      "m.youtube.com",
+      "youtu.be",
+      "open.spotify.com",
+      "GITHUB.COM",
+      "gist.github.com",
+      "x.com",
+      "mobile.twitter.com",
+      "youtube.com.",
+      "embed.bsky.app",
+    ])
+      expect(hit(h), h).toBe(true);
+    for (const h of [
+      "notyoutube.com",
+      "youtube.com.evil.example",
+      "evil-youtube.com",
+      "youtubecom.evil",
+      "xx.com",
+      "fakex.com",
+      "github.com.evil.example",
+      "githubb.com",
+      "youtu.be.evil.example",
+      "yоutube.com", // Cyrillic o: becomes xn-- and matches nothing
+      "youtube.com․evil.example", // one-dot leader
+      "xn--youtube-1.com",
+      "youtube.com@evil.example", // user info: the host is evil.example
+      "127.0.0.1",
+    ])
+      expect(hit(h), h).toBe(false);
   });
   it("matches a domain and its subdomains only", () => {
     expect(domainMatches("example.com", "example.com")).toBe(true);
@@ -433,6 +474,13 @@ describe("link previews in a running server", () => {
       const path = req.url ?? "/";
       hits.set(path, (hits.get(path) ?? 0) + 1);
       const html = (body: string) => res.writeHead(200, { "content-type": "text/html" }).end(body);
+      if (path.startsWith("/to-elsewhere"))
+        return void res.writeHead(302, { location: `http://elsewhere.example:${port}/landing` }).end();
+      if (path === "/landing") return html('<head><meta property="og:title" content="Landed"></head>');
+      if (path === "/article-cdn")
+        return html(
+          `<head><meta property="og:title" content="Card"><meta property="og:image" content="http://cdn.other.example:${port}/pic.png"></head>`,
+        );
       if (path.startsWith("/article"))
         return html(`<head><title>Fallback</title><meta property="og:title" content="A &lt;b&gt;great&lt;/b&gt; article">
           <meta property="og:description" content="Short summary"><meta property="og:image" content="/pic.png"></head>`);
@@ -488,13 +536,15 @@ describe("link previews in a running server", () => {
     }
     return (await call(owner).get(`/audit-log?action=${action}`)).body.items;
   };
+  /** The local test site is not on the default list, so most tests switch the allow list off (`allowAll`). */
   const enable = (patch: object = {}) =>
-    call(owner).patch("/admin/link-previews", { enabled: true, ...patch });
+    call(owner).patch("/admin/link-previews", { enabled: true, allowAll: true, ...patch });
 
   it("is off by default and fetches nothing", async () => {
     expect((await call(owner).get("/admin/link-previews")).body).toEqual({
       enabled: false,
-      allowDomains: [],
+      allowAll: false,
+      allowDomains: [...LINK_PREVIEW_DEFAULT_ALLOW],
       denyDomains: [],
     });
     expect((await call(owner).get("/capabilities")).body.features["link-previews"]).toEqual({
@@ -595,11 +645,72 @@ describe("link previews in a running server", () => {
     await enable({ denyDomains: ["pages.test"] });
     const id = await say(ann.token, link("/article"));
     expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toEqual([]);
-    await enable({ denyDomains: [], allowDomains: ["other.example"] });
+    await enable({ denyDomains: [], allowAll: false, allowDomains: ["other.example"] });
     expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toEqual([]);
-    await enable({ allowDomains: ["pages.test"] });
+    await enable({ allowAll: false, allowDomains: ["pages.test"] });
     expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toHaveLength(1);
     expect(hits.get("/article")).toBe(1);
+  });
+
+  it("ships a default allow list, which turning previews on does not widen", async () => {
+    expect([...LINK_PREVIEW_DEFAULT_ALLOW]).toEqual([
+      "youtube.com",
+      "youtu.be",
+      "youtube-nocookie.com",
+      "vimeo.com",
+      "soundcloud.com",
+      "spotify.com",
+      "bsky.app",
+      "x.com",
+      "twitter.com",
+      "github.com",
+    ]);
+    // First enable: only `enabled` is sent; the list in force is the default and "all sites" stays off.
+    const r = await call(owner).patch("/admin/link-previews", { enabled: true });
+    expect(r.body).toEqual({
+      enabled: true,
+      allowAll: false,
+      allowDomains: [...LINK_PREVIEW_DEFAULT_ALLOW],
+      denyDomains: [],
+    });
+    // The local test site is not on the list, so nothing is fetched for it.
+    const id = await say(ann.token, link("/article"));
+    expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toEqual([]);
+    expect(hits.size).toBe(0);
+  });
+
+  it("restores the default list and allows nothing for an empty one", async () => {
+    await enable({ allowAll: false, allowDomains: ["pages.test"] });
+    const id = await say(ann.token, link("/article"));
+    expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toHaveLength(1);
+    // An empty list is not "everything".
+    await call(owner).patch("/admin/link-previews", { allowDomains: [] });
+    const other = await say(ann.token, link("/article-other"));
+    expect((await call(bo.token).get(`/link-previews/messages/${other}`)).body.previews).toEqual([]);
+    const back = await call(owner).patch("/admin/link-previews", {
+      allowDomains: [...LINK_PREVIEW_DEFAULT_ALLOW],
+    });
+    expect(back.body.allowDomains).toEqual([...LINK_PREVIEW_DEFAULT_ALLOW]);
+    expect(back.body.allowAll).toBe(false);
+  });
+
+  it("refuses a redirect hop to a site that is not allowed", async () => {
+    await enable({ allowAll: false, allowDomains: ["pages.test"] });
+    const id = await say(ann.token, link("/to-elsewhere"));
+    expect((await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews).toEqual([]);
+    expect(hits.get("/landing")).toBeUndefined();
+    await enable({ allowAll: false, allowDomains: ["pages.test", "elsewhere.example"] });
+    const ok = await say(ann.token, link("/to-elsewhere?x=2"));
+    expect((await call(bo.token).get(`/link-previews/messages/${ok}`)).body.previews).toHaveLength(1);
+  });
+
+  it("only fetches a picture from an allowed or built-in picture host", async () => {
+    await enable({ allowAll: false, allowDomains: ["pages.test"] });
+    const id = await say(ann.token, link("/article-cdn"));
+    const p = (await call(bo.token).get(`/link-previews/messages/${id}`)).body.previews[0];
+    expect(p.title).toBe("Card");
+    expect(p.image).toBeNull(); // cdn.other.example is neither listed nor a built-in picture host
+    expect(hits.get("/pic.png")).toBeUndefined();
   });
 
   it("limits fetches per person", async () => {

@@ -6,7 +6,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
-Nothing to do when upgrading. Link previews are **off** until the owner turns them on in Settings › Server › Link previews.
+Nothing to do when upgrading. Link previews are **off** until the owner turns them on in Settings › Server › Link previews, and then only for the sites on an allow list that is filled in with YouTube, Vimeo, SoundCloud, Spotify, Bluesky, X/Twitter and GitHub (change it, restore it, or choose "allow all sites" in the same place).
 
 ### Added
 
@@ -14,7 +14,7 @@ Nothing to do when upgrading. Link previews are **off** until the owner turns th
 - **Video and audio players:** uploaded videos (mp4, webm, mov) and audio (mp3, ogg, wav, m4a, flac) can be played in the message. Nothing starts by itself, starting one pauses the other, and a video your browser cannot play shows a download link instead. Seeking works because the file endpoint now answers `Range` requests.
 - **File type icons** for documents, spreadsheets, presentations, archives, code, text, 3D models and fonts, each with the type written next to the icon.
 - **Text previews:** the first lines of text files (txt, md, csv, json, log, html, source code …) show in the message, as plain text only. HTML is shown as source, never run.
-- **Link previews** (owner switch, off by default): a card with the title, description and picture of a link. The server fetches the page, never a member's browser, so sites do not see members' addresses. Private and internal addresses are refused, the owner can allow or deny sites, and the author or a moderator can remove a message's previews. Works for YouTube, Vimeo, SoundCloud, Spotify, Bluesky and most pages with Open Graph tags; X/Twitter posts show their text when X allows it without a key.
+- **Link previews** (owner switch, off by default): a card with the title, description and picture of a link. The server fetches the page, never a member's browser, so sites do not see members' addresses. Private and internal addresses are refused, the owner decides which sites get previews (allow list with a default, deny list, and an explicit "allow all sites" switch with a warning), and the author or a moderator can remove a message's previews. Works for YouTube, Vimeo, SoundCloud, Spotify, Bluesky and most pages with Open Graph tags; X/Twitter posts show their text when X allows it without a key.
 
 ### Fixed
 

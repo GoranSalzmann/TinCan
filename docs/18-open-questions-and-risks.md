@@ -643,6 +643,7 @@ Design in [23](23-media-previews.md); checks in [qa/media-previews.md](qa/media-
 - S-5 Text excerpts are made at upload time and stored with the attachment (600 characters / 8 lines), not read by each viewer.
 - S-6 The 8 MiB animation threshold and the 1 GiB inline video limit are constants in the web client, not owner settings.
 - S-7 X/Twitter previews use `publish.twitter.com/oembed` without a key; X can change that at any time, and then the message just has no card.
+- S-9 **Default allow list** (owner decision): `youtube.com, youtu.be, youtube-nocookie.com, vimeo.com, soundcloud.com, spotify.com, bsky.app, x.com, twitter.com, github.com`, subdomains included, shown and restorable in Server settings; "allow all sites" is a separate, warned switch; picture hosts of these sites are fetched without being listed (23 §8.5).
 - S-8 Preview data is fetched when a member views a message, not when it is posted, so a link nobody opens is never fetched; the cost is the first viewer waits a moment.
 
 ### Not done or not verified
@@ -653,7 +654,7 @@ Design in [23](23-media-previews.md); checks in [qa/media-previews.md](qa/media-
 
 ### What I need from you
 
-- Whether to switch link previews on for mkarl.io, and with which allow list.
+- Link previews on mkarl.io: answered by the owner (2026-11-02): off in code, switched on by the owner with the default allow list (S-9).
 - Whether you want `ffmpeg` for video posters and durations.
 
 ## Open items

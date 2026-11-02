@@ -43,6 +43,8 @@ export interface FetchLimits {
   /** The whole fetch, redirects included. */
   timeoutMs: number;
   maxRedirects: number;
+  /** Asked for the address and for every redirect hop before anything is resolved; false refuses the fetch. */
+  allowHop?: (u: URL) => boolean;
   accept: string;
   /** Allowed `Content-Type` values (the part before `;`). */
   types: readonly string[];
@@ -107,6 +109,7 @@ export async function safeFetch(
     throw new FetchError("blocked", "not a URL");
   }
   for (let hop = 0; hop <= limits.maxRedirects; hop++) {
+    if (limits.allowHop && !limits.allowHop(current)) throw new FetchError("blocked", "site not allowed");
     const ip = await vet(current, net);
     const res = await request(current, ip, limits, deadline, userAgent);
     if ("redirect" in res) {

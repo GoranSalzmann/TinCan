@@ -48,7 +48,12 @@ Design: [23](../23-media-previews.md). Security review: [media-previews-review.m
 - [ ] **(you)** A YouTube link shows title, channel and thumbnail; an X/Twitter link shows the post text (if X still answers without a key) or no card.
 - [ ] `<https://…>` in angle brackets, or a link inside a code span, gets no card.
 - [ ] A link to `http://127.0.0.1:…`, `http://192.168.x.x`, `http://169.254.169.254/` or `http://[::1]/` gets no card.
-- [ ] "Never these sites" with the link's domain removes the card; "Only these sites" with another domain does the same.
+- [ ] The **Allowed sites** box already holds the ten default sites before previews were ever switched on; the note says only these and their subdomains are visited; **Restore defaults** brings the list back after an edit.
+- [ ] With the default list, a link to a site that is not on it (for example a news site) gets no card and the server makes no request to it; a `github.com` and a `m.youtube.com` link do.
+- [ ] Emptying the list says "no site gets a preview" and no link gets a card. Ticking **Allow all sites** shows the red warning and greys out the list; unticking returns to the list.
+- [ ] "Never these sites" with a listed domain removes its cards (the deny list wins).
+- [ ] A link on an allowed site that redirects to a site that is not allowed gets no card.
+- [ ] YouTube card still has its thumbnail although `ytimg.com` is not in the list. **(you)** Real YouTube.
 - [ ] The author's and a moderator's **✕** removes the card for everyone; a moderator's removal appears in the audit log as `message.preview.remove`. A member without Manage messages sees no ✕ on someone else's message.
 - [ ] Turning previews off again hides all cards after a reload.
 - [ ] Turning the setting on or off writes `linkpreviews.settings` in the audit log.
