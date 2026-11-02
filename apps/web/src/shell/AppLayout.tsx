@@ -159,8 +159,8 @@ function ConnectionStatus({ compact = false }: { compact?: boolean }) {
         aria-hidden="true"
         className={`inline-block size-2.5 shrink-0 rounded-full border-2 ${gw === "ready" ? "border-presence-online bg-presence-online" : "border-presence-offline"}`}
       />
-      {/* In the page corner only the shape shows, so it never runs into a header's own labels. */}
-      <span className={compact ? "sr-only" : undefined}>{t(key)}</span>
+      {/* In the page corner the word shows from 1280 px (xl); below that only the dot, so it never runs into a header's own labels. */}
+      <span className={compact ? "max-xl:sr-only" : undefined}>{t(key)}</span>
     </span>
   );
 }

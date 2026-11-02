@@ -312,6 +312,18 @@ describe("side panels", () => {
     expect(screen.queryByRole("button", { name: "Close the member list" })).not.toBeInTheDocument();
   });
 
+  it("shows the connection word in the page corner only from 1280 px, and always keeps it as a tooltip", async () => {
+    windowOf(1440);
+    fakeServer({ setupRequired: false, loggedIn: true });
+    renderApp("/login");
+    await screen.findByRole("group", { name: "Your account" });
+    const corner = screen.getByRole("main").querySelector<HTMLElement>("[role=status][title]")!;
+    expect(corner).toBeTruthy();
+    const word = corner.querySelector("span:not([aria-hidden])");
+    expect(word).toHaveClass("max-xl:sr-only");
+    expect(word?.textContent).toBe(corner.getAttribute("title"));
+  });
+
   it("does not resize the channel list while it is a drawer on a phone", async () => {
     windowOf(400);
     fakeServer({ setupRequired: false, loggedIn: true });

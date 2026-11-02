@@ -14,7 +14,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 ### Fixed
 
 - **The voice status in the channel list is no longer cut off:** "Voice connected" and the channel name now wrap onto a second line, and the buttons move below them when the panel is narrow.
-- **In a call, "End-to-end encrypted" and the connection indicator no longer overlap at the top right.** The connection indicator in the corner is now a dot (its text is a tooltip and for screen readers), and the lock label becomes an icon on a phone.
+- **In a call, "End-to-end encrypted" and the connection indicator no longer overlap at the top right.** The connection indicator in the corner is a dot below 1280 px (its text is a tooltip and for screen readers; the word shows on wider windows), and the lock label becomes an icon on a phone.
 - **The member list can always be closed:** below 1280 px the open list covered its own toggle. It now has a close button, closes with Escape, and puts the focus back on the toggle.
 - **The channel menu (the three dots) stays next to the channel name** when people join or leave a voice channel instead of sliding down with the list of participants. A long voice channel name also no longer makes the channel list scroll sideways.
 
