@@ -11,19 +11,19 @@
     "dev": "tsx --conditions=tincan-src --watch src/cli.ts serve --config ../../dev/config.yaml"
   },
   "dependencies": {
-    "@fastify/multipart": "^10.1.6",
-    "@fastify/websocket": "^11.3.4",
+    "@fastify/multipart": "^10.1.8",
+    "@fastify/websocket": "^11.3.7",
     "@tincan/auth": "workspace:*",
     "@tincan/db": "workspace:*",
     "@tincan/pubsub": "workspace:*",
     "@tincan/shared": "workspace:*",
     "@tincan/storage": "workspace:*",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "fastify-type-provider-zod": "^7.0.0",
     "livekit-server-sdk": "2.19.2",
     "pino": "^10.4.0",
     "sharp": "^0.35.5",
-    "ws": "^8.18.0",
+    "ws": "^8.22.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
