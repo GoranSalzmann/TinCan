@@ -1,0 +1,5 @@
+[Unit]
+Description=Restart LiveKit so it loads the renewed TURN certificate
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker restart tincan-livekit-1

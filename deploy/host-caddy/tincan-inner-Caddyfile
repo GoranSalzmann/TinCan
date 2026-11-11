@@ -1,0 +1,46 @@
+# Tin Can's own web server, behind the host's Caddy (/etc/caddy/conf.d/tincan.caddy). It speaks plain HTTP on
+# 127.0.0.1:8080 and never asks for certificates; the host Caddy terminates TLS and owns ports 80 and 443.
+{
+	auto_https off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:8080 {
+	encode zstd gzip
+	@internal path /api/internal/* /api/v1/internal/* /api/v1/metrics
+	handle @internal {
+		respond 404
+	}
+	handle /api/* {
+		reverse_proxy tincan:3000
+	}
+	handle /gateway {
+		reverse_proxy tincan:3000
+	}
+	handle /files/* {
+		reverse_proxy tincan:3000
+	}
+	handle /livekit/rtc* {
+		uri strip_prefix /livekit
+		reverse_proxy host.docker.internal:7880
+	}
+	# Build files carry a hash in their name; the worker and manifest must be re-checked on every load.
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	@pwa path /sw.js /manifest.webmanifest
+	header @pwa Cache-Control "no-cache"
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=()"
+		Cross-Origin-Opener-Policy same-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' wss://{hostport}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		Strict-Transport-Security "max-age=31536000"
+	}
+}
