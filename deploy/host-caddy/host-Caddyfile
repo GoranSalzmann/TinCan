@@ -1,0 +1,3 @@
+# Host Caddy. Owns ports 80 and 443 for every service on this machine.
+# To add a service: create /etc/caddy/conf.d/<name>.caddy with its site block, then `sudo systemctl reload caddy`.
+import /etc/caddy/conf.d/*.caddy

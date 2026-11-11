@@ -2,6 +2,8 @@
 
 How the author's server (mkarl.io) gets a new release without anyone logging in, and how you can set up the same. Everything here is optional: other installations upgrade by hand ([hosting guide §6](hosting.md#6-upgrading-and-rolling-back)), and this setup is built on the same steps.
 
+**Other sites on the same machine?** Tin Can's own Caddy owns ports 80 and 443 by default. To share them, see [shared-host.md](shared-host.md).
+
 ## 1. What happens
 
 ```

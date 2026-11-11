@@ -2,6 +2,8 @@
 
 For the person who sets up and runs the server. The shortest path is the quickstart in the [README](../../README.md); this page explains the choices around it: what machine, where it lives, which ports, how to upgrade, and what to do when something does not work. Day-to-day running (moderation, encryption, backups, metrics) is in the [admin guide](admin-guide.md).
 
+Sharing the machine with other websites (a Caddy on the host instead of the container owning 80/443): [shared-host.md](shared-host.md).
+
 Figures below come from the project's own measurements ([docs/18 §M](../18-open-questions-and-risks.md), run on a desktop computer and one small VPS, not on a range of hosting plans) or from the design documents. Where nothing was measured, this page says so.
 
 ## 1. A VPS with a public IP

@@ -1,0 +1,9 @@
+# Tin Can: its own web server listens on 127.0.0.1:8080 (docker-compose.yml in ~/tincan).
+mkarl.io {
+	reverse_proxy 127.0.0.1:8080
+}
+
+# Only here so this Caddy keeps the certificate that LiveKit's TURN/TLS uses (mounted read-only into LiveKit).
+turn.mkarl.io {
+	respond 404
+}
