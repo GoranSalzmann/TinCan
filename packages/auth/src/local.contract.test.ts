@@ -34,7 +34,10 @@ runAuthContract("local", async () => {
 describe("passwords", () => {
   it("hashes as argon2id with the default 64 MiB / 3 iteration parameters and verifies", async () => {
     const hash = await hashPassword("a long enough password");
-    expect(hash).toMatch(/^\$argon2id\$v=19\$m=65536,p=1,t=3\$/);
+    // Compare the parameter set, not its order: argon2 0.45.2 switched from "m,p,t" to the canonical "m,t,p".
+    const [, type, version, params] = hash.split("$");
+    expect([type, version]).toEqual(["argon2id", "v=19"]);
+    expect(params?.split(",").sort()).toEqual(["m=65536", "p=1", "t=3"]);
     expect(await verifyPassword(hash, "a long enough password")).toBe(true);
     expect(await verifyPassword(hash, "a long enough passwore")).toBe(false);
     expect(needsRehash(hash)).toBe(false);
