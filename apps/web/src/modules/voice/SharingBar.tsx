@@ -49,7 +49,7 @@ export function SharingBar() {
   return (
     <section
       aria-label={t("video.bar")}
-      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-bg-sidebar px-4 py-2 text-sm"
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-bg-sidebar ps-4 pe-4 py-2 text-sm md:pe-20 xl:pe-56"
     >
       <span className="rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-text-on-danger">
         {t("video.badge.live")}
