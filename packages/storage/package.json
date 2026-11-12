@@ -21,7 +21,7 @@
     "build": "tsc -b"
   },
   "devDependencies": {
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "files": [
     "dist"
