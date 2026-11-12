@@ -117,15 +117,43 @@ describe("push to talk (in window)", () => {
 
 describe("voice activity", () => {
   it("holds the speaking state for a moment so it does not flicker", () => {
-    const v = new VoiceActivity(0.1, 250);
+    const v = new VoiceActivity(0.1, { hangMs: 250, attackMs: 0 });
     expect(v.update(0.05, 0)).toBe(false);
     expect(v.update(0.4, 100)).toBe(true);
     expect(v.update(0.01, 200)).toBe(true);
     expect(v.update(0.01, 400)).toBe(false);
   });
 
-  it("derives an automatic threshold above the noise floor, never below -50 dBFS", () => {
-    expect(autoThreshold(0)).toBeCloseTo(0.003);
+  it("ignores a short burst such as a click (attack)", () => {
+    const v = new VoiceActivity(0.1);
+    expect(v.update(0.5, 0)).toBe(false);
+    expect(v.update(0.5, 40)).toBe(false);
+    expect(v.update(0.01, 80)).toBe(false); // the click is over before the attack time
+    expect(v.update(0.5, 120)).toBe(false); // a new run starts from scratch
+    expect(v.update(0.5, 160)).toBe(false);
+    expect(v.update(0.5, 200)).toBe(true); // sustained for 80 ms
+  });
+
+  it("stays on while speech hovers just under the open threshold (hysteresis)", () => {
+    const v = new VoiceActivity(0.1, { hangMs: 200 });
+    for (let t = 0; t <= 80; t += 40) v.update(0.2, t);
+    expect(v.update(0.2, 120)).toBe(true);
+    const states: boolean[] = [];
+    // Alternates just above and just below the open threshold, never below the close threshold (0.063).
+    for (let t = 160; t < 2000; t += 40) states.push(v.update(t % 80 === 0 ? 0.11 : 0.08, t));
+    expect(states.every(Boolean)).toBe(true);
+    // Below the close threshold, it switches off after the hang time.
+    v.update(0.05, 2000);
+    expect(v.update(0.05, 2240)).toBe(false);
+  });
+
+  it("does not open on a level below the threshold even though it is above the close threshold", () => {
+    const v = new VoiceActivity(0.1, { attackMs: 0 });
+    for (let t = 0; t < 1000; t += 40) expect(v.update(0.08, t)).toBe(false);
+  });
+
+  it("derives an automatic threshold above the noise floor, never below -45 dBFS", () => {
+    expect(autoThreshold(0)).toBeCloseTo(0.0056);
     expect(autoThreshold(0.01)).toBeCloseTo(0.032);
     expect(autoThreshold(5)).toBe(0.5);
   });
