@@ -213,7 +213,8 @@ class VoiceManager {
     useVoice.getState().patch({ status: "connected", muted: !pipeline, deafened: false });
     this.#announceSelf();
     void this.#detectTransport(room);
-    this.#startMeter();
+    // #publishMic already started the meter when there is a microphone.
+    if (!this.#meter) this.#startMeter();
 
     // Changing device, preset or tier in settings applies live (W-21).
     let last = JSON.stringify(captureKey(prefs));
@@ -475,7 +476,13 @@ class VoiceManager {
 
   // ---- level meter and local speaking indicator ----------------------------------------------
 
+  /**
+   * (Re)starts the meter on the current pipeline. It always stops the running one first: two loops would each keep their
+   * own detector and overwrite each other's ring every tick, and one left on a closed pipeline reports silence forever.
+   */
   #startMeter(): void {
+    if (this.#meter) clearInterval(this.#meter);
+    this.#meter = null;
     const pipeline = this.#pipeline;
     const self = useSession.getState().user?.id;
     if (!pipeline || !self) return;
@@ -509,7 +516,6 @@ class VoiceManager {
       this.#pipeline = next;
       next.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
       old?.stop();
-      if (this.#meter) clearInterval(this.#meter);
       this.#startMeter();
       this.#startTransmitGate(prefs);
     } catch {
