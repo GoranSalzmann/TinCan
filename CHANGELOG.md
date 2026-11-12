@@ -6,6 +6,15 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-12
+
+Nothing to do when upgrading.
+
+### Fixed
+
+- **Speaking ring in calls:** your own ring no longer flickers on and off, and a click or tap no longer lights it. It stays lit while you talk and turns off once you stop.
+- **Screen sharing:** the Stop sharing button no longer overlaps the members button and the connection status in the top-right corner.
+
 ## [1.1.0] - 2026-11-02
 
 Nothing to do when upgrading. Link previews are **off** until the owner turns them on in Settings › Server › Link previews, and then only for the sites on an allow list that is filled in with YouTube, Vimeo, SoundCloud, Spotify, Bluesky, X/Twitter and GitHub (change it, restore it, or choose "allow all sites" in the same place).
