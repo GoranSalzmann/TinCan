@@ -153,6 +153,11 @@ export default defineModule({
           .where("user_id", "=", userId)
           .execute();
       },
+      async settingsOf(userIds) {
+        const out = new Map<string, Record<string, unknown>>();
+        await Promise.all(userIds.map(async (id) => void out.set(id, await settings.get(id))));
+        return out;
+      },
       setLoginBlocker: (b) => svc.setLoginBlocker(b),
       onMemberJoin: (hook) => svc.addJoinHook(hook),
       onMemberJoined: (hook) => svc.addJoinedHook(hook),

@@ -47,6 +47,8 @@ function notify(m: Message): void {
         .replace(/<#[0-9A-Z]{26}>/g, "#…")
         .slice(0, 140) || "Sent a file",
     tag: m.channelId,
+    channelId: m.channelId,
+    messageId: m.id,
     onClick: () => ui.navigator?.(m.channelId, m.id),
   });
 }

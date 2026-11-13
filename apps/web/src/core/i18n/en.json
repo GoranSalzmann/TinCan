@@ -381,6 +381,7 @@
   "notifications.ask": "Tin Can can show a notification when someone writes while this tab is in the background.",
   "notifications.enable": "Turn on notifications",
   "notifications.on": "Notifications are on in this browser.",
+  "notifications.push": "Also notify me when Tin Can is closed (push)",
   "notifications.denied": "Notifications are blocked for this site. Change it in your browser's site settings.",
   "notifications.unsupported": "This browser can't show notifications.",
   "notifications.default": "Notify me for",

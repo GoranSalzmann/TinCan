@@ -193,6 +193,10 @@ export const api = {
   settings: () => request<Record<string, unknown>>("GET", "/users/@me/settings"),
   patchSettings: (body: Record<string, unknown>) =>
     request<Record<string, unknown>>("PATCH", "/users/@me/settings", { body }),
+  pushKey: () => request<{ publicKey: string }>("GET", "/push/vapid-key"),
+  putPush: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    request<void>("PUT", "/push/subscription", { body }),
+  deletePush: (endpoint: string) => request<void>("DELETE", "/push/subscription", { body: { endpoint } }),
   setAvatar: (file: Blob) => {
     const form = new FormData();
     form.set("file", file, "avatar");

@@ -6,8 +6,14 @@ import { ChevronDown, LogOut, Menu as MenuIcon, Settings, Users, X } from "lucid
 import { ACCENT_NAMES } from "../theme/tokens.js";
 import { useAppearance, type ThemePreference } from "../theme/store.js";
 import { PSEUDO_LOCALES, useLocale, useT, type Locale, type MessageKey } from "../core/i18n/index.js";
-import { notificationPermission, badgeCount, requestNotificationPermission } from "../core/notifications.js";
-import { sendCommand, useSession } from "../core/session/store.js";
+import { syncPush, usePushSync } from "../core/push.js";
+import {
+  badgeCount,
+  listenForNotificationClicks,
+  requestNotificationPermission,
+  useNotificationPermission,
+} from "../core/notifications.js";
+import { sendCommand, useFeature, useSession } from "../core/session/store.js";
 import { useChat } from "../core/state/chat.js";
 import { memberName, useCan, useCommunity } from "../core/state/community.js";
 import { useUi } from "../core/state/ui.js";
@@ -198,7 +204,14 @@ function useFocusAndNavigator() {
       void navigate(`/channels/${channelId}`);
       if (messageId) void useChat.getState().jumpTo(channelId, messageId);
     });
-    return () => setNavigator(null);
+    const stop = listenForNotificationClicks(
+      (channelId, messageId) => useUi.getState().navigator?.(channelId, messageId),
+      () => void syncPush().catch(() => undefined),
+    );
+    return () => {
+      stop();
+      setNavigator(null);
+    };
   }, [navigate, setNavigator]);
 }
 
@@ -236,6 +249,7 @@ export function AppLayout() {
   const t = useT();
   useRegionCycle();
   useFocusAndNavigator();
+  usePushSync(useFeature("push"), useNotificationPermission());
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSession((s) => s.user)!;
@@ -251,7 +265,7 @@ export function AppLayout() {
   const medium = useMediaQuery("(min-width: 768px)");
   const [drawer, setDrawer] = useState(false);
   const [members, setMembers] = useState<boolean | null>(null);
-  const [perm, setPerm] = useState(notificationPermission());
+  const perm = useNotificationPermission();
   const instanceName = caps?.server.name ?? "Tin Can";
   const showMembers = (members ?? wide) && !inSettings;
   const sidebarVisible = medium || drawer;
@@ -363,10 +377,7 @@ export function AppLayout() {
                   {t("instance.settings")}
                 </Menu.Item>
                 {perm === "default" ? (
-                  <Menu.Item
-                    className={menuItem}
-                    onSelect={() => void requestNotificationPermission().then(setPerm)}
-                  >
+                  <Menu.Item className={menuItem} onSelect={() => void requestNotificationPermission()}>
                     {t("notifications.enable")}
                   </Menu.Item>
                 ) : null}

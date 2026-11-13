@@ -4,12 +4,9 @@ import { useNavigate } from "react-router-dom";
 import type { SessionInfo } from "@tincan/shared";
 import { api, ApiError, type OwnAttachment } from "../../core/api/client.js";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
-import {
-  notificationPermission,
-  requestNotificationPermission,
-  type PermissionState,
-} from "../../core/notifications.js";
-import { useSession } from "../../core/session/store.js";
+import { requestNotificationPermission, useNotificationPermission } from "../../core/notifications.js";
+import { usePushState } from "../../core/push.js";
+import { useFeature, useSession } from "../../core/session/store.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
 import { ACCENT_NAMES } from "../../theme/tokens.js";
 import { useAppearance } from "../../theme/store.js";
@@ -248,7 +245,9 @@ export function NotificationsPane() {
   const t = useT();
   const settings = useCommunity((s) => s.settings);
   const channels = useCommunity((s) => s.channels).filter((c) => c.type === "text");
-  const [perm, setPerm] = useState<PermissionState>(notificationPermission());
+  const perm = useNotificationPermission();
+  const push = usePushState();
+  const pushFeature = useFeature("push");
   const level = (settings["notifications.default"] as string | undefined) ?? "all";
   const save = (patch: Record<string, unknown>) => void api.patchSettings(patch).catch(toastError);
   return (
@@ -258,14 +257,22 @@ export function NotificationsPane() {
         {perm === "unsupported" ? (
           <p className="text-text-muted">{t("notifications.unsupported")}</p>
         ) : perm === "granted" ? (
-          <p>{t("notifications.on")}</p>
+          <>
+            <p>{t("notifications.on")}</p>
+            {pushFeature && push.supported ? (
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={push.on} disabled={push.busy} onChange={push.toggle} />
+                {t("notifications.push")}
+              </label>
+            ) : null}
+          </>
         ) : perm === "denied" ? (
           <p className="text-text-muted">{t("notifications.denied")}</p>
         ) : (
           <>
             <p className="text-text-muted">{t("notifications.ask")}</p>
             <div>
-              <Button onClick={() => void requestNotificationPermission().then(setPerm)}>
+              <Button onClick={() => void requestNotificationPermission()}>
                 {t("notifications.enable")}
               </Button>
             </div>

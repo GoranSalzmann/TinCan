@@ -80,3 +80,58 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/* Notifications are shown from the page (registration.showNotification) so they work in background tabs and on
+ * mobile. A click focuses an open window and tells it which channel to open, or opens the app if none is. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  event.waitUntil(
+    (async () => {
+      const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const msg = { type: "notification-click", channelId: data.channelId, messageId: data.messageId };
+      const win = list.find((c) => "focus" in c) || null;
+      if (win) {
+        await win.focus();
+        win.postMessage(msg);
+      } else if (data.channelId) {
+        await self.clients.openWindow("/channels/" + data.channelId);
+      }
+    })(),
+  );
+});
+
+/* Web Push: the server sends {channelId, messageId, title, body} (encrypted) when a member's app is closed. The tag
+ * is the channel, so a newer message replaces the one still showing, as the in-page notification does. A push that
+ * arrives while a window is focused and visible is not shown: the page is already showing the message. */
+self.addEventListener("push", (event) => {
+  let data;
+  try {
+    data = event.data ? event.data.json() : null;
+  } catch {
+    data = null;
+  }
+  if (!data || typeof data.title !== "string") return;
+  event.waitUntil(
+    (async () => {
+      const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      if (list.some((c) => c.focused && c.visibilityState === "visible")) return;
+      await self.registration.showNotification(data.title, {
+        body: typeof data.body === "string" ? data.body : "",
+        tag: data.channelId,
+        icon: "/icons/icon-192.png",
+        data: { channelId: data.channelId, messageId: data.messageId },
+      });
+    })(),
+  );
+});
+
+/* The browser rotated or dropped the subscription: tell an open page to register the new one. */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const list = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const c of list) c.postMessage({ type: "push-resubscribe" });
+    })(),
+  );
+});

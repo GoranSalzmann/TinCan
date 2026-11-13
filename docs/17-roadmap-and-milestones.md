@@ -206,7 +206,7 @@ basics, docs.
 | Camera background blur / virtual backgrounds | 08, 09 |
 | Welcome message, rules screen, announcements | 11, 12 |
 | Custom emoji, GIF picker (needs opt-in provider), soundboard | 12 |
-| Web Push notifications | 12 |
+| ~~Web Push notifications~~ (done: `push` module, 12 §14) | 12 |
 | Public plugin/bot API (webhooks, bot tokens) | 04 §12 |
 | MLS-based E2EE where Host can't read keys | 10 §9 |
 | Native mobile apps | Q10 |
