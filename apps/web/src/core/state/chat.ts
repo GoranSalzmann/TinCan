@@ -43,7 +43,8 @@ interface ChatState {
   /** The message to scroll to and highlight after a jump (search result, reply reference). */
   focusId: string | null;
 
-  open: (channelId: string) => Promise<void>;
+  /** `resume` keeps what is loaded (reconnect); otherwise the window is cut back to the newest page. */
+  open: (channelId: string, opts?: { resume?: boolean }) => Promise<void>;
   loadOlder: (channelId: string) => Promise<void>;
   loadNewer: (channelId: string) => Promise<void>;
   jumpTo: (channelId: string, messageId: string) => Promise<void>;
@@ -94,16 +95,30 @@ export const useChat = create<ChatState>((set, get) => {
     reset: () => set({ ...initial }),
     clearFocus: () => set({ focusId: null }),
 
-    async open(channelId) {
+    async open(channelId, opts) {
       set((s) => ({ loadError: { ...s.loadError, [channelId]: undefined } }));
-      const have = get().windows[channelId];
+      let have = get().windows[channelId];
+      if (have && !opts?.resume) {
+        // Entering a channel starts at its end: drop older pages loaded on a previous visit.
+        if (have.hasNewer || have.messages.length === 0) {
+          have = undefined;
+          set((s) => {
+            const windows = { ...s.windows };
+            delete windows[channelId];
+            return { windows };
+          });
+        } else if (have.messages.length > PAGE) {
+          have = { messages: have.messages.slice(-PAGE), hasOlder: true, hasNewer: false };
+          setWindow(channelId, have);
+        }
+      }
       setLoading(channelId, true);
       try {
         const page = await api.history(channelId, { limit: PAGE });
         // Keep what is already loaded when the live edge is contiguous with it; otherwise start from the latest page.
         const latest = fromLatest(page, PAGE);
-        const keep = have && !have.hasNewer && have.messages.length > 0;
-        setWindow(channelId, keep ? { ...appendNewer(have, page, PAGE), hasNewer: false } : latest);
+        const keep = have && !have.hasNewer && have.messages.length > 0 ? have : undefined;
+        setWindow(channelId, keep ? { ...appendNewer(keep, page, PAGE), hasNewer: false } : latest);
       } catch (e) {
         fail(channelId, e);
       } finally {
