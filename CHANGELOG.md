@@ -6,6 +6,18 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Before you upgrade
+
+- To use Linux application audio, add `http://127.0.0.1:19477` to `connect-src` in your existing web CSP and reload your reverse proxy. Newly generated Caddy configurations already include it. The web image includes the helper downloads; source deployments must package them before building the PWA. See [Linux application audio](docs/audio-helper.md).
+
+### Added
+
+- **Linux application audio:** share selected games and other apps from the PWA using a small Rust/PipeWire helper. Includes per-user installation, local server pairing, searchable multi-selection, a live meter, actionable setup errors and automatic cleanup. Conversation playback is routed separately and excluded from capture. Requires Linux x86-64, PipeWire with its PulseAudio service and a Chromium browser with output selection.
+
+### Fixed
+
+- **Screen-share cancellation:** cancelling setup or changing calls also cleans up media operations that complete late. Helper audio failure stops sharing and restores the conversation output. Browser audio requests `restrictOwnAudio` where Chromium supports it, and shared audio is not also played locally.
+
 ## [1.2.2] - 2026-11-13
 
 Nothing to do when upgrading.
