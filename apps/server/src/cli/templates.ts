@@ -72,6 +72,11 @@ adapters:
   auth: { kinds: [local] }
 modules:
   accounts: { signup: invite-only }
+  # GIFs: search and send Tenor/GIPHY GIFs through a server-side proxy (17 §10). Keys stay on the server.
+  gifs:
+    tenorKey: ""
+    giphyKey: ""
+    rating: medium # off|low|medium|high
 log:
   level: info
 `;

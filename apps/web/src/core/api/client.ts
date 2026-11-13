@@ -11,6 +11,8 @@ import {
   type AuditList,
   type Ban,
   type ErrorCode,
+  type GifList,
+  type GifProvider,
   type Invite,
   type InviteCreate,
   type LoginResponse,
@@ -290,6 +292,12 @@ export const api = {
   readState: () => request<ReadStateEntry[]>("GET", "/read-state"),
   search: (q: { q: string; channelId?: string; sort?: "newest" | "relevance"; cursor?: string }) =>
     request<Page<Message>>("GET", `/search${qs(q)}`),
+
+  // gifs
+  searchGifs: (provider: GifProvider, q: string, pos?: string) =>
+    request<GifList>("GET", `/gifs/search${qs({ provider, q, pos })}`),
+  trendingGifs: (provider: GifProvider, pos?: string) =>
+    request<GifList>("GET", `/gifs/trending${qs({ provider, pos })}`),
 };
 
 /** Uploads one file with progress (fetch cannot report upload progress). */
@@ -337,4 +345,7 @@ export function uploadFile(
 export const fileUrl = (id: string, filename: string, thumb = false): string =>
   `${API_PREFIX}/files/${encodeURIComponent(id)}/${encodeURIComponent(filename || "file")}${thumb ? "?thumb=1" : ""}`;
 export const linkPreviewImageUrl = (hash: string): string => `${API_PREFIX}/link-previews/image/${hash}`;
+/** A re-hosted GIF on this server: provider media hosts never reach the browser (CSP img-src 'self'). */
+export const gifMediaUrl = (provider: string, id: string, variant: "preview" | "full" | "still"): string =>
+  `${API_PREFIX}/gifs/media/${provider}/${encodeURIComponent(id)}/${variant}`;
 export const avatarUrl = (key: string): string => `${API_PREFIX}/avatars/${encodeURIComponent(key)}`;

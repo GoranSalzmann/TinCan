@@ -12,6 +12,7 @@ import { Button } from "../../ui/Button.js";
 import { ConfirmDialog } from "../../ui/Dialog.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { AttachmentView } from "./AttachmentView.js";
+import { GifAttachment } from "./GifAttachment.js";
 import { useLinkGate } from "./linkGate.js";
 import { LinkPreviews } from "./LinkPreviews.js";
 import { Markdown, type RenderContext } from "./markdown.js";
@@ -235,6 +236,7 @@ export const MessageItem = memo(function MessageItem({
             {m.attachments.map((a) => (
               <AttachmentView key={a.id} a={a} />
             ))}
+            {m.gif ? <GifAttachment gif={m.gif} /> : null}
             <LinkPreviews
               messageId={m.id}
               content={m.content}
@@ -309,6 +311,7 @@ export function PendingItem({
             {a.filename}
           </div>
         ))}
+        {p.gif ? <GifAttachment gif={p.gif} /> : null}
         {p.status === "sending" ? (
           <span className="text-xs text-text-muted">{t("message.sending")}</span>
         ) : (

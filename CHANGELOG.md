@@ -6,6 +6,9 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- GIF picker: search Tenor/GIPHY in the composer, send GIFs that the server re-hosts so the CSP keeps working (#33).
 ### Before you upgrade
 
 - To use Linux application audio, add `http://127.0.0.1:19477` to `connect-src` in your existing web CSP and reload your reverse proxy. Newly generated Caddy configurations already include it. The web image includes the helper downloads; source deployments must package them before building the PWA. See [Linux application audio](docs/audio-helper.md).

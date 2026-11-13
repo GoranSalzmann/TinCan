@@ -14,6 +14,8 @@ export interface TextChatTables {
     deleted_at: number | null;
     /** Bit 0 pinned, bit 1 system message. */
     flags: number;
+    /** JSON of the resolved MessageGif, when the message is a picked GIF (module `gifs`, issue #33). */
+    gif: string | null;
   };
   message_mention: {
     message_id: string;
@@ -66,6 +68,13 @@ export const textChatMigrations: ModuleMigrations = {
           .on("message_mention")
           .column("message_id")
           .execute();
+      },
+    },
+    {
+      version: 2,
+      name: "message gifs",
+      async up(db) {
+        await db.schema.alterTable("message").addColumn("gif", "text").execute();
       },
     },
   ],

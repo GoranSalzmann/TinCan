@@ -10,13 +10,14 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { has, type Channel, type Message } from "@tincan/shared";
+import { has, type Channel, type GifItem, type GifProvider, type Message } from "@tincan/shared";
 import { api, ApiError, uploadFile, type UploadResult } from "../../core/api/client.js";
 import { useT } from "../../core/i18n/index.js";
 import { sendCommand, useSession } from "../../core/session/store.js";
 import { useChat } from "../../core/state/chat.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
 import { toast } from "../../ui/toast.js";
+import { GifPicker } from "./GifPicker.js";
 import { formatSize } from "./MessageItem.js";
 import {
   activeTrigger,
@@ -79,6 +80,8 @@ export function Composer({
   const uploadsOn = !!caps?.features.uploads;
   const canSend = has(perms, "SEND_MESSAGES");
   const canAttach = uploadsOn && has(perms, "ATTACH_FILES");
+  // The server announces which GIF providers it has keys for; no providers means no GIF button (17 §10).
+  const gifProviders = (caps?.features.gifs as { providers?: GifProvider[] } | undefined)?.providers ?? [];
 
   const [text, setText] = useState(() => loadDraft(channel.id));
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -87,6 +90,7 @@ export function Composer({
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [gifOpen, setGifOpen] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
   const area = useRef<HTMLTextAreaElement>(null);
@@ -232,6 +236,34 @@ export function Composer({
       content,
       ...(replyTo ? { replyToId: replyTo.id } : {}),
       ...(attachments.length ? { attachments } : {}),
+    });
+    setText("");
+    setInserted([]);
+    setUploads([]);
+    saveDraft(channel.id, "");
+    onCancelReply();
+    const slow = channel.settings.slowmodeSecs ?? 0;
+    if (slow > 0 && !has(perms, "MANAGE_MESSAGES")) {
+      setCooldownUntil(Date.now() + slow * 1000);
+      setNow(Date.now());
+    }
+  };
+
+  // A picked GIF sends immediately, carrying any typed text and settled attachments along (17 §10).
+  const pickGif = (item: GifItem) => {
+    setGifOpen(false);
+    if (!ready || tooLong || cooldownLeft > 0) return;
+    void send(channel.id, {
+      content,
+      ...(replyTo ? { replyToId: replyTo.id } : {}),
+      ...(attachments.length ? { attachments } : {}),
+      gif: {
+        provider: item.provider,
+        id: item.id,
+        title: item.title,
+        width: item.width,
+        height: item.height,
+      },
     });
     setText("");
     setInserted([]);
@@ -398,6 +430,18 @@ export function Composer({
           onPaste={onPaste}
           className="max-h-56 min-h-9 flex-1 resize-none bg-transparent py-1.5 outline-none"
         />
+        {gifProviders.length > 0 ? (
+          <button
+            type="button"
+            data-gif-toggle
+            aria-label={t("composer.gifs")}
+            aria-expanded={gifOpen}
+            onClick={() => setGifOpen((o) => !o)}
+            className="mb-0.5 rounded-md px-2 py-1.5 text-xs font-bold text-text-muted hover:bg-bg-hover"
+          >
+            GIF
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label={t("composer.send")}
@@ -407,6 +451,9 @@ export function Composer({
         >
           <Send aria-hidden="true" size={18} />
         </button>
+        {gifOpen ? (
+          <GifPicker providers={gifProviders} onPick={pickGif} onClose={() => setGifOpen(false)} />
+        ) : null}
         {options.length > 0 ? (
           <ul
             id={listId}

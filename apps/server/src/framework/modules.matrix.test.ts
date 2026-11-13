@@ -196,6 +196,7 @@ describe("module boot matrix", () => {
         "reactions",
         "search",
         "link-previews",
+        "gifs",
         "voice",
         "video",
         "screenshare",

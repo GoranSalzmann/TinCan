@@ -10,6 +10,7 @@ import { defineModule } from "../../framework/types.js";
 import { VERSION } from "../../version.js";
 import type { AccountsApi } from "../accounts/api.js";
 import type { ChannelsApi } from "../channels/api.js";
+import type { GifsApi } from "../gifs/api.js";
 import type { RolesApi } from "../roles/api.js";
 import type { UploadsApi } from "../uploads/api.js";
 import type { TextChatApi } from "./api.js";
@@ -33,7 +34,7 @@ export default defineModule({
   id: "text-chat",
   version: VERSION,
   dependsOn: ["channels"],
-  optionalDependsOn: ["uploads"],
+  optionalDependsOn: ["uploads", "gifs"],
   requiresPorts: ["db", "pubsub"],
   configSchema: ConfigSchema,
   migrations: textChatMigrations,
@@ -50,6 +51,7 @@ export default defineModule({
       channels,
       accounts,
       uploads: ctx.api.get<UploadsApi>("uploads"),
+      gifs: ctx.api.get<GifsApi>("gifs"),
       gateway: ctx.gateway,
       events: ctx.events,
       outbox: ctx.outbox,
