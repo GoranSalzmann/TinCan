@@ -16,7 +16,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ### Fixed
 
-- **Screen-share cancellation:** cancelling setup or changing calls also cleans up media operations that complete late. Helper audio failure stops sharing and restores the conversation output. Browser audio requests `restrictOwnAudio` where Chromium supports it.
+- **Screen-share cancellation:** cancelling setup or changing calls also cleans up media operations that complete late. Helper audio failure stops sharing and restores the conversation output. Browser audio requests `restrictOwnAudio` where Chromium supports it, and shared audio is not also played locally.
 
 ## [1.2.2] - 2026-11-13
 

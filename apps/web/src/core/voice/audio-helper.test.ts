@@ -194,6 +194,36 @@ describe("application audio ownership", () => {
     expect(useHelperAudio.getState().active).toBe(false);
   });
 
+  it("unlocks device labels before resolving the saved output", async () => {
+    const unlock = new FakeTrack();
+    enumerate.mockResolvedValueOnce(devices.map((d) => device(d.kind, d.deviceId, "")));
+    gum.mockResolvedValueOnce(stream(unlock));
+    const capture = await begin();
+    expect(unlock.stop).toHaveBeenCalled();
+    expect(gum).toHaveBeenNthCalledWith(1, { audio: true, video: false });
+    expect(gum).toHaveBeenLastCalledWith({
+      audio: {
+        deviceId: { exact: "helper-input" },
+        channelCount: 2,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+      video: false,
+    });
+    const session = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/session"));
+    expect(JSON.parse(String(session?.[1]?.body))).toMatchObject({ outputLabel: "Speakers" });
+    await capture.stop();
+  });
+
+  it("maps a denied label unlock to permission_denied before creating a session", async () => {
+    enumerate.mockResolvedValue(devices.map((d) => device(d.kind, d.deviceId, "")));
+    gum.mockRejectedValueOnce(new DOMException("denied", "NotAllowedError"));
+    await expect(begin()).rejects.toEqual(new HelperError("permission_denied"));
+    expect(gum).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("cuts samples immediately if the protected output is changed", async () => {
     const capture = await begin();
     context.sinkId = "other-output";

@@ -2,7 +2,7 @@
 mod pipewire;
 mod server;
 
-use std::{path::PathBuf, process::Stdio};
+use std::{collections::HashSet, path::PathBuf, process::Stdio};
 
 const ADDRESS: &str = "127.0.0.1:19477";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -65,12 +65,17 @@ fn stop_running() -> std::io::Result<()> {
     if !matches() {
         return Ok(());
     }
-    // SAFETY: a positive PID of this user's installed helper was verified.
+    kill_and_wait(pid, matches)
+}
+
+fn kill_and_wait(pid: i32, alive: impl Fn() -> bool) -> std::io::Result<()> {
+    // SAFETY: the caller verified this positive PID belongs to this user's
+    // helper process.
     if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
     for _ in 0..50 {
-        if !matches() {
+        if !alive() {
             return Ok(());
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -80,9 +85,91 @@ fn stop_running() -> std::io::Result<()> {
     ))
 }
 
+fn is_helper(pid: i32) -> bool {
+    let Ok(exe) = std::fs::read_link(format!("/proc/{pid}/exe")) else {
+        return false;
+    };
+    exe.file_name()
+        .is_some_and(|n| n.to_string_lossy().trim_end_matches(" (deleted)") == "tincan-audio")
+}
+
+// Find the process holding the LISTEN socket on ADDRESS: look up the socket
+// inode in /proc/net/tcp{,6}, then the fd symlinks under /proc/*/fd.
+fn port_owner() -> Option<i32> {
+    let mut inodes = HashSet::new();
+    for table in ["/proc/net/tcp", "/proc/net/tcp6"] {
+        let Ok(text) = std::fs::read_to_string(table) else {
+            continue;
+        };
+        for line in text.lines().skip(1) {
+            let fields = line.split_whitespace().collect::<Vec<_>>();
+            // 0100007F is 127.0.0.1 and 4A65 is port 19477; state 0A is LISTEN.
+            if fields.len() > 9
+                && matches!(
+                    fields[1],
+                    "0100007F:4A65" | "00000000000000000000000000000000:4A65"
+                )
+                && fields[3] == "0A"
+            {
+                inodes.insert(fields[9].to_string());
+            }
+        }
+    }
+    if inodes.is_empty() {
+        return None;
+    }
+    for entry in std::fs::read_dir("/proc").ok()?.flatten() {
+        let Ok(pid) = entry.file_name().to_string_lossy().parse::<i32>() else {
+            continue;
+        };
+        if pid <= 1 || pid == std::process::id() as i32 {
+            continue;
+        }
+        let Ok(fds) = std::fs::read_dir(entry.path().join("fd")) else {
+            continue;
+        };
+        for fd in fds.flatten() {
+            let Ok(target) = std::fs::read_link(fd.path()) else {
+                continue;
+            };
+            let name = target.to_string_lossy();
+            let Some(inode) = name
+                .strip_prefix("socket:[")
+                .and_then(|s| s.strip_suffix(']'))
+            else {
+                continue;
+            };
+            if inodes.contains(inode) {
+                return Some(pid);
+            }
+        }
+    }
+    None
+}
+
 fn install() -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     stop_running()?;
+    if std::net::TcpStream::connect(ADDRESS).is_ok() {
+        // The port is still bound: a helper may be running from another path
+        // (old install, dev build, pid-file write failure). Only kill it if
+        // it is actually a helper; otherwise fail rather than claim success.
+        match port_owner() {
+            Some(pid) if is_helper(pid) => {
+                kill_and_wait(pid, || std::net::TcpStream::connect(ADDRESS).is_ok())?
+            }
+            Some(pid) => {
+                return Err(std::io::Error::other(format!(
+                    "{ADDRESS} is already used by another program (pid {pid}); stop it and try again"
+                )));
+            }
+            None => {
+                return Err(std::io::Error::other(format!(
+                    "{ADDRESS} is already used by another program; stop it and try again"
+                )));
+            }
+        }
+    }
     let home = PathBuf::from(std::env::var_os("HOME").expect("HOME is not set"));
     let dir = home.join(".local/lib/tincan-audio");
     std::fs::create_dir_all(&dir)?;

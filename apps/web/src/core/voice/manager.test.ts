@@ -232,7 +232,7 @@ describe("saved codec preferences in the voice manager", () => {
     const participant = voiceManager.room!.localParticipant;
     expect(participant.setScreenShareEnabled).toHaveBeenCalledWith(
       true,
-      expect.objectContaining({ audio: false }),
+      expect.objectContaining({ audio: false, suppressLocalAudioPlayback: false }),
       expect.anything(),
     );
     expect(participant.publishTrack).toHaveBeenCalledWith(
@@ -247,6 +247,15 @@ describe("saved codec preferences in the voice manager", () => {
     await voiceManager.stopScreenShare();
     expect(stop).toHaveBeenCalledOnce();
     expect(useVoice.getState().screenOn).toBe(false);
+  });
+
+  it("suppresses local playback of shared audio on the browser picker path", async () => {
+    expect(await voiceManager.startScreenShare({ hint: "detail", audio: true })).toBe(true);
+    expect(voiceManager.room!.localParticipant.setScreenShareEnabled).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ suppressLocalAudioPlayback: true }),
+      expect.anything(),
+    );
   });
 
   it("rolls back the video and surfaces a helper setup failure", async () => {

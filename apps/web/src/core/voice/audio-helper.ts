@@ -45,6 +45,14 @@ export class HelperError extends Error {
 export const helperErrorCode = (error: unknown): HelperErrorCode =>
   error instanceof HelperError ? error.code : "unavailable";
 
+/** Maps a getUserMedia failure to a code; anything else is rethrown unchanged. */
+function throwInputError(err: unknown): never {
+  if ((err as DOMException).name === "NotAllowedError") throw new HelperError("permission_denied");
+  if (["NotFoundError", "OverconstrainedError"].includes((err as DOMException).name))
+    throw new HelperError("input_missing");
+  throw err;
+}
+
 export interface HelperSource {
   id: string;
   name: string;
@@ -222,8 +230,21 @@ export async function captureHelperAudio(
   if (!supportsHelperAudio()) throw new HelperError("browser_unsupported");
   const context = playback as RoutedContext;
   const previousOutput = typeof context.sinkId === "string" ? context.sinkId : (outputDeviceId ?? "");
-  const before = await navigator.mediaDevices.enumerateDevices();
+  // Device labels are empty until a getUserMedia grant, so listen-only users
+  // unlock them here before the saved output's label is resolved. This stream
+  // is used solely for enumeration and is immediately stopped.
+  let before = await navigator.mediaDevices.enumerateDevices();
   signal.throwIfAborted();
+  if (!before.some((d) => d.label)) {
+    try {
+      const permission = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      permission.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      throwInputError(err);
+    }
+    signal.throwIfAborted();
+    before = await navigator.mediaDevices.enumerateDevices();
+  }
   const outputLabel =
     outputDeviceId && outputDeviceId !== "default"
       ? before.find((d) => d.kind === "audiooutput" && d.deviceId === outputDeviceId)?.label
@@ -354,13 +375,6 @@ export async function captureHelperAudio(
   void watch();
   try {
     assertAlive();
-    // Listen-only users may not have device-label permission yet. This stream
-    // is used solely to unlock enumeration and is immediately stopped.
-    if (!before.some((d) => d.kind === "audioinput" && d.label)) {
-      const permission = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      permission.getTracks().forEach((track) => track.stop());
-      assertAlive();
-    }
     let input: MediaDeviceInfo | undefined;
     let output: MediaDeviceInfo | undefined;
     const deadline = Date.now() + 6000;
@@ -436,9 +450,6 @@ export async function captureHelperAudio(
         .catch(() => undefined);
     }
     await stop();
-    if ((err as DOMException).name === "NotAllowedError") throw new HelperError("permission_denied");
-    if (["NotFoundError", "OverconstrainedError"].includes((err as DOMException).name))
-      throw new HelperError("input_missing");
-    throw err;
+    throwInputError(err);
   }
 }

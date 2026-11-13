@@ -24,6 +24,7 @@ pub struct Server {
     tokens: Mutex<HashMap<String, String>>,
     pending: Mutex<HashMap<String, Pairing>>,
     session: Mutex<Option<pipewire::Session>>,
+    status_cache: Mutex<Option<(Instant, &'static str)>>,
     path: PathBuf,
     page_key: String,
 }
@@ -94,6 +95,7 @@ impl Server {
             tokens: Mutex::new(tokens),
             pending: Mutex::new(HashMap::new()),
             session: Mutex::new(None),
+            status_cache: Mutex::new(None),
             path,
             page_key: secret(),
         })
@@ -241,8 +243,16 @@ struct Connect {
 
 async fn connect(
     State(s): State<Arc<Server>>,
+    headers: HeaderMap,
     axum::extract::Query(q): axum::extract::Query<Connect>,
 ) -> Response {
+    // Browser subresource loads always send Sec-Fetch-Mode; only real
+    // top-level navigations (or header-less clients like curl) create pending
+    // entries, so a malicious page cannot fill the pending map with <img> GETs.
+    let mode = header(&headers, "sec-fetch-mode");
+    if !mode.is_empty() && mode != "navigate" {
+        return error(StatusCode::BAD_REQUEST, "invalid_request");
+    }
     if !origin_valid(&q.origin)
         || q.challenge.len() != 64
         || !q.challenge.bytes().all(|b| b.is_ascii_hexdigit())
@@ -341,11 +351,21 @@ async fn disconnect(
     )
 }
 
-async fn status() -> Response {
+async fn status(State(s): State<Arc<Server>>) -> Response {
+    // The lock is held across the check so concurrent requests single-flight
+    // instead of each spawning pw-loopback, pw-link and pw-dump.
+    let mut cache = s.status_cache.lock().await;
+    let checked = match *cache {
+        Some((at, result)) if at.elapsed() < Duration::from_secs(3) => result,
+        _ => {
+            let result = pipewire::check().await.err().unwrap_or("");
+            *cache = Some((Instant::now(), result));
+            result
+        }
+    };
     response(
         StatusCode::OK,
-        json!({"name": "tincan-audio", "protocol": 1, "version": VERSION,
-        "error": pipewire::check().await.err().unwrap_or("")}),
+        json!({"name": "tincan-audio", "protocol": 1, "version": VERSION, "error": checked}),
     )
 }
 
@@ -482,6 +502,7 @@ async fn watch(
     // The response owns capture lifetime. Closing a tab closes the connection;
     // no background-tab timer or stored authorization can keep capture alive.
     tokio::spawn(async move {
+        let mut failures = 0;
         loop {
             if tx.is_closed() {
                 break;
@@ -502,12 +523,23 @@ async fn watch(
                 Err(e) => (Vec::new(), Some(e)),
             };
             drop(session);
-            let event = json!({"sources": available, "error": err}).to_string() + "\n";
+            // A slow pw-dump is transient: tolerate a couple of consecutive
+            // soft failures without an event (the client keeps its last-known
+            // sources). Anything else, or the third in a row, is fatal.
+            let soft = err == Some("pipewire_unavailable");
+            failures = if soft { failures + 1 } else { 0 };
+            let fatal = err.is_some() && (!soft || failures >= 3);
+            if soft && !fatal {
+                tokio::select! { _ = tx.closed() => break, _ = tokio::time::sleep(Duration::from_secs(1)) => {} }
+                continue;
+            }
+            let event =
+                json!({"sources": available, "error": err.filter(|_| fatal)}).to_string() + "\n";
             if tokio::time::timeout(Duration::from_secs(5), tx.send(Ok(event)))
                 .await
                 .is_err()
                 || tx.is_closed()
-                || err.is_some()
+                || fatal
             {
                 break;
             }
@@ -553,6 +585,22 @@ mod tests {
                     },
                 )
                 .body(Body::from(body.to_owned()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn connect_with_mode(app: Router, mode: &str, challenge: &str) -> Response {
+        app.oneshot(
+            axum::http::Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/connect?origin=https%3A%2F%2Fchat.example&challenge={challenge}"
+                ))
+                .header("host", ADDRESS)
+                .header("sec-fetch-mode", mode)
+                .body(Body::empty())
                 .unwrap(),
         )
         .await
@@ -719,6 +767,47 @@ mod tests {
         let restarted = Server::new(dir.join("sites.json")).await;
         assert_eq!(restarted.tokens.lock().await.get(origin).unwrap(), token);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn connect_creates_pending_pairings_only_for_navigations() {
+        let app = Server::new(std::env::temp_dir().join(secret()).join("sites.json"))
+            .await
+            .router();
+        let challenge = secret();
+        let pair = json!({"challenge": challenge}).to_string();
+        // A cross-site subresource load must not reserve a pending slot.
+        assert_eq!(
+            connect_with_mode(app.clone(), "no-cors", &challenge)
+                .await
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            call(
+                app.clone(),
+                "POST",
+                "/v1/pair",
+                "https://chat.example",
+                "",
+                &pair
+            )
+            .await
+            .status(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            connect_with_mode(app.clone(), "navigate", &challenge)
+                .await
+                .status(),
+            StatusCode::OK
+        );
+        assert_eq!(
+            call(app, "POST", "/v1/pair", "https://chat.example", "", &pair)
+                .await
+                .status(),
+            StatusCode::ACCEPTED
+        );
     }
 
     #[test]

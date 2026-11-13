@@ -83,6 +83,52 @@ describe("share dialog", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  it("keeps polling the audio helper through transient failures", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(helper, "isLinuxDesktop").mockReturnValue(true);
+      vi.spyOn(helper, "helperPreferred").mockReturnValue(true);
+      vi.spyOn(helper, "supportsHelperAudio").mockReturnValue(true);
+      vi.spyOn(helper, "hasHelperToken").mockReturnValue(true);
+      vi.spyOn(helper, "checkHelper").mockResolvedValue();
+      const list = vi
+        .spyOn(helper, "helperSources")
+        .mockResolvedValue([{ id: "1", name: "Game", detail: "", running: true }]);
+      render(<ShareDialog open onOpenChange={vi.fn()} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByRole("checkbox", { name: /Game/ })).toBeInTheDocument();
+
+      // A transient failure keeps the picker ready and polling in the background.
+      list.mockRejectedValueOnce(new helper.HelperError("unavailable"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(screen.getByRole("checkbox", { name: /Game/ })).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+
+      // The next poll recovers and resets the failure count.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(list).toHaveBeenCalledTimes(3);
+      expect(screen.getByRole("checkbox", { name: /Game/ })).toBeInTheDocument();
+
+      // Three consecutive failures go offline and stop polling.
+      list.mockRejectedValue(new helper.HelperError("unavailable"));
+      for (let i = 0; i < 3; i++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+      }
+      expect(screen.queryByRole("checkbox", { name: /Game/ })).toBeNull();
+      expect(screen.getByRole("alert")).toHaveTextContent(/reach the audio helper/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lets the user cancel a pending share and ignores its late completion", async () => {
     let finish: (started: boolean) => void = () => undefined;
     const pending = new Promise<boolean>((resolve) => {

@@ -821,6 +821,8 @@ class VoiceManager {
         true,
         {
           audio: o.audio && !o.helper ? screenAudioConstraints() : false,
+          // A shared tab must not also play its audio locally; with the helper there is no browser audio.
+          suppressLocalAudioPlayback: !o.helper,
           resolution: { width: preset.width, height: preset.height, frameRate: preset.fps },
           contentHint: o.hint,
           selfBrowserSurface: "exclude",

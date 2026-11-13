@@ -333,12 +333,18 @@ impl Session {
         for (a, b) in self.links.difference(&want) {
             let _ = tool("pw-link", &["--disconnect", &a.to_string(), &b.to_string()]).await;
         }
+        // A stream can vanish between snapshot and link; skip failed connects
+        // so they are retried on the next tick instead of ending the session.
+        let mut linked: HashSet<(u64, u64)> = self.links.intersection(&want).copied().collect();
         for (a, b) in want.difference(&self.links) {
-            tool("pw-link", &[&a.to_string(), &b.to_string()])
+            if tool("pw-link", &[&a.to_string(), &b.to_string()])
                 .await
-                .map_err(|_| "capture_failed")?;
+                .is_ok()
+            {
+                linked.insert((*a, *b));
+            }
         }
-        self.links = want;
+        self.links = linked;
         Ok(())
     }
 

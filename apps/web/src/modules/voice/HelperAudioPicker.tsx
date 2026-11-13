@@ -48,6 +48,7 @@ export function HelperAudioPicker({
   useEffect(() => {
     const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
+    let failures = 0;
     if (!supported) return;
     const refresh = async (initial: boolean) => {
       try {
@@ -65,10 +66,18 @@ export function HelperAudioPicker({
         setSources(next);
         setStatus("ready");
         setError(null);
+        failures = 0;
         timer = setTimeout(() => void refresh(false), 3000);
       } catch (err) {
         if (abort.signal.aborted) return;
         const code = helperErrorCode(err);
+        // Transient failures keep polling in the background; only the third
+        // consecutive one drops the picker offline. Pairing and the initial
+        // load still surface immediately.
+        if (!initial && code !== "not_paired" && ++failures < 3) {
+          timer = setTimeout(() => void refresh(false), 3000);
+          return;
+        }
         setError(code);
         setStatus(code === "not_paired" ? "pair" : "offline");
       }
