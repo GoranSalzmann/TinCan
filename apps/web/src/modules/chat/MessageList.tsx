@@ -138,7 +138,7 @@ export function MessageList({
     // A new READY after a non-resumable reconnect: verify the live edge (12 §5.2), keep what is loaded.
     if (readyCount !== firstReady.current) {
       firstReady.current = readyCount;
-      void open(channelId);
+      void open(channelId, { resume: true });
     }
   }, [readyCount, channelId, open]);
 
@@ -152,7 +152,16 @@ export function MessageList({
   // ---- keep following the live edge; preserve position when older pages arrive ----
   const anchor = useRef<{ key: string; offset: number } | null>(null);
   const lastCount = useRef(0);
+  /** Set when "jump to latest" replaces the window: the new rows may not outnumber the old, so scroll regardless. */
+  const forceBottom = useRef(false);
   useLayoutEffect(() => {
+    if (forceBottom.current) {
+      forceBottom.current = false;
+      lastCount.current = rows.length;
+      anchor.current = null;
+      scrollToBottom();
+      return;
+    }
     const grew = rows.length > lastCount.current;
     lastCount.current = rows.length;
     if (anchor.current) {
@@ -303,10 +312,15 @@ export function MessageList({
       {!atBottom || win.hasNewer ? (
         <Button
           onClick={() => {
-            if (win.hasNewer) void jumpToLatest(channelId);
-            else scrollToBottom();
             atBottomRef.current = true;
             setAtBottom(true);
+            if (win.hasNewer) {
+              forceBottom.current = true;
+              void jumpToLatest(channelId).finally(() => {
+                // A failed load leaves the window as it was: nothing will re-render to consume the flag.
+                if (useChat.getState().windows[channelId]?.hasNewer) forceBottom.current = false;
+              });
+            } else scrollToBottom();
           }}
           className="absolute end-4 bottom-3 shadow-md"
         >
