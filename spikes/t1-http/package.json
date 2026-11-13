@@ -17,7 +17,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "fastify": "^5.12.7",
     "fastify-type-provider-zod": "^7.0.0",
-    "hono": "^4.13.14",
+    "hono": "^4.13.18",
     "ws": "^8.22.0",
     "zod": "^4.6.7"
   },
