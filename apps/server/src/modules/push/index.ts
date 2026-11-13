@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import webpush from "web-push";
+import { sendNotification } from "web-push";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
@@ -56,7 +56,7 @@ export default defineModule({
 
     const real: PushSender = {
       async send(target, payload, o) {
-        await webpush.sendNotification(target, payload, {
+        await sendNotification(target, payload, {
           vapidDetails: vapid,
           TTL: o.ttlSecs,
           urgency: o.urgency,
