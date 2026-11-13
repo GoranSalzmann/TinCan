@@ -1,6 +1,6 @@
 {
   "name": "tincan",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Tin Can: self-hosted voice, video and text chat",
   "license": "AGPL-3.0-or-later",
