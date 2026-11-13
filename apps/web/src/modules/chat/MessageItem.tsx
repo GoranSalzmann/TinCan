@@ -154,7 +154,7 @@ export const MessageItem = memo(function MessageItem({
           <time
             dateTime={m.createdAt}
             title={full.format(new Date(m.createdAt))}
-            className="hidden pt-1 text-xs text-text-muted group-hover:block"
+            className="hidden whitespace-nowrap pt-1 text-end text-xs leading-4 text-text-muted group-hover:block"
           >
             {time.format(new Date(m.createdAt))}
           </time>
