@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
 import { ApiError } from "../core/api/client.js";
+import { playSfx } from "../core/sfx/sfx.js";
 
 interface Toast {
   id: number;
@@ -20,6 +21,7 @@ export const useToasts = create<ToastState>((set, get) => ({
   toasts: [],
   push(text, kind = "info") {
     const id = next++;
+    if (kind === "error") playSfx("error");
     set({ toasts: [...get().toasts.slice(-3), { id, text, kind }] });
     setTimeout(() => get().dismiss(id), kind === "error" ? 7000 : 4000);
   },

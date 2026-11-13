@@ -17,6 +17,7 @@ import {
 } from "livekit-client";
 import { request } from "../api/client.js";
 import { sendCommand, useSession } from "../session/store.js";
+import { playSfx } from "../sfx/sfx.js";
 import { createE2eeWorker, decodeKey, e2eeSupported, RoomKeyProvider } from "./e2ee.js";
 import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
@@ -211,6 +212,7 @@ class VoiceManager {
       for (const pub of p.trackPublications.values()) this.#onPublished(pub, p.identity);
     if (pipeline) await this.#publishMic(room, prefs);
     useVoice.getState().patch({ status: "connected", muted: !pipeline, deafened: false });
+    playSfx("voiceJoin");
     this.#announceSelf();
     void this.#detectTransport(room);
     // #publishMic already started the meter when there is a microphone.
@@ -304,6 +306,7 @@ class VoiceManager {
       ...VIDEO_RESET,
     });
     this.#wanted.clear();
+    if (had && !o.silent) playSfx("voiceLeave");
     if (had && !o.silent) void request("POST", "/voice/leave").catch(() => undefined);
     if (had && o.silent) void request("POST", "/voice/leave").catch(() => undefined);
   }
@@ -1025,6 +1028,7 @@ class VoiceManager {
             : "disconnected";
       // When the server removed us it also tells us why over the gateway; give that message a moment to arrive.
       const wait = notice === "removed" ? new Promise((r) => setTimeout(r, 1500)) : Promise.resolve();
+      playSfx(notice === "disconnected" ? "disconnected" : "voiceLeave");
       void Promise.all([this.#teardown(), wait]).then(() => {
         useVoice.getState().patch({
           status: notice === "disconnected" ? "failed" : "idle",
