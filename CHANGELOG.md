@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- GIF picker: search Tenor/GIPHY in the composer, send GIFs that the server re-hosts so the CSP keeps working (#33).
+
 ## [1.2.2] - 2026-11-13
 
 Nothing to do when upgrading.
