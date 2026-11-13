@@ -429,6 +429,18 @@ export function detectCodecSupport(): Promise<CodecSupport> {
       // Match the SDK's publishing restrictions, not just the browser's advertised MIME types.
       const { supportsAV1, supportsVP9 } = await import("livekit-client");
       out.vp9 = supportsVP9();
+      if (out.h264 && navigator.mediaCapabilities?.encodingInfo) {
+        // Advertised is not encodable: ask the browser too, keeping the advertised answer if the query fails.
+        try {
+          const info = await navigator.mediaCapabilities.encodingInfo({
+            type: "webrtc",
+            video: { contentType: "video/H264", width: 1280, height: 720, framerate: 30, bitrate: 3_000_000 },
+          });
+          out.h264 = info.supported;
+        } catch {
+          // keep the advertised answer
+        }
+      }
       if (supportsAV1() && navigator.mediaCapabilities?.encodingInfo) {
         const info = await navigator.mediaCapabilities.encodingInfo({
           type: "webrtc",

@@ -30,7 +30,15 @@ describe("video encoder capability detection", () => {
   it("recognizes H.264 but follows the SDK's restrictions on advertised VP9 and AV1", async () => {
     const { detectCodecSupport } = await import("./video.js");
     expect(await detectCodecSupport()).toEqual({ h264: true, vp9: false, av1Hardware: false });
-    expect(encodingInfo).not.toHaveBeenCalled();
+    expect(encodingInfo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ video: expect.objectContaining({ contentType: "video/AV1" }) }),
+    );
+  });
+
+  it("drops H.264 when advertised but the browser reports it cannot be encoded", async () => {
+    encodingInfo.mockResolvedValue({ supported: false, powerEfficient: false, smooth: false });
+    const { detectCodecSupport } = await import("./video.js");
+    expect((await detectCodecSupport()).h264).toBe(false);
   });
 
   it("offers AV1 only when encoding is supported and power efficient", async () => {
