@@ -10,6 +10,7 @@ import {
   type PermissionState,
 } from "../../core/notifications.js";
 import { useSession } from "../../core/session/store.js";
+import { playSfx, useSfxPrefs, type SfxCategory } from "../../core/sfx/sfx.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
 import { ACCENT_NAMES } from "../../theme/tokens.js";
 import { useAppearance } from "../../theme/store.js";
@@ -244,6 +245,51 @@ export function AppearancePane() {
 
 // ---- Notifications (12 §5.4, 12 §8) -------------------------------------------------------------------------
 
+const SFX_CATEGORIES: readonly SfxCategory[] = ["messages", "voice", "controls", "alerts"];
+
+function SoundsCard() {
+  const t = useT();
+  const { prefs, set, setCategory } = useSfxPrefs();
+  return (
+    <fieldset className={card}>
+      <legend className="px-1 text-lg">{t("sfx.title")}</legend>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={prefs.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        {t("sfx.enabled")}
+      </label>
+      <div className="flex items-center gap-3">
+        <label htmlFor="sfx-volume">{t("sfx.volume")}</label>
+        <input
+          id="sfx-volume"
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(prefs.volume * 100)}
+          disabled={!prefs.enabled}
+          onChange={(e) => set({ volume: Number(e.target.value) / 100 })}
+          onPointerUp={() => playSfx("message")}
+          onKeyUp={() => playSfx("message")}
+        />
+        <Button disabled={!prefs.enabled} onClick={() => playSfx("mention", { force: true })}>
+          {t("sfx.test")}
+        </Button>
+      </div>
+      {SFX_CATEGORIES.map((c) => (
+        <label key={c} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={prefs.categories[c]}
+            disabled={!prefs.enabled}
+            onChange={(e) => setCategory(c, e.target.checked)}
+          />
+          {t(`sfx.category.${c}` as MessageKey)}
+        </label>
+      ))}
+      <p className="text-text-muted">{t("sfx.hint")}</p>
+    </fieldset>
+  );
+}
+
 export function NotificationsPane() {
   const t = useT();
   const settings = useCommunity((s) => s.settings);
@@ -286,6 +332,7 @@ export function NotificationsPane() {
           </label>
         ))}
       </fieldset>
+      <SoundsCard />
       <div className={card}>
         <h3 className="text-lg">{t("notifications.perChannel")}</h3>
         <ul className="m-0 flex list-none flex-col gap-2 p-0">

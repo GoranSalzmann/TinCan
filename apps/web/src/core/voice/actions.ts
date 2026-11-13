@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ApiError } from "../api/client.js";
+import { playSfx } from "../sfx/sfx.js";
 import { useVoice } from "./store.js";
 import type { StreamQuality, StreamSource, VideoPrefs } from "./video.js";
 
@@ -62,17 +63,32 @@ export async function leaveVoice(o: { keepNotice?: boolean; silent?: boolean } =
   await (await manager()).leave(o);
 }
 
-export const toggleMute = async () => (await manager()).setMuted(!useVoice.getState().muted);
-export const toggleDeafen = async () => (await manager()).setDeafened(!useVoice.getState().deafened);
+export const toggleMute = async () => {
+  const wasDeafened = useVoice.getState().deafened;
+  const muted = !useVoice.getState().muted;
+  (await manager()).setMuted(muted);
+  // Unmuting while deafened also undeafens; one sound for the bigger change.
+  playSfx(!muted && wasDeafened ? "deafenOff" : muted ? "muteOn" : "muteOff");
+};
+export const toggleDeafen = async () => {
+  const deafened = !useVoice.getState().deafened;
+  (await manager()).setDeafened(deafened);
+  playSfx(deafened ? "deafenOn" : "deafenOff");
+};
 export const setPlaybackVolume = async (userId: string, volume: number) =>
   (await manager()).setUserVolume(userId, volume);
 
 // ---- video (M4) ------------------------------------------------------------------------------
 
 export const toggleCamera = async () => (await manager()).setCamera(!useVoice.getState().cameraOn);
-export const startScreenShare = async (o: { hint: "detail" | "motion"; audio: boolean }) =>
-  (await manager()).startScreenShare(o);
-export const stopScreenShare = async () => (await manager()).stopScreenShare();
+export const startScreenShare = async (o: { hint: "detail" | "motion"; audio: boolean }) => {
+  await (await manager()).startScreenShare(o);
+  if (useVoice.getState().screenOn) playSfx("shareStart");
+};
+export const stopScreenShare = async () => {
+  await (await manager()).stopScreenShare();
+  playSfx("shareStop");
+};
 export const updateScreenShare = async (o: { hint: "detail" | "motion" }) =>
   (await manager()).updateScreenShare(o);
 export const setStreamQuality = async (key: string, q: StreamQuality) =>
