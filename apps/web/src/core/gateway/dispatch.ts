@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Message } from "@tincan/shared";
+import { format, useLocale } from "../i18n/index.js";
 import { shouldNotify, showNotification } from "../notifications.js";
 import { playSfx } from "../sfx/sfx.js";
 import { useChat } from "../state/chat.js";
@@ -22,6 +23,26 @@ export function dispatchEvent(t: string, d: unknown): void {
   if (peers) peerSounds(peers, peersInMyCall());
   if (t === "READY") useUi.getState().bumpReady();
   if (t === "MESSAGE_CREATE") notify((d as { message: Message }).message);
+  if (t === "NUDGE_RECEIVED") nudgeReceived(d as NudgeReceived);
+}
+
+interface NudgeReceived {
+  senderId?: unknown;
+  senderName?: unknown;
+}
+
+/** A member poked you (module `nudge`): always the sound, plus a desktop notification when granted. */
+function nudgeReceived(d: NudgeReceived): void {
+  const name = typeof d.senderName === "string" && d.senderName !== "" ? d.senderName : "Someone";
+  const locale = useLocale.getState().locale;
+  playSfx("nudge");
+  showNotification({
+    title: format(locale, "nudge.received", { name }),
+    body: "",
+    // Repeated pokes from one member replace each other instead of piling up.
+    tag: `nudge-${typeof d.senderId === "string" ? d.senderId : "someone"}`,
+    onClick: () => undefined,
+  });
 }
 
 /** Others in the voice channel this client is in, or null when not in a call. */

@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Added
+
+- **Nudges ("anstupsen"):** a member can nudge another member from their member card in the member list. The target hears a sound and gets a desktop notification, or a Web Push while their app is closed (push module). `POST /api/v1/members/:id/nudge` answers `429 RATE_LIMITED` on cooldown — one nudge per member pair per `modules.nudge.cooldownSecs` (60 s by default) plus a per-sender burst cap (`modules.nudge.burst`, 10 per minute) — and `404` when the module is off (`modules.nudge.enabled: false`).
+
 ## [1.2.2] - 2026-11-13
 
 Nothing to do when upgrading.

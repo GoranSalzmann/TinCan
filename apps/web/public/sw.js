@@ -94,16 +94,18 @@ self.addEventListener("notificationclick", (event) => {
       if (win) {
         await win.focus();
         win.postMessage(msg);
-      } else if (data.channelId) {
-        await self.clients.openWindow("/channels/" + data.channelId);
+      } else {
+        // Messages open their channel; a nudge has none and just opens the app.
+        await self.clients.openWindow(data.channelId ? "/channels/" + data.channelId : "/");
       }
     })(),
   );
 });
 
-/* Web Push: the server sends {channelId, messageId, title, body} (encrypted) when a member's app is closed. The tag
- * is the channel, so a newer message replaces the one still showing, as the in-page notification does. A push that
- * arrives while a window is focused and visible is not shown: the page is already showing the message. */
+/* Web Push: the server sends {title, body, channelId?, messageId?, tag?} (encrypted) when a member's app is closed.
+ * The tag is the channel for messages and "nudge" for nudges, so a newer one replaces the one still showing, as the
+ * in-page notification does. A push that arrives while a window is focused and visible is not shown: the page is
+ * already showing it. */
 self.addEventListener("push", (event) => {
   let data;
   try {
@@ -118,7 +120,7 @@ self.addEventListener("push", (event) => {
       if (list.some((c) => c.focused && c.visibilityState === "visible")) return;
       await self.registration.showNotification(data.title, {
         body: typeof data.body === "string" ? data.body : "",
-        tag: data.channelId,
+        tag: data.tag ?? data.channelId,
         icon: "/icons/icon-192.png",
         data: { channelId: data.channelId, messageId: data.messageId },
       });

@@ -228,6 +228,9 @@ export const api = {
   auditLog: (q: { before?: string; action?: string }) =>
     request<AuditList>("GET", `/audit-log${qs({ ...q, limit: 50 })}`),
 
+  // nudge (module `nudge`)
+  nudge: (id: string) => request<{ online: boolean }>("POST", `/members/${encodeURIComponent(id)}/nudge`),
+
   // channels
   channels: (archived = false) =>
     request<ChannelList>("GET", `/channels${qs({ archived: archived || undefined })}`),

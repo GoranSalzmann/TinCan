@@ -14,6 +14,7 @@ import textChat from "./text-chat/index.js";
 import voice from "./voice/index.js";
 import metrics from "./metrics/index.js";
 import moderation from "./moderation/index.js";
+import nudge from "./nudge/index.js";
 
 /**
  * Every module this build knows (04 §2). Features that arrive in later milestones (roles, channels,
@@ -33,5 +34,6 @@ export const ALL_MODULES: readonly AnyManifest[] = [
   search,
   voice,
   moderation,
+  nudge,
   metrics,
 ];

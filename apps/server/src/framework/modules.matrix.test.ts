@@ -202,6 +202,7 @@ describe("module boot matrix", () => {
         "voice-e2ee",
         "recording",
         "moderation",
+        "nudge",
         "metrics",
       ].sort(),
     );

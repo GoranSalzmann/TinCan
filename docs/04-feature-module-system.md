@@ -21,6 +21,7 @@ Server side first, then client side.
 | `channels` | Channel and category CRUD | roles | db |
 | `text-chat` | Messages, history, edit/delete, replies, mentions | channels | db, pubsub |
 | `read-state` | Unread/mention tracking | text-chat | db |
+| `nudge` | Member-to-member ping ("anstupsen") | accounts | pubsub |
 | `uploads` | Attachments, avatars | accounts | storage, db |
 | `reactions` | Emoji reactions | text-chat | db |
 | `search` | Full-text message search | text-chat | db |

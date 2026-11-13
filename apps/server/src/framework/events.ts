@@ -23,6 +23,8 @@ export interface Events {
   /** A moderator removed someone (11 §2.6): they are signed out everywhere and leave voice. */
   "member.kicked": { userId: string };
   "member.banned": { userId: string };
+  /** A member poked another (module `nudge`): `push` forwards it while the target has no live socket. */
+  "nudge.sent": { senderId: string; senderName: string; targetId: string };
   /** Anything may report an auditable fact; `moderation` stores it (11 §3, 06 §3.10). Never include secrets or message text. */
   "audit.record": AuditInput;
   /** An audit entry was stored (by the moderation module); for metrics. */
