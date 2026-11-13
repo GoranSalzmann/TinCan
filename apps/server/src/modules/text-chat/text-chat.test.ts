@@ -391,6 +391,7 @@ describe("module off", () => {
         modules: {
           "text-chat": { enabled: false },
           "read-state": { enabled: false },
+          push: { enabled: false },
           search: { enabled: false },
           "link-previews": { enabled: false },
         },

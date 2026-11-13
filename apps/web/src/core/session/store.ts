@@ -3,6 +3,7 @@ import { API_VERSION, type Capabilities, type User } from "@tincan/shared";
 import { create } from "zustand";
 import { api, ApiError } from "../api/client.js";
 import { GatewayClient, gatewayUrl, type GatewayState } from "../gateway/client.js";
+import { unsubscribePush } from "../push.js";
 import { dispatchEvent, setDispatchSelf } from "../gateway/dispatch.js";
 import { setSelfId, useChat } from "../state/chat.js";
 import { useCommunity } from "../state/community.js";
@@ -130,6 +131,8 @@ export const useSession = create<SessionState>((set, get) => {
 
     async logout() {
       try {
+        // Needs the login, so before it ends; the server also drops the row when the session is revoked.
+        await unsubscribePush().catch(() => undefined);
         await api.logout();
       } finally {
         stopGateway();

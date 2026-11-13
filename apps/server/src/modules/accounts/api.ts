@@ -79,6 +79,8 @@ export interface AccountsApi {
   revokeAllSessions(userId: string): Promise<number>;
   /** Stores or clears the end of a timeout (epoch ms). `roles` applies it to permissions; this keeps it across restarts. */
   setTimeoutUntil(userId: string, until: number | null): Promise<void>;
+  /** Synced preferences of several users at once (06 `user_setting`), for modules that act on them server-side. */
+  settingsOf(userIds: readonly string[]): Promise<Map<string, Record<string, unknown>>>;
   setLoginBlocker(blocker: LoginBlocker): void;
   onMemberJoin(hook: JoinHook): void;
   onMemberJoined(hook: JoinedHook): void;

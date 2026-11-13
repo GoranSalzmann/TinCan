@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { useEffect, useState } from "react";
 import type { Message, NotificationLevel } from "@tincan/shared";
 import { mentionsUser } from "./state/window.js";
 
@@ -78,24 +79,121 @@ export function notificationPermission(): PermissionState {
 
 export async function requestNotificationPermission(): Promise<PermissionState> {
   if (typeof Notification === "undefined") return "unsupported";
-  return Notification.requestPermission();
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return notificationPermission();
+  }
 }
 
+/**
+ * Keeps the permission state live and never leaves it stuck at "default": until the user explicitly
+ * grants or denies, the next click or key press asks again (browsers only show the prompt from a user
+ * gesture). The state is re-read on focus, visibility change, the Permissions API change event and a
+ * slow timer, so a change made in the browser's site settings is picked up without a reload.
+ */
+export function watchNotificationPermission(onChange: (p: PermissionState) => void): () => void {
+  if (typeof Notification === "undefined") {
+    onChange("unsupported");
+    return () => undefined;
+  }
+  let inflight = false;
+  const sync = () => onChange(notificationPermission());
+  const ask = () => {
+    if (inflight || notificationPermission() !== "default") return;
+    inflight = true;
+    void requestNotificationPermission().finally(() => {
+      inflight = false;
+      sync();
+    });
+  };
+  sync();
+  document.addEventListener("pointerdown", ask, true);
+  document.addEventListener("keydown", ask, true);
+  window.addEventListener("focus", sync);
+  document.addEventListener("visibilitychange", sync);
+  const timer = window.setInterval(sync, 5000);
+  let status: PermissionStatus | null = null;
+  let disposed = false;
+  navigator.permissions
+    ?.query({ name: "notifications" })
+    .then((st) => {
+      if (disposed) return;
+      status = st;
+      st.onchange = sync;
+    })
+    .catch(() => undefined);
+  return () => {
+    disposed = true;
+    document.removeEventListener("pointerdown", ask, true);
+    document.removeEventListener("keydown", ask, true);
+    window.removeEventListener("focus", sync);
+    document.removeEventListener("visibilitychange", sync);
+    window.clearInterval(timer);
+    if (status) status.onchange = null;
+  };
+}
+
+export function useNotificationPermission(): PermissionState {
+  const [perm, setPerm] = useState<PermissionState>(notificationPermission());
+  useEffect(() => watchNotificationPermission(setPerm), []);
+  return perm;
+}
+
+export interface NotificationClickMessage {
+  type: "notification-click";
+  channelId: string;
+  messageId?: string;
+}
+
+/**
+ * Shows a notification. Goes through the service worker when one is active (works while the tab is in
+ * the background and on mobile, where the constructor is refused), else the plain constructor.
+ */
 export function showNotification(opts: {
   title: string;
   body: string;
   tag: string;
+  channelId: string;
+  messageId?: string;
   onClick: () => void;
 }): void {
   if (notificationPermission() !== "granted") return;
-  try {
-    const n = new Notification(opts.title, { body: opts.body, tag: opts.tag });
-    n.onclick = () => {
-      window.focus();
-      opts.onClick();
-      n.close();
-    };
-  } catch {
-    // Some browsers refuse the constructor outside a service worker (mobile); nothing to do.
-  }
+  const options = {
+    body: opts.body,
+    tag: opts.tag,
+    icon: "/icons/icon-192.png",
+    data: { channelId: opts.channelId, messageId: opts.messageId },
+  };
+  const direct = () => {
+    try {
+      const n = new Notification(opts.title, options);
+      n.onclick = () => {
+        window.focus();
+        opts.onClick();
+        n.close();
+      };
+    } catch {
+      // Nothing more to try.
+    }
+  };
+  const sw = navigator.serviceWorker;
+  if (!sw?.controller) return direct();
+  sw.ready.then((reg) => reg.showNotification(opts.title, options)).catch(direct);
+}
+
+/** Opens the channel when a notification shown by the service worker is clicked. */
+export function listenForNotificationClicks(
+  open: (channelId: string, messageId?: string) => void,
+  resubscribe?: () => void,
+): () => void {
+  const sw = navigator.serviceWorker;
+  if (!sw) return () => undefined;
+  const handler = (e: MessageEvent) => {
+    const d = e.data as NotificationClickMessage | undefined;
+    if (d?.type === "notification-click") open(d.channelId, d.messageId);
+    else if ((e.data as { type?: string } | undefined)?.type === "push-resubscribe") resubscribe?.();
+  };
+  sw.addEventListener("message", handler);
+  return () => sw.removeEventListener("message", handler);
 }
