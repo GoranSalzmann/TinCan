@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-13
+
+Nothing to do when upgrading.
+
 ### Added
 
 - **Preferred video codec:** choose Auto, VP8, H.264, VP9 or AV1 independently for camera and screen sharing. The choice is saved in this browser and preselected next time, including after a reload. Unsupported choices use VP8 without losing the preference; AV1 needs a power-efficient encoder. A codec change for a running screen share takes effect when sharing is restarted.
