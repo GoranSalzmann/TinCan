@@ -1,4 +1,4 @@
-# PR pipeline (16 §12): typecheck, lint, unit, contract, module matrix, build, licence and secret scan.
+# PR pipeline (16 §12): typecheck, lint, unit, contract, module matrix, build, boot of the built server, licence and secret scan.
 # `pnpm check` runs the same steps locally. Actions are pinned by commit SHA; Dependabot keeps them current.
 name: PR checks
 
@@ -42,6 +42,8 @@ jobs:
         run: pnpm test:matrix
       - name: Build
         run: pnpm build
+      - name: Boot the built server
+        run: pnpm check:boot
       - name: Dependency audit (S-14)
         run: pnpm audit --audit-level high
       - name: Licence scan
