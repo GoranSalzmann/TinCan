@@ -6,6 +6,21 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-12
+
+Nothing to do when upgrading. Browser notifications now ask for permission at a moment you choose, and they keep working when the Tin Can tab is closed, as long as the browser allows it.
+
+### Added
+
+- **Desktop notifications that reach you:** the permission prompt is asked again on your next click until you answer it, and the browser's permission is re-read when you come back to the tab. Notifications are shown through the service worker, so they appear even when no Tin Can tab is open.
+- **Web Push:** a switch in notification settings subscribes this browser to push messages from the server. The server only sends to push services it recognises, and only while you are offline. The keys come from the instance secret, so there is nothing new to configure.
+- **Interface sounds:** short synthesized cues for new messages and mentions, joining and leaving calls, mute and deafen, screen sharing, lost voice connections and error messages. Nothing is downloaded. A Sounds card in notification settings has a master switch, a volume control, a sample button and a switch for each kind of sound. The choices are kept in each browser.
+
+### Fixed
+
+- **Text channels open at the newest messages:** re-entering a channel no longer leaves you short of the bottom, and "jump to latest" always reaches the end.
+- **Hovering a message timestamp** no longer shifts the message height.
+
 ## [1.1.1] - 2026-11-12
 
 Nothing to do when upgrading.
