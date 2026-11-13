@@ -6,6 +6,14 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-13
+
+Nothing to do when upgrading. Fixes a 1.2.0 start-up failure: the 1.2.0 server did not start, so the deploy rolled back to 1.1.1 and no data was lost.
+
+### Fixed
+
+- **Server start-up:** the server starts again with the Web Push library. Pull checks now start the built server, so this kind of failure is caught before a release.
+
 ## [1.2.0] - 2026-11-12
 
 Nothing to do when upgrading. Browser notifications now ask for permission at a moment you choose, and they keep working when the Tin Can tab is closed, as long as the browser allows it.
