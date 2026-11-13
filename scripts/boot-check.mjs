@@ -72,7 +72,9 @@ rmSync(dir, { recursive: true, force: true });
 
 if (!ok) {
   console.error(output.trim() || "(no output)");
-  console.error(exited ? `Server exited early (${JSON.stringify(exited)}).` : "Server was not ready in time.");
+  console.error(
+    exited ? `Server exited early (${JSON.stringify(exited)}).` : "Server was not ready in time.",
+  );
   process.exit(1);
 }
 console.log("Built server booted and answered /readyz.");
