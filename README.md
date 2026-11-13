@@ -15,6 +15,7 @@ A friends group, a club, a small team or a game community, roughly up to a few d
 - **Text:** channels, formatting, mentions, replies, reactions, edits, pins, file uploads (limits set by the owner, up to 4 GiB per file), search.
 - **Voice:** voice channels over LiveKit, noise suppression, push to talk (while the window has focus), a connection test.
 - **Camera and screen share:** viewers choose to watch, quality presets and a custom quality up to 4K and 60 fps, server-wide bitrate caps.
+- **Linux application audio:** an optional small Rust/PipeWire helper lets the PWA share selected apps in stereo while excluding the Tin Can conversation. [Setup and requirements](docs/audio-helper.md).
 - **Roles and moderation:** roles and per-channel permissions, timeout, server mute, move, kick, ban, an audit log.
 - **Encrypted voice (E2EE):** on by default. The media server cannot read calls; **you, the host, can**, because the keys derive from your server's secret. Text and files are not end-to-end encrypted. The details are in [docs/10](docs/10-end-to-end-encryption.md) and the [user guide](docs/guides/user-guide.md).
 - **Backups:** `tincan backup` (optionally encrypted), a daily schedule, `tincan restore`, a restore drill script, metrics and optional Grafana dashboards.
@@ -23,7 +24,7 @@ A friends group, a club, a small team or a game community, roughly up to a few d
 
 ## What does not exist
 
-- **No desktop app.** The installable web app replaces it. That means no global push-to-talk key or mute shortcut, and system audio when screen sharing only where the browser offers it (Windows and ChromeOS).
+- **No desktop app.** The installable web app replaces it. That means no global push-to-talk key or mute shortcut. Screen audio comes from the browser where supported, or from the optional Linux x86-64 audio helper.
 - **No native mobile apps.** The web app works on a phone browser; voice and camera there are not tested yet.
 - **One server per community.** There is no federation and no shared account across servers.
 - **SQLite only**, one app process. No Postgres, Redis or S3 yet.

@@ -2,6 +2,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as actions from "../../core/voice/actions.js";
+import * as helper from "../../core/voice/audio-helper.js";
 import { useVoice } from "../../core/voice/store.js";
 import * as video from "../../core/voice/video.js";
 import { ShareDialog } from "./ShareDialog.js";
@@ -27,7 +28,7 @@ const reset = () => {
 
 beforeEach(() => {
   reset();
-  vi.spyOn(actions, "startScreenShare").mockResolvedValue(undefined);
+  vi.spyOn(actions, "startScreenShare").mockResolvedValue(true);
   vi.spyOn(actions, "updateScreenShare").mockResolvedValue(undefined);
   vi.spyOn(video, "knownCodecSupport").mockReturnValue({
     h264: true,
@@ -43,6 +44,64 @@ afterEach(() => {
 });
 
 describe("share dialog", () => {
+  it("keeps the dialog open when the browser screen picker is cancelled", async () => {
+    vi.mocked(actions.startScreenShare).mockResolvedValue(false);
+    const onOpenChange = vi.fn();
+    render(<ShareDialog open onOpenChange={onOpenChange} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
+  it("requires an application selection and passes exact stream IDs to the manager", async () => {
+    vi.spyOn(helper, "isLinuxDesktop").mockReturnValue(true);
+    vi.spyOn(helper, "helperPreferred").mockReturnValue(true);
+    vi.spyOn(helper, "supportsHelperAudio").mockReturnValue(true);
+    vi.spyOn(helper, "hasHelperToken").mockReturnValue(true);
+    vi.spyOn(helper, "checkHelper").mockResolvedValue();
+    vi.spyOn(helper, "helperSources").mockResolvedValue([
+      { id: "123", name: "Game", detail: "", running: true },
+    ]);
+    const onOpenChange = vi.fn();
+    render(<ShareDialog open onOpenChange={onOpenChange} />);
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    const game = await screen.findByRole("checkbox", { name: /Game/ });
+    fireEvent.click(game);
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    vi.mocked(actions.startScreenShare).mockRejectedValue(new helper.HelperError("source_missing"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    });
+    expect(actions.startScreenShare).toHaveBeenCalledWith({
+      hint: "detail",
+      audio: true,
+      helper: { sources: ["123"], names: ["Game"] },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/selected stream closed/i);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("lets the user cancel a pending share and ignores its late completion", async () => {
+    let finish: (started: boolean) => void = () => undefined;
+    const pending = new Promise<boolean>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(actions.startScreenShare).mockReturnValue(pending);
+    const stop = vi.spyOn(actions, "stopScreenShare").mockResolvedValue();
+    const onOpenChange = vi.fn();
+    render(<ShareDialog open onOpenChange={onOpenChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(stop).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+    await act(async () => {
+      finish(true);
+    });
+    expect(onOpenChange).toHaveBeenCalledOnce();
+  });
+
   it("explains that codec edits apply next time and updates a running share on Apply without starting one", async () => {
     useVoice.setState({
       screenOn: true,

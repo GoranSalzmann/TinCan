@@ -9,6 +9,7 @@ import { useVoice } from "../../core/voice/store.js";
 import { streamKey } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
 import { ShareDialog, mbps } from "./ShareDialog.js";
+import { useHelperAudio } from "../../core/voice/audio-helper.js";
 
 /**
  * The bar at the top of the main column while you share or have your camera on (W-13): what goes out, who watches
@@ -27,6 +28,7 @@ export function SharingBar() {
   const members = useCommunity((s) => s.members);
   const [open, setOpen] = useState(false);
   const [change, setChange] = useState(false);
+  const helper = useHelperAudio();
   if (!screenOn && !cameraOn) return null;
 
   const names = (key: string) =>
@@ -88,6 +90,25 @@ export function SharingBar() {
         ) : null}
       </span>
       <span className="text-text-muted">{t("video.bar.upload", { mbps: mbps(upload) })}</span>
+      {screenOn && helper.active ? (
+        <span className="flex min-w-0 items-center gap-2">
+          <meter
+            min={0}
+            max={1}
+            value={helper.level}
+            aria-label={t("voice.helper.level")}
+            className="h-2 w-16"
+          />
+          <span className="max-w-64 truncate" title={helper.names.join(", ")}>
+            {t("voice.helper.sharing", { names: formatList(locale, helper.names) })}
+          </span>
+          {helper.missing ? (
+            <span role="status" className="text-warning-text">
+              {t("voice.helper.waiting")}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
       <span className="ms-auto flex gap-2">
         {screenOn ? (
           <Button variant="ghost" onClick={() => setChange(true)}>

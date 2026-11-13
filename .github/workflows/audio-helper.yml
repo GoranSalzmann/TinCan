@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Linux audio helper
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  helper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust checks and static Linux build
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            -e CARGO_HOME=/repo/apps/audio-helper/target/cargo rust:1.100-alpine sh -ec '
+              rustup component add rustfmt clippy
+              cargo fmt --manifest-path apps/audio-helper/Cargo.toml -- --check
+              cargo test --locked --manifest-path apps/audio-helper/Cargo.toml
+              cargo clippy --locked --all-targets --manifest-path apps/audio-helper/Cargo.toml -- -D warnings
+              cargo build --locked --release --manifest-path apps/audio-helper/Cargo.toml
+              sh scripts/package-audio-helper.sh apps/audio-helper/target/release/tincan-audio /repo/out/audio-helper
+            '
+      - name: Installer shell checks
+        run: shellcheck scripts/package-audio-helper.sh apps/web/public/helpers/install.sh
+      - name: Ubuntu PipeWire isolation and lifecycle
+        run: |
+          docker build -f tools/audio-helper-test/Dockerfile -t tincan-audio-test .
+          docker run --rm -e AUDIO_HELPER_PACKAGE=/repo/out/audio-helper -v "$PWD:/repo:ro" tincan-audio-test apps/audio-helper/target/release/tincan-audio
+      - name: Fedora PipeWire isolation and lifecycle
+        run: |
+          docker build -f tools/audio-helper-test/Dockerfile.fedora -t tincan-audio-test-fedora .
+          docker run --rm -e AUDIO_HELPER_PACKAGE=/repo/out/audio-helper -v "$PWD:/repo:ro" tincan-audio-test-fedora apps/audio-helper/target/release/tincan-audio
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Real Chromium pairing, stereo capture and conversation exclusion
+        run: |
+          docker build -f tools/audio-helper-test/Dockerfile.browser -t tincan-audio-test-browser .
+          docker run --rm -v "$PWD:/repo:ro" tincan-audio-test-browser apps/audio-helper/target/release/tincan-audio
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: audio-helper
+          path: out/audio-helper/

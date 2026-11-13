@@ -9,6 +9,8 @@ import {
 } from "livekit-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { publishOptionsFor, voiceManager } from "./manager.js";
+import { captureHelperAudio, HelperError } from "./audio-helper.js";
+import type * as AudioHelper from "./audio-helper.js";
 import { useVoice } from "./store.js";
 import type * as Video from "./video.js";
 import {
@@ -40,6 +42,10 @@ vi.mock("../session/store.js", () => ({
 }));
 vi.mock("../sfx/sfx.js", () => ({ playSfx: vi.fn() }));
 vi.mock("./pipeline.js", () => ({ createPipeline: vi.fn() }));
+vi.mock("./audio-helper.js", async (original) => ({
+  ...(await original<typeof AudioHelper>()),
+  captureHelperAudio: vi.fn(),
+}));
 vi.mock("./video.js", async (original) => ({
   ...(await original<typeof Video>()),
   detectCodecSupport: vi.fn(async () => ({ h264: true, vp9: true, av1Hardware: true })),
@@ -92,6 +98,7 @@ vi.mock("livekit-client", async (original) => {
             this.setVideo(livekit.Track.Source.ScreenShare, on, options);
           },
         ),
+        publishTrack: vi.fn(async (_track: MediaStreamTrack, _options: TrackPublishOptions) => undefined),
         unpublishTrack: vi.fn(async (track: ReturnType<typeof makeTrack>, stop: boolean) => {
           for (const [source, pub] of this.publications) {
             if (pub.track !== track) continue;
@@ -192,6 +199,67 @@ describe("saved codec preferences in the voice manager", () => {
     useVideoPrefs.setState({ prefs: initialPrefs });
     localStorage.clear();
     useVoice.getState().reset();
+  });
+
+  it("cancels a picker that completes after changing rooms without stopping the new participant", async () => {
+    const old = voiceManager.room!.localParticipant;
+    let finish: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(old.setScreenShareEnabled).mockImplementationOnce(async () => {
+      await pending;
+      return undefined;
+    });
+    const starting = voiceManager.startScreenShare({ hint: "detail", audio: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(old.setScreenShareEnabled).toHaveBeenCalledWith(true, expect.anything(), expect.anything());
+    await voiceManager.join("other-channel");
+    const next = voiceManager.room!.localParticipant;
+    finish();
+    expect(await starting).toBe(false);
+    expect(old.setScreenShareEnabled).toHaveBeenLastCalledWith(false);
+    expect(next.setScreenShareEnabled).not.toHaveBeenCalled();
+    expect(useVoice.getState().screenOn).toBe(false);
+  });
+
+  it("publishes helper audio separately as screen audio and closes it on stop", async () => {
+    const track = { stop: vi.fn() } as unknown as MediaStreamTrack;
+    const stop = vi.fn(async () => undefined);
+    vi.mocked(captureHelperAudio).mockResolvedValueOnce({ track, stop });
+    const helper = { sources: ["123"], names: ["Game"] };
+    expect(await voiceManager.startScreenShare({ hint: "motion", audio: true, helper })).toBe(true);
+    const participant = voiceManager.room!.localParticipant;
+    expect(participant.setScreenShareEnabled).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ audio: false }),
+      expect.anything(),
+    );
+    expect(participant.publishTrack).toHaveBeenCalledWith(
+      track,
+      expect.objectContaining({
+        source: Track.Source.ScreenShareAudio,
+        forceStereo: true,
+        dtx: false,
+        red: false,
+      }),
+    );
+    await voiceManager.stopScreenShare();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(useVoice.getState().screenOn).toBe(false);
+  });
+
+  it("rolls back the video and surfaces a helper setup failure", async () => {
+    vi.mocked(captureHelperAudio).mockRejectedValueOnce(new HelperError("input_missing"));
+    await expect(
+      voiceManager.startScreenShare({
+        hint: "detail",
+        audio: true,
+        helper: { sources: ["123"], names: ["Game"] },
+      }),
+    ).rejects.toEqual(new HelperError("input_missing"));
+    expect(voiceManager.room!.localParticipant.getTrackPublication(Track.Source.ScreenShare)).toBeUndefined();
+    expect(useVoice.getState().screenOn).toBe(false);
   });
 
   it.each(CODECS)(

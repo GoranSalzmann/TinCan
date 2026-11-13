@@ -18,6 +18,7 @@ import {
 import { request } from "../api/client.js";
 import { sendCommand, useSession } from "../session/store.js";
 import { playSfx } from "../sfx/sfx.js";
+import { captureHelperAudio, HelperError, type HelperCapture, type HelperSelection } from "./audio-helper.js";
 import { createE2eeWorker, decodeKey, e2eeSupported, RoomKeyProvider } from "./e2ee.js";
 import { createPipeline, type Pipeline } from "./pipeline.js";
 import { effectiveSettings, useAudioPrefs, type AudioPrefs } from "./prefs.js";
@@ -86,6 +87,19 @@ const QUALITY: Record<string, Quality> = {
   [ConnectionQuality.Lost]: "lost",
 };
 
+function screenAudioConstraints() {
+  return { echoCancellation: false, noiseSuppression: false, autoGainControl: false, restrictOwnAudio: true };
+}
+
+interface ScreenOperation {
+  room: Room;
+  abort: AbortController;
+  helper: HelperCapture | null;
+  helperMode: boolean;
+  starting: boolean;
+  stopping: Promise<void> | null;
+}
+
 /**
  * One call at a time (08 §4.5): the Room, the audio pipeline and the transmit gate. The UI talks to it through
  * `actions.ts` and reads state from `useVoice`.
@@ -103,6 +117,7 @@ class VoiceManager {
   /** Receive path per person: gain then limiter, then a tap for the tests (D8 volume above 100 %). */
   #chains = new Map<string, { gain: GainNode; limiter: DynamicsCompressorNode }>();
   #playback: AudioContext | null = null;
+  #screen: ScreenOperation | null = null;
   #cleanups: (() => void)[] = [];
   /** Streams the person asked to watch; kept across a camera being switched off and on (R-041). */
   #wanted = new Set<string>();
@@ -217,10 +232,28 @@ class VoiceManager {
     void this.#detectTransport(room);
     // #publishMic already started the meter when there is a microphone.
     if (!this.#meter) this.#startMeter();
+    if (prefs.outputDeviceId)
+      await room.switchActiveDevice("audiooutput", prefs.outputDeviceId).catch(() => undefined);
 
     // Changing device, preset or tier in settings applies live (W-21).
     let last = JSON.stringify(captureKey(prefs));
+    let lastOutput = prefs.outputDeviceId;
     this.#unsubPrefs = useAudioPrefs.subscribe((s) => {
+      if (s.prefs.outputDeviceId !== lastOutput) {
+        lastOutput = s.prefs.outputDeviceId;
+        const op = this.#screen;
+        if (op?.helperMode) {
+          useVoice.getState().patch({ notice: "helper_lost" });
+          void this.#stopScreen(op).then(() => {
+            if (room === this.#room)
+              void room
+                .switchActiveDevice("audiooutput", s.prefs.outputDeviceId ?? "")
+                .catch(() => undefined);
+          });
+        } else {
+          void room.switchActiveDevice("audiooutput", lastOutput ?? "").catch(() => undefined);
+        }
+      }
       const key = JSON.stringify(captureKey(s.prefs));
       if (key !== last) {
         last = key;
@@ -312,6 +345,7 @@ class VoiceManager {
   }
 
   async #teardown(): Promise<void> {
+    if (this.#screen) await this.#stopScreen(this.#screen);
     this.#unsubPrefs?.();
     this.#unsubPrefs = null;
     if (this.#meter) clearInterval(this.#meter);
@@ -754,45 +788,113 @@ class VoiceManager {
   }
 
   /**
-   * Screen share through the browser's own picker (W-16). Cancelling the picker is not an error. Audio is only
-   * available where the browser offers it: tab audio in Chromium, system audio on Windows and ChromeOS, none in
-   * Firefox or Safari (docs/18 §K).
+   * Video always uses the browser's picker. Audio comes from that picker or the
+   * Linux companion; a cancelled/obsolete operation owns its own cleanup.
    */
-  async startScreenShare(o: { hint: "detail" | "motion"; audio: boolean }): Promise<void> {
+  async startScreenShare(o: {
+    hint: "detail" | "motion";
+    audio: boolean;
+    helper?: HelperSelection;
+  }): Promise<boolean> {
     const room = this.#room;
     const st = useVoice.getState();
-    if (!room) return;
-    const r = await this.#resolve("screen");
-    if (!r) return void st.patch({ notice: "screen_failed" });
-    const preset = r.preset;
+    if (!room || this.#screen || st.screenOn) return false;
+    const op: ScreenOperation = {
+      room,
+      abort: new AbortController(),
+      helper: null,
+      helperMode: !!o.helper,
+      starting: true,
+      stopping: null,
+    };
+    this.#screen = op;
+    const alive = () => {
+      if (op.abort.signal.aborted || room !== this.#room || this.#screen !== op)
+        throw new DOMException("Cancelled", "AbortError");
+    };
     try {
+      const r = await this.#resolve("screen");
+      alive();
+      if (!r) throw new Error("No supported screen configuration");
+      const preset = r.preset;
       await room.localParticipant.setScreenShareEnabled(
         true,
         {
-          audio: o.audio
-            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-            : false,
+          audio: o.audio && !o.helper ? screenAudioConstraints() : false,
           resolution: { width: preset.width, height: preset.height, frameRate: preset.fps },
           contentHint: o.hint,
           selfBrowserSurface: "exclude",
           surfaceSwitching: "include",
           systemAudio: "include",
-          suppressLocalAudioPlayback: true,
         },
         publishOptionsFor("screen", r),
       );
+      alive();
+      if (o.helper) {
+        if (!this.#playback) throw new HelperError("session_lost");
+        const helper = await captureHelperAudio(
+          o.helper,
+          this.#playback,
+          useAudioPrefs.getState().prefs.outputDeviceId,
+          op.abort.signal,
+          () => {
+            if (this.#screen !== op || op.abort.signal.aborted) return;
+            void this.#stopScreen(op);
+            useVoice.getState().patch({ notice: "helper_lost" });
+          },
+        );
+        op.helper = helper;
+        alive();
+        await room.localParticipant.publishTrack(helper.track, {
+          ...publishOptionsFor("screen", r),
+          source: Track.Source.ScreenShareAudio,
+          name: "application-audio",
+        });
+        alive();
+      }
       this.#noteLocalShare(r, o.hint);
       this.#startActualPoll();
+      return true;
     } catch (err) {
+      await this.#stopScreen(op);
       const name = (err as DOMException).name;
-      if (name === "NotAllowedError" || name === "AbortError") return; // the person cancelled the picker
-      useVoice.getState().patch({ notice: "screen_failed" });
+      if (err instanceof HelperError) throw err;
+      if (name === "NotAllowedError" || name === "AbortError") return false; // the person cancelled the picker
+      if (room === this.#room) useVoice.getState().patch({ notice: "screen_failed" });
+      return false;
+    } finally {
+      op.starting = false;
+      // setScreenShareEnabled/publishTrack can finish after a stop or room change.
+      // Retry on the old participant, never on a newly joined room.
+      if (op.abort.signal.aborted) {
+        await this.#stopScreen(op);
+        if (this.#screen === op) this.#screen = null;
+      }
     }
   }
 
   async stopScreenShare(): Promise<void> {
-    await this.#room?.localParticipant.setScreenShareEnabled(false).catch(() => undefined);
-    useVoice.getState().patch({ screenOn: false, share: null });
+    if (this.#screen) await this.#stopScreen(this.#screen);
+  }
+
+  async #stopScreen(op: ScreenOperation): Promise<void> {
+    op.abort.abort();
+    if (op.stopping) return op.stopping;
+    op.stopping = (async () => {
+      const helper = op.helper;
+      op.helper = null;
+      await helper?.stop();
+      await op.room.localParticipant.setScreenShareEnabled(false).catch(() => undefined);
+      if (this.#screen === op) {
+        if (op.room === this.#room) useVoice.getState().patch({ screenOn: false, share: null });
+        if (!op.starting) this.#screen = null;
+      }
+    })();
+    try {
+      await op.stopping;
+    } finally {
+      op.stopping = null;
+    }
   }
 
   /** Quality and optimisation while live, within the cap; the picker is not shown again (W-13). Audio is fixed at start. */
@@ -925,9 +1027,14 @@ class VoiceManager {
       useVoice.getState().patch({ cameraOn: false });
     } else if (pub.source === Track.Source.ScreenShare) {
       pub.track?.stop();
+      void this.stopScreenShare();
       useVoice.getState().patch({ screenOn: false, share: null });
     } else if (pub.source === Track.Source.ScreenShareAudio) {
       pub.track?.stop();
+      const op = this.#screen;
+      if (op?.helperMode && !op.abort.signal.aborted) void this.#stopScreen(op);
+      const share = useVoice.getState().share;
+      if (share) useVoice.getState().patch({ share: { ...share, audio: false } });
     }
   }
 
@@ -993,7 +1100,8 @@ class VoiceManager {
       document.body.appendChild(el);
       if (track instanceof RemoteAudioTrack && this.#playback) this.#chain(track, key, this.#playback);
       const sink = useAudioPrefs.getState().prefs.outputDeviceId;
-      if (sink) void room.switchActiveDevice("audiooutput", sink).catch(() => undefined);
+      if (sink && !this.#screen?.helperMode)
+        void room.switchActiveDevice("audiooutput", sink).catch(() => undefined);
     });
     room.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
       track.detach().forEach((el) => el.remove());
@@ -1026,6 +1134,7 @@ class VoiceManager {
         (perm.canPublishSources.length === 0 || perm.canPublishSources.includes(source));
       const mayPublishMic = may(PROTOCOL_MICROPHONE);
       useVoice.getState().patch({ canCamera: may(PROTOCOL_CAMERA), canScreen: may(PROTOCOL_SCREEN_SHARE) });
+      if (!may(PROTOCOL_SCREEN_SHARE)) void this.stopScreenShare();
       if (mayPublishMic) void this.#publishMic(room, useAudioPrefs.getState().prefs);
     });
     room.on(RoomEvent.EncryptionError, () => {

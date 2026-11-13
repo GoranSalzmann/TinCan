@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+FROM tincan-audio-test-fedora
+RUN dnf install -y --setopt=install_weak_deps=False chromium nodejs && dnf clean all
+ENV AUDIO_HELPER_BROWSER=1
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
