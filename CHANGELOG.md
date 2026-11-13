@@ -12,7 +12,7 @@ Nothing to do when upgrading. Fixes a 1.2.0 start-up failure: the 1.2.0 server d
 
 ### Fixed
 
-- **Server start-up:** the server starts again with the Web Push library. Pull checks now start the built server, so this kind of failure is caught before a release.
+- **Server start-up:** the server starts again with the Web Push library. PR checks now start the built server, so this kind of failure is caught before a release.
 
 ## [1.2.0] - 2026-11-12
 
