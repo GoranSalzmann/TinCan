@@ -455,6 +455,18 @@ async function main(): Promise<number> {
     const all = [ann, bo, cy];
 
     console.log("Running:");
+    await step("the preferred camera codec stays selected after a full page reload", async () => {
+      await ann.page.goto(`${WEB}/settings/voice`);
+      await ann.page.getByRole("combobox", { name: "Video codec" }).selectOption("vp9");
+      await ann.page.reload();
+      const codec = ann.page.getByRole("combobox", { name: "Video codec" });
+      await codec.waitFor();
+      if ((await codec.inputValue()) !== "vp9") throw new Error("the saved codec was not restored");
+      // Keep the baseline simulcast checks below on the original automatic selection.
+      await codec.selectOption("auto");
+      await ann.page.goto(WEB);
+    });
+
     await step("all three join the voice channel and see each other", async () => {
       for (const c of all) await c.page.getByRole("link", { name: /Join voice channel Lounge/ }).click();
       for (const c of all) await dock(c.page).getByText("Voice connected").waitFor({ timeout: 20_000 });
@@ -876,6 +888,15 @@ async function main(): Promise<number> {
     const setPrefs = (p: Page, patch: object) =>
       p.evaluate(`window.__tincanVideoPrefs.getState().set(${JSON.stringify(patch)})`);
     const codecsSent = async (p: Page) => (await videoStats(p)).outbound.map((o) => o.codec).filter(Boolean);
+    const currentCodecs = (p: Page, source: "camera" | "screen_share") =>
+      p.evaluate<string[]>(`(async () => {
+        const track = window.__tincanVoice.room?.localParticipant.getTrackPublication("${source}")?.videoTrack;
+        if (!track?.sender) return [];
+        const report = await track.sender.getStats();
+        return [...report.values()]
+          .filter((s) => s.type === 'outbound-rtp' && s.kind === 'video' && s.active !== false && s.bytesSent > 0)
+          .map((s) => report.get(s.codecId)?.mimeType || '').filter(Boolean);
+      })()`);
     const topWidth = async (p: Page) => Math.max(0, ...(await videoStats(p)).outbound.map((o) => o.width));
 
     // Chromium's fake camera cannot deliver more than 1280×720, so this step also proves the readout: the person asked
@@ -947,6 +968,33 @@ async function main(): Promise<number> {
     );
 
     await step(
+      "an explicit camera codec overrides a preset and changing it republishes the camera",
+      async () => {
+        await setPrefs(ann.page, { cameraPreset: "standard", cameraCodec: "vp9" });
+        await controls(ann.page).getByRole("button", { name: "Turn camera on" }).click();
+        await bo.page.getByRole("button", { name: "Watch camera" }).click();
+        await until(
+          "preset camera encoded as VP9",
+          async () => (await currentCodecs(ann.page, "camera")).some((codec) => /vp9/i.test(codec)),
+          20_000,
+        );
+        await ann.page.evaluate(`(async () => {
+          const prev = window.__tincanVideoPrefs.getState().prefs;
+          window.__tincanVideoPrefs.getState().set({ cameraCodec: "vp8" });
+          await window.__tincanVoice.applyCameraPrefs(prev);
+        })()`);
+        await until(
+          "camera republished as VP8",
+          async () => (await currentCodecs(ann.page, "camera")).some((codec) => /vp8/i.test(codec)),
+          20_000,
+        );
+        await vm(bo.page, `unwatch("${ids.ann}", "camera")`);
+        await controls(ann.page).getByRole("button", { name: "Turn camera off" }).click();
+        await setPrefs(ann.page, { cameraCodec: "auto" });
+      },
+    );
+
+    await step(
       "a custom 1080p60 screen share shows what was asked for against what the browser delivers",
       async () => {
         await setPrefs(cy.page, {
@@ -1012,6 +1060,43 @@ async function main(): Promise<number> {
       await ann.page.getByRole("button", { name: "Stop watching" }).click();
       await controls(cy.page).getByRole("button", { name: "Stop sharing screen" }).click();
       await setPrefs(cy.page, { screenPreset: "standard" });
+    });
+
+    await step("a changed screen codec is saved but only applied after sharing restarts", async () => {
+      await controls(cy.page).getByRole("button", { name: "Share screen" }).click();
+      let dialog = cy.page.getByRole("dialog", { name: "Share your screen" });
+      await dialog.getByRole("combobox", { name: "Video codec" }).selectOption("vp9");
+      await dialog.getByRole("button", { name: "Continue" }).click();
+      await ann.page.getByRole("button", { name: "Watch stream" }).click();
+      await until(
+        "preset screen encoded as VP9",
+        async () => (await currentCodecs(cy.page, "screen_share")).some((codec) => /vp9/i.test(codec)),
+        20_000,
+      );
+      await cy.page.getByRole("region", { name: "Sharing" }).getByRole("button", { name: "Change" }).click();
+      dialog = cy.page.getByRole("dialog", { name: "Change stream settings" });
+      await dialog.getByRole("combobox", { name: "Video codec" }).selectOption("vp8");
+      await dialog.getByText(/Codec changes are saved for your next screen share/).waitFor();
+      await dialog.getByRole("button", { name: "Apply" }).click();
+      const codecs = await currentCodecs(cy.page, "screen_share");
+      if (!codecs.some((codec) => /vp9/i.test(codec)) || codecs.some((codec) => /vp8/i.test(codec)))
+        throw new Error(`the running codec changed: ${codecs.join(",")}`);
+      await cy.page.getByTestId("video-readout").getByText(/VP9/).waitFor();
+      await controls(cy.page).getByRole("button", { name: "Stop sharing screen" }).click();
+      await controls(cy.page).getByRole("button", { name: "Share screen" }).click();
+      dialog = cy.page.getByRole("dialog", { name: "Share your screen" });
+      if ((await dialog.getByRole("combobox", { name: "Video codec" }).inputValue()) !== "vp8")
+        throw new Error("the next share did not preselect the saved codec");
+      await dialog.getByRole("button", { name: "Continue" }).click();
+      await ann.page.getByRole("button", { name: "Watch stream" }).click();
+      await until(
+        "restarted screen encoded as VP8",
+        async () => (await currentCodecs(cy.page, "screen_share")).some((codec) => /vp8/i.test(codec)),
+        20_000,
+      );
+      await ann.page.getByRole("button", { name: "Stop watching" }).click();
+      await controls(cy.page).getByRole("button", { name: "Stop sharing screen" }).click();
+      await setPrefs(cy.page, { screenCodec: "auto" });
     });
 
     await step("taking CONNECT away removes the person from the call within seconds", async () => {

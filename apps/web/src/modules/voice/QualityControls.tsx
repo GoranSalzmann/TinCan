@@ -14,6 +14,8 @@ import {
   sanitizeCustom,
   type CustomVideo,
   type StreamSource,
+  type VideoCodecName,
+  type VideoCodecPreference,
   type VideoPrefs,
   uploadKbps,
   useVideoPrefs,
@@ -23,6 +25,8 @@ import {
 export const mbit = (kbps: number): string => (Math.round(kbps / 100) / 10).toString();
 
 const select = "min-h-8 rounded-md border border-border-control bg-bg-input px-2";
+const codecs: VideoCodecName[] = ["vp8", "h264", "vp9", "av1"];
+const codecLabel = (codec: VideoCodecName): string => (codec === "h264" ? "H.264" : codec.toUpperCase());
 
 /**
  * Presets plus a Custom choice with resolution, frame rate and bitrate, for the camera and for a screen share. A preset
@@ -43,17 +47,27 @@ export function QualityControls({
   const cap = useVoice((s) => (source === "camera" ? s.caps.cameraKbps : s.caps.screenKbps));
   const [, rerender] = useState(0);
   useEffect(() => {
-    void detectCodecSupport().then(() => rerender((n) => n + 1));
+    let cancelled = false;
+    void detectCodecSupport().then(() => {
+      if (!cancelled) rerender((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const presetKey = source === "camera" ? "cameraPreset" : "screenPreset";
   const customKey = source === "camera" ? "cameraCustom" : "screenCustom";
+  const codecKey = source === "camera" ? "cameraCodec" : "screenCodec";
   const chosen = prefs[presetKey];
   const stored = prefs[customKey];
-  const r = resolveVideo(source, chosen, stored, cap, knownCodecSupport());
+  const preference = prefs[codecKey];
+  const support = knownCodecSupport();
+  const r = resolveVideo(source, chosen, stored, cap, support, preference);
   if (!r) return <p className="text-sm text-danger-text">{t("video.capped.none")}</p>;
   const cur = { height: r.preset.height, fps: r.preset.fps };
   const manual = r.custom && stored.bitrateKbps !== null;
+  const codecFallback = preference !== "auto" && preference !== r.codec;
 
   const edit = (patch: Partial<CustomVideo>) => {
     const prev = prefs;
@@ -94,6 +108,49 @@ export function QualityControls({
           {t("video.custom")}
         </label>
       </fieldset>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${source}-codec`} className="font-medium">
+          {t("video.codec.preference")}
+        </label>
+        <select
+          id={`${source}-codec`}
+          className={select}
+          value={preference}
+          aria-describedby={[
+            `${source}-codec-help`,
+            !support.av1Hardware ? `${source}-codec-av1` : "",
+            codecFallback ? `${source}-codec-fallback` : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onChange={(e) => {
+            const prev = prefs;
+            setPrefs({ [codecKey]: e.target.value as VideoCodecPreference });
+            onChanged?.(prev);
+          }}
+        >
+          <option value="auto">{t("video.codec.auto")}</option>
+          {codecs.map((codec) => (
+            <option key={codec} value={codec} disabled={codec === "av1" && !support.av1Hardware}>
+              {codecLabel(codec)}
+            </option>
+          ))}
+        </select>
+        <p id={`${source}-codec-help`} className="m-0 text-sm text-text-muted">
+          {t("video.codec.saved")}
+        </p>
+        {!support.av1Hardware ? (
+          <p id={`${source}-codec-av1`} className="m-0 text-sm text-text-muted">
+            {t("video.codec.av1Hardware")}
+          </p>
+        ) : null}
+        {codecFallback ? (
+          <p id={`${source}-codec-fallback`} role="status" className="m-0 text-sm text-warning-text">
+            {t("video.codec.fallback", { requested: codecLabel(preference), codec: codecLabel(r.codec) })}
+          </p>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-[8rem_1fr] items-center gap-2">
         <label htmlFor={`${source}-res`}>{t("video.resolution")}</label>
@@ -189,7 +246,7 @@ export function QualityControls({
         {t(source === "camera" ? "video.pane.upload" : "video.share.estimate", {
           mbps: mbit(uploadKbps(r.preset)),
         })}
-        {r.custom ? ` ${t("video.codec", { codec: r.codec.toUpperCase() })}` : ""}
+        {` ${t("video.codec", { codec: codecLabel(r.codec) })}`}
       </p>
     </div>
   );

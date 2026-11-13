@@ -18,6 +18,8 @@ Files: drop or paste into the message box. Images show inline; everything else d
 
 Click a voice channel to join; click the microphone or headphones to mute or deafen yourself. Settings › Voice & audio has your devices, noise suppression, push to talk and a connection test. Camera and screen share are in the call bar; nobody receives your screen or camera picture until they press **Watch**, and you can see who is watching.
 
+Choose a **Video codec** under the camera quality settings or in the screen-sharing dialog: Auto, VP8, H.264, VP9 or AV1. Camera and screen-sharing choices are saved separately in this browser and preselected next time, even after a reload. Auto keeps the existing automatic choice; an unsupported preference uses VP8 without forgetting your choice. AV1 is used only when the browser reports power-efficient encoding. Changing the camera codec restarts the camera; changing a running screen share's codec takes effect after you stop and start sharing again.
+
 ### The lock
 
 A lock and "End-to-end encrypted" in the call header mean the **media server cannot read the call**. Be clear about what it does not mean:

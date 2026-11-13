@@ -38,6 +38,7 @@ import {
   type StreamQuality,
   type StreamSource,
   type Resolved,
+  type VideoCodecName,
   type VideoPrefs,
   uploadKbps,
 } from "./video.js";
@@ -55,19 +56,18 @@ const SOURCE_OF: Record<StreamSource, Track.Source> = {
 const streamSourceOf = (s: Track.Source): StreamSource | null =>
   s === Track.Source.Camera ? "camera" : s === Track.Source.ScreenShare ? "screen" : null;
 
-/** Publish options for a preset: simulcast layers below the top one, and the top layer's cap (08 §5.2). */
-function publishOptionsFor(source: StreamSource, r: Resolved): TrackPublishOptions {
+/** Publish options: VP8/H264 simulcast or VP9/AV1 SVC, with the top layer's cap (08 §5.2). */
+export function publishOptionsFor(source: StreamSource, r: Resolved): TrackPublishOptions {
   const p = r.preset;
   const encoding = { maxBitrate: p.kbps * 1000, maxFramerate: p.fps };
-  const layers = p.layers.map((l) => new LkVideoPreset(l.width, l.height, l.kbps * 1000, l.fps));
-  // Presets stay on VP8 with simulcast. A custom setting above 1080p30 uses VP9 (or hardware AV1) as one scalable
-  // encoding, whose spatial layers the SFU and dynacast handle like simulcast; the SDK adds a VP8 backup for viewers
-  // that cannot decode it. For these codecs the simulcast layer list has no effect.
-  const codec: TrackPublishOptions = r.codec === "vp8" ? {} : { videoCodec: r.codec, simulcast: true };
+  const svc = r.codec === "vp9" || r.codec === "av1";
+  const layers = svc ? [] : p.layers.map((l) => new LkVideoPreset(l.width, l.height, l.kbps * 1000, l.fps));
+  // Let the SDK choose the source-appropriate SVC mode and its backup codec policy. The requested codec is explicit,
+  // including VP8, so room defaults cannot override it; negotiation can still fall back to another codec.
+  const codec: TrackPublishOptions = { videoCodec: r.codec, simulcast: !svc && layers.length > 0 };
   return source === "camera"
-    ? { simulcast: layers.length > 0, videoEncoding: encoding, videoSimulcastLayers: layers, ...codec }
+    ? { videoEncoding: encoding, videoSimulcastLayers: layers, ...codec }
     : {
-        simulcast: layers.length > 0,
         screenShareEncoding: encoding,
         screenShareSimulcastLayers: layers,
         ...codec,
@@ -741,7 +741,11 @@ class VoiceManager {
     const quality = (p: VideoPrefs) =>
       p.cameraPreset === "custom" ? JSON.stringify(p.cameraCustom) : p.cameraPreset;
     // A new resolution, rate, bitrate or codec needs a new capture and a new encoder: republish.
-    if (prefs.cameraPreset !== prev.cameraPreset || quality(prefs) !== quality(prev)) {
+    if (
+      prefs.cameraCodec !== prev.cameraCodec ||
+      prefs.cameraPreset !== prev.cameraPreset ||
+      quality(prefs) !== quality(prev)
+    ) {
       await this.setCamera(false);
       await this.setCamera(true);
     } else if (prefs.cameraDeviceId && prefs.cameraDeviceId !== prev.cameraDeviceId) {
@@ -799,7 +803,14 @@ class VoiceManager {
     if (!room || !track) return;
     // The codec was chosen when the share started and cannot change without a new capture: only size, rate, bitrate and
     // hint move. The simulcast ratios (1, 1/2, 1/4) stay, so the lower layers follow a new capture size by themselves.
-    const r = await this.#resolve("screen", st.share?.spec?.codec);
+    // LiveKit can fall back during publication. Use its selected codec for bitrate/layer calculations, not a newly
+    // saved preference or just the originally requested codec. The UI spec continues to describe that request.
+    const codec = track.codec;
+    const keepCodec =
+      codec === "vp8" || codec === "h264" || codec === "vp9" || codec === "av1"
+        ? codec
+        : st.share?.spec?.codec;
+    const r = await this.#resolve("screen", keepCodec);
     if (!r) return;
     const preset = r.preset;
     track.mediaStreamTrack.contentHint = o.hint;
@@ -813,19 +824,26 @@ class VoiceManager {
     const sender = track.sender;
     if (sender) {
       const params = sender.getParameters();
-      // Simulcast layers go smallest to largest (q, h, f); a single layer is the top one.
-      const bitrates = [...preset.layers.map((l) => l.kbps).reverse(), preset.kbps];
-      const offset = Math.max(0, params.encodings.length - bitrates.length);
+      // Encodings survive downsizing even when the new preset has fewer layers. Match their actual scale, and
+      // derive missing lower caps by pixel area from the nearest larger layer, rather than giving them the top cap.
+      const layers = [...preset.layers, preset].sort((a, b) => a.height - b.height);
       params.encodings.forEach((e, i) => {
-        e.maxBitrate = (bitrates[i - offset] ?? preset.kbps) * 1000;
+        // Without SDK scales, simulcast is ordered smallest to largest (q, h, f). A single sender gets the top cap.
+        const scale =
+          params.encodings.length === 1
+            ? 1
+            : Math.max(1, e.scaleResolutionDownBy ?? 2 ** (params.encodings.length - i - 1));
+        const height = preset.height / scale;
+        const layer = layers.find((l) => l.height >= height) ?? preset;
+        e.maxBitrate = Math.round(layer.kbps * 1000 * (height / layer.height) ** 2);
       });
       await sender.setParameters(params).catch(() => undefined);
     }
-    this.#noteLocalShare(r, o.hint);
+    this.#noteLocalShare(r, o.hint, st.share?.spec?.codec);
   }
 
   /** The chosen preset or custom setting for a source, within the cap, with the codec this browser can use. */
-  async #resolve(source: StreamSource, keepCodec?: string): Promise<Resolved | null> {
+  async #resolve(source: StreamSource, keepCodec?: VideoCodecName): Promise<Resolved | null> {
     const prefs = useVideoPrefs.getState().prefs;
     const caps = useVoice.getState().caps;
     const support = await detectCodecSupport();
@@ -834,7 +852,9 @@ class VoiceManager {
       source === "camera" ? prefs.cameraPreset : prefs.screenPreset,
       source === "camera" ? prefs.cameraCustom : prefs.screenCustom,
       source === "camera" ? caps.cameraKbps : caps.screenKbps,
-      keepCodec === "vp8" ? { vp9: false, av1Hardware: false } : support,
+      support,
+      source === "camera" ? prefs.cameraCodec : prefs.screenCodec,
+      keepCodec,
     );
     return r;
   }
@@ -880,7 +900,7 @@ class VoiceManager {
     }, 2000);
   }
 
-  #noteLocalShare(r: Resolved, hint: "detail" | "motion"): void {
+  #noteLocalShare(r: Resolved, hint: "detail" | "motion", requestedCodec = r.codec): void {
     const presetId = r.preset.id;
     const lp = this.#room?.localParticipant;
     const video = lp?.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
@@ -892,7 +912,7 @@ class VoiceManager {
         hint,
         audio: !!lp?.getTrackPublication(Track.Source.ScreenShareAudio),
         surface: surface === "monitor" || surface === "window" || surface === "browser" ? surface : null,
-        spec: specInfo(r),
+        spec: { ...specInfo(r), codec: requestedCodec },
       },
     });
   }
