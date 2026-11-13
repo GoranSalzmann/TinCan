@@ -106,6 +106,8 @@ export interface VideoPrefs {
   /** A preset id, or "custom" to use the values below. */
   cameraPreset: string;
   screenPreset: string;
+  cameraCodec: VideoCodecPreference;
+  screenCodec: VideoCodecPreference;
   cameraCustom: CustomVideo;
   screenCustom: CustomVideo;
   contentHint: ContentHint;
@@ -118,6 +120,8 @@ const DEFAULTS: VideoPrefs = {
   cameraDeviceId: null,
   cameraPreset: "standard",
   screenPreset: "standard",
+  cameraCodec: "auto",
+  screenCodec: "auto",
   cameraCustom: { height: 720, fps: 30, bitrateKbps: null },
   screenCustom: { height: 1080, fps: 30, bitrateKbps: null },
   contentHint: "detail",
@@ -128,13 +132,18 @@ const DEFAULTS: VideoPrefs = {
 const KEY = "tincan.video.prefs.v1";
 const NOTICE_KEY = "tincan.video.watchNotice.v1";
 
-function load(): VideoPrefs {
+/** Additive preferences keep the v1 key; older values retain their settings and get automatic codec selection. */
+export function parseVideoPrefs(value: string | null): VideoPrefs {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<VideoPrefs>;
-    // Older stored values have no custom settings: the defaults fill in, nothing else changes.
+    const parsed: unknown = JSON.parse(value ?? "{}");
+    const raw = (
+      parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+    ) as Partial<VideoPrefs>;
     return {
       ...DEFAULTS,
       ...raw,
+      cameraCodec: sanitizeCodecPreference(raw.cameraCodec),
+      screenCodec: sanitizeCodecPreference(raw.screenCodec),
       cameraCustom: sanitizeCustom(raw.cameraCustom, "camera"),
       screenCustom: sanitizeCustom(raw.screenCustom, "screen"),
     };
@@ -143,20 +152,13 @@ function load(): VideoPrefs {
   }
 }
 
-export const useVideoPrefs = create<{ prefs: VideoPrefs; set: (p: Partial<VideoPrefs>) => void }>(
-  (set, get) => ({
-    prefs: load(),
-    set(p) {
-      const prefs = { ...get().prefs, ...p };
-      set({ prefs });
-      try {
-        localStorage.setItem(KEY, JSON.stringify(prefs));
-      } catch {
-        // not persisted
-      }
-    },
-  }),
-);
+function load(): VideoPrefs {
+  try {
+    return parseVideoPrefs(localStorage.getItem(KEY));
+  } catch {
+    return parseVideoPrefs(null);
+  }
+}
 
 /** "The sharer can see that you are watching" is shown once per device (U15, W-14). */
 export function watchNoticeSeen(): boolean {
@@ -241,9 +243,17 @@ export function sanitizeCustom(v: unknown, source: StreamSource): CustomVideo {
   };
 }
 
-export type VideoCodecName = "vp8" | "vp9" | "av1";
+export type VideoCodecName = "vp8" | "h264" | "vp9" | "av1";
+export type VideoCodecPreference = "auto" | VideoCodecName;
+
+export function sanitizeCodecPreference(value: unknown): VideoCodecPreference {
+  return typeof value === "string" && ["auto", "vp8", "h264", "vp9", "av1"].includes(value)
+    ? (value as VideoCodecPreference)
+    : "auto";
+}
+
 /** Bits needed relative to VP8 for the same quality (rule of thumb from the encoders' own guidance, not measured here). */
-const CODEC_FACTOR: Record<VideoCodecName, number> = { vp8: 1, vp9: 0.75, av1: 0.65 };
+const CODEC_FACTOR: Record<VideoCodecName, number> = { vp8: 1, h264: 1, vp9: 0.75, av1: 0.65 };
 
 /**
  * The bitrate a resolution and frame rate want, in kbit/s: about 0.06 bit per pixel at 30 fps, a little less per pixel as
@@ -256,6 +266,7 @@ export function autoKbps(width: number, height: number, fps: number, codec: Vide
 }
 
 export interface CodecSupport {
+  h264?: boolean;
   vp9: boolean;
   /** AV1 that the browser says it can encode in hardware; software AV1 at these sizes is not offered. */
   av1Hardware: boolean;
@@ -263,10 +274,22 @@ export interface CodecSupport {
 
 /**
  * The codec for a setting. Up to 1080p30 VP8 stays (it is what the presets use, and every browser decodes it). Above that
- * VP9 is about a quarter cheaper per picture, and AV1 more so but only where the machine encodes it in hardware; a
- * VP8 backup is published when a viewer cannot decode the chosen codec (the SDK's default policy).
+ * VP9 is about a quarter cheaper per picture, and AV1 more so but only where the machine encodes it in hardware.
+ * An explicit preference overrides automatic selection when supported, otherwise VP8 is used without changing the
+ * preference. The SDK can publish a VP8 backup for incompatible viewers only in unencrypted calls.
  */
-export function pickCodec(height: number, fps: number, support: CodecSupport): VideoCodecName {
+export function pickCodec(
+  height: number,
+  fps: number,
+  support: CodecSupport,
+  preference: VideoCodecPreference = "auto",
+): VideoCodecName {
+  if (preference !== "auto") {
+    if (preference === "h264" && support.h264) return "h264";
+    if (preference === "vp9" && support.vp9) return "vp9";
+    if (preference === "av1" && support.av1Hardware) return "av1";
+    return "vp8";
+  }
   if (height <= 1080 && fps <= 30) return "vp8";
   if (support.av1Hardware) return "av1";
   if (support.vp9) return "vp9";
@@ -335,13 +358,21 @@ export function resolveVideo(
   custom: CustomVideo,
   capKbps: number,
   support: CodecSupport = { vp9: false, av1Hardware: false },
+  preference: VideoCodecPreference = "auto",
+  /** A running screen share keeps its encoder until it is stopped and started again. */
+  keepCodec?: VideoCodecName,
 ): Resolved | null {
+  const codecFor = (height: number, fps: number) => keepCodec ?? pickCodec(height, fps, support, preference);
   if (id !== "custom") {
     const preset = resolvePreset(source, id, capKbps);
     if (!preset) return null;
+    const codec =
+      keepCodec ??
+      (preference === "auto" ? "vp8" : pickCodec(preset.height, preset.fps, support, preference));
+    const scalable = codec === "vp9" || codec === "av1";
     return {
-      preset,
-      codec: "vp8",
+      preset: scalable ? { ...preset, layers: [], svc: true } : preset,
+      codec,
       custom: false,
       wantedKbps: preset.kbps,
       kbps: preset.kbps,
@@ -353,7 +384,7 @@ export function resolveVideo(
   }
   const c = sanitizeCustom(custom, source);
   const width = widthOf(c.height);
-  const codec = pickCodec(c.height, c.fps, support);
+  const codec = codecFor(c.height, c.fps);
   const wantedKbps = autoKbps(width, c.height, c.fps, codec);
   const chosen = c.bitrateKbps ?? wantedKbps;
   const kbps = Math.max(100, Math.min(chosen, capKbps));
@@ -362,13 +393,13 @@ export function resolveVideo(
   let fitHeight: number | null = null;
   if (cappedByServer) {
     for (const h of [...RESOLUTIONS].reverse()) {
-      if (h < c.height && autoKbps(widthOf(h), h, c.fps, pickCodec(h, c.fps, support)) <= capKbps) {
+      if (h < c.height && autoKbps(widthOf(h), h, c.fps, codecFor(h, c.fps)) <= capKbps) {
         fitHeight = h;
         break;
       }
     }
   }
-  const svc = codec !== "vp8";
+  const svc = codec === "vp9" || codec === "av1";
   const layers = svc ? [] : deriveLayers(source, width, c.height, c.fps, kbps, codec);
   const preset: VideoPreset = { id: "custom", width, height: c.height, fps: c.fps, kbps, layers };
   if (svc) preset.svc = true;
@@ -387,16 +418,18 @@ export function resolveVideo(
 
 /** Looks at what this browser can encode. Cached; the answer does not change during a visit. */
 let support: Promise<CodecSupport> | null = null;
-let known: CodecSupport = { vp9: false, av1Hardware: false };
+let known: CodecSupport = { h264: false, vp9: false, av1Hardware: false };
 export const knownCodecSupport = (): CodecSupport => known;
 export function detectCodecSupport(): Promise<CodecSupport> {
   support ??= (async () => {
-    const out: CodecSupport = { vp9: false, av1Hardware: false };
+    const out: CodecSupport = { h264: false, vp9: false, av1Hardware: false };
     try {
       const caps = RTCRtpSender.getCapabilities("video")?.codecs ?? [];
-      out.vp9 = caps.some((c) => /vp9/i.test(c.mimeType));
-      const hasAv1 = caps.some((c) => /av1/i.test(c.mimeType));
-      if (hasAv1 && navigator.mediaCapabilities?.encodingInfo) {
+      out.h264 = caps.some((c) => c.mimeType.toLowerCase() === "video/h264");
+      // Match the SDK's publishing restrictions, not just the browser's advertised MIME types.
+      const { supportsAV1, supportsVP9 } = await import("livekit-client");
+      out.vp9 = supportsVP9();
+      if (supportsAV1() && navigator.mediaCapabilities?.encodingInfo) {
         const info = await navigator.mediaCapabilities.encodingInfo({
           type: "webrtc",
           video: { contentType: "video/AV1", width: 3840, height: 2160, framerate: 30, bitrate: 15_000_000 },
@@ -411,6 +444,22 @@ export function detectCodecSupport(): Promise<CodecSupport> {
   })();
   return support;
 }
+
+// Initialize only after the sanitizers' constants: otherwise reading stored custom settings throws during import.
+export const useVideoPrefs = create<{ prefs: VideoPrefs; set: (p: Partial<VideoPrefs>) => void }>(
+  (set, get) => ({
+    prefs: load(),
+    set(p) {
+      const prefs = { ...get().prefs, ...p };
+      set({ prefs });
+      try {
+        localStorage.setItem(KEY, JSON.stringify(prefs));
+      } catch {
+        // not persisted
+      }
+    },
+  }),
+);
 
 try {
   if (localStorage.getItem("tincan.debug"))

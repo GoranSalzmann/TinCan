@@ -58,6 +58,7 @@ export function ShareDialog({
         }}
       >
         <QualityControls source="screen" />
+        {live ? <p className="m-0 text-sm text-text-muted">{t("video.share.codecNextStart")}</p> : null}
         <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
           <legend className="mb-1 font-medium">{t("video.hint")}</legend>
           {hints.map((h) => (

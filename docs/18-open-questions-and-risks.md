@@ -686,6 +686,15 @@ Design in [23](23-media-previews.md); checks in [qa/media-previews.md](qa/media-
 - Link previews on mkarl.io: answered by the owner (2026-11-02): off in code, switched on by the owner with the default allow list (S-9).
 - Whether you want `ffmpeg` for video posters and durations.
 
+## U. Saved video codec preferences (2026-11-13)
+
+- Separate camera and screen-sharing codec choices (Auto, VP8, H.264, VP9, AV1) use the existing browser-local video preference key. Additive defaults preserve old quality settings; invalid codec values become Auto.
+- Explicit choices apply to preset and custom quality. Unavailable encoders use VP8 without changing the preference; AV1 still requires the supported, power-efficient encoding probe. Detection follows the SDK's VP9/AV1 browser restrictions.
+- A camera codec change republishes it. A running screen share keeps its codec until restarted, including its bitrate/layer calculations.
+- Fixed video-preference initialization: the store used to load before the custom-setting sanitizer's constants existed, catch the resulting error and discard stored preferences.
+- The pinned SDK disables its additional backup codec under E2EE. The earlier unconditional VP8-backup description in §K is not valid for encrypted calls; 08 §5.3 now states the restriction.
+- Automated coverage includes preference parsing, a fresh-store reload, unavailable storage, capability detection, codec resolution and UI persistence. Real encoder/browser checks remain in [qa/m4.md §H](qa/m4.md#h-saved-video-codec-preference).
+
 ## Open items
 
 - Watch Together decisions (22) and spikes (21 §3).

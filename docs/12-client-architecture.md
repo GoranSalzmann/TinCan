@@ -166,7 +166,7 @@ Invites, Moderation/Audit log, Modules/Status.
 
 Settings are split in two:
 - **Synced (server-side, per user, 06 `user_setting`, 07 `/users/@me/settings`):** notification rules and per-channel mutes, theme, language. They follow the user across devices and update live via `USER_SETTINGS_UPDATE`.
-- **Device-local:** audio/video devices, audio preset and denoiser choices, keybinds, per-user volume, hardware acceleration, window/layout state, drafts. These persist to `localStorage`/IndexedDB on web and to a file in the user-data directory on desktop (via the bridge) and never leave the device.
+- **Device-local:** audio/video devices, audio preset and denoiser choices, separate camera/screen-sharing quality and codec preferences, keybinds, per-user volume, hardware acceleration, window/layout state, drafts. These persist to `localStorage`/IndexedDB on web and to a file in the user-data directory on desktop (via the bridge) and never leave the device.
 
 ## 9. PlatformBridge
 

@@ -74,6 +74,7 @@ describe("video state", () => {
 describe("custom resolution, frame rate and bitrate", () => {
   const none = { vp9: false, av1Hardware: false };
   const vp9 = { vp9: true, av1Hardware: false };
+  const all = { h264: true, vp9: true, av1Hardware: true };
 
   it("wants about what the presets use for the same size and rate", () => {
     expect(autoKbps(1280, 720, 30)).toBe(1650); // camera preset 1700
@@ -92,6 +93,20 @@ describe("custom resolution, frame rate and bitrate", () => {
     expect(pickCodec(1440, 30, none)).toBe("vp8");
     expect(pickCodec(2160, 30, { vp9: true, av1Hardware: true })).toBe("av1");
     expect(pickCodec(720, 60, { vp9: true, av1Hardware: true })).toBe("av1");
+  });
+
+  it("honours an explicit codec independently of resolution and frame rate", () => {
+    expect(pickCodec(720, 30, all, "vp9")).toBe("vp9");
+    expect(pickCodec(720, 30, all, "av1")).toBe("av1");
+    expect(pickCodec(2160, 60, all, "h264")).toBe("h264");
+    expect(pickCodec(2160, 60, all, "vp8")).toBe("vp8");
+  });
+
+  it("uses VP8 when the preferred encoder is unavailable", () => {
+    expect(pickCodec(2160, 60, none, "h264")).toBe("vp8");
+    expect(pickCodec(2160, 60, none, "vp9")).toBe("vp8");
+    // Software AV1 is not offered, even when another advanced codec is available.
+    expect(pickCodec(2160, 60, vp9, "av1")).toBe("vp8");
   });
 
   it("replaces stored values that are not offered, and fills in a missing custom setting", () => {
@@ -116,6 +131,26 @@ describe("custom resolution, frame rate and bitrate", () => {
     expect(
       resolveVideo("screen", "smooth", { height: 720, fps: 30, bitrateKbps: null }, 4000)!.preset.id,
     ).toBe("standard");
+  });
+
+  it("applies the preferred codec to presets without changing their quality or cap", () => {
+    const custom = { height: 2160, fps: 60, bitrateKbps: null };
+    const svc = resolveVideo("screen", "standard", custom, 6000, all, "vp9")!;
+    expect(svc).toMatchObject({ codec: "vp9", custom: false, kbps: 3500 });
+    expect(svc.preset).toMatchObject({ height: 1080, fps: 30, svc: true, layers: [] });
+    expect(uploadKbps(svc.preset)).toBe(3500);
+    const h264 = resolveVideo("camera", "high", custom, 1700, all, "h264")!;
+    expect(h264.codec).toBe("h264");
+    expect(h264.preset).toBe(CAMERA_PRESETS[1]);
+    expect(h264.preset.layers).toHaveLength(2);
+    expect(h264.preset.svc).toBeUndefined();
+    expect(resolveVideo("screen", "standard", custom, 6000, none, "vp9")!.codec).toBe("vp8");
+  });
+
+  it("keeps automatic selection unchanged for presets, including Smooth", () => {
+    const custom = { height: 2160, fps: 60, bitrateKbps: null };
+    expect(resolveVideo("screen", "smooth", custom, 6000, all, "auto")!.codec).toBe("vp8");
+    expect(resolveVideo("screen", "custom", custom, 60_000, all, "auto")!.codec).toBe("av1");
   });
 
   it("uses the automatic bitrate for a custom setting that fits the cap", () => {
@@ -193,4 +228,32 @@ describe("custom resolution, frame rate and bitrate", () => {
     const sim = resolveVideo("screen", "custom", { height: 1080, fps: 30, bitrateKbps: null }, 60_000, vp9)!;
     expect(uploadKbps(sim.preset)).toBeGreaterThan(sim.kbps);
   });
+
+  it("uses the preferred codec for automatic bitrate and resolution suggestions too", () => {
+    const custom = { height: 2160, fps: 30, bitrateKbps: null };
+    const r = resolveVideo("screen", "custom", custom, 3000, all, "vp9")!;
+    expect(r).toMatchObject({ codec: "vp9", wantedKbps: 11_200, fitHeight: 1080, cappedByServer: true });
+    const baseline = resolveVideo("screen", "custom", custom, 3000, all, "vp8")!;
+    expect(baseline).toMatchObject({ codec: "vp8", wantedKbps: 14_950, fitHeight: 720 });
+    expect(
+      resolveVideo("camera", "custom", { height: 720, fps: 30, bitrateKbps: null }, 25_000, all, "h264")!
+        .preset.layers,
+    ).toHaveLength(2);
+  });
+
+  it.each(["vp8", "h264", "vp9", "av1"] as const)(
+    "keeps a running %s screen encoder when the preference or quality changes",
+    (codec) => {
+      const custom = { height: 1080, fps: 30, bitrateKbps: null };
+      for (const preset of ["standard", "custom"]) {
+        // Even capability re-detection cannot change an already running encoder.
+        const r = resolveVideo("screen", preset, custom, 60_000, none, "auto", codec)!;
+        expect(r.codec).toBe(codec);
+        expect(Boolean(r.preset.svc)).toBe(codec === "vp9" || codec === "av1");
+        expect(r.preset.layers.length > 0).toBe(codec === "vp8" || codec === "h264");
+        if (preset === "custom")
+          expect(r.wantedKbps).toBe(autoKbps(widthOf(custom.height), custom.height, custom.fps, codec));
+      }
+    },
+  );
 });
