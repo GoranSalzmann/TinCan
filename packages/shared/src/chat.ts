@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 import { DisplayNameSchema, UsernameSchema } from "./accounts.js";
+import { GifRefSchema, MessageGifSchema } from "./gifs.js";
 
 /** Wire schemas for messages, attachments, read state, search and synced settings (07 §3.6–3.7). */
 
@@ -65,6 +66,8 @@ export const MessageSchema = z.object({
   editedAt: z.string().nullable(),
   pinned: z.boolean(),
   attachments: z.array(AttachmentSchema),
+  /** A picked GIF, resolved server-side and re-hosted (module `gifs`); null for ordinary messages. */
+  gif: MessageGifSchema.nullable(),
   mentions: z.object({
     users: z.array(z.string()),
     roles: z.array(z.string()),
@@ -76,9 +79,11 @@ export const MessageSchema = z.object({
 export type Message = z.infer<typeof MessageSchema>;
 
 export const MessageCreateSchema = z.object({
+  /** May be "" when a GIF or attachments carry the message (the service checks). */
   content: z.string().max(MESSAGE_SCHEMA_MAX_CHARS),
   replyToId: z.string().optional(),
   attachmentIds: z.array(z.string()).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
+  gif: GifRefSchema.optional(),
   nonce: z.string().min(1).max(64).optional(),
 });
 export type MessageCreate = z.infer<typeof MessageCreateSchema>;

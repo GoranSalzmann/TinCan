@@ -45,6 +45,7 @@ export type VoiceNotice =
   | "camera_missing"
   | "camera_failed"
   | "screen_failed"
+  | "helper_lost"
   | "denoiser_downgraded"
   | "disconnected"
   | "e2ee_unsupported"

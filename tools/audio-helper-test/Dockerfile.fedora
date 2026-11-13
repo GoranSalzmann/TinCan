@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+FROM fedora:44
+RUN dnf install -y pipewire pipewire-utils pipewire-pulseaudio wireplumber dbus-daemon python3 \
+    && dnf clean all
+WORKDIR /repo
+ENTRYPOINT ["dbus-run-session", "--", "python3", "tools/audio-helper-test/run.py"]

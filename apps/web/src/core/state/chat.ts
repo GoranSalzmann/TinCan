@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
-import type { Message, ReadStateEntry } from "@tincan/shared";
+import type { Message, MessageGif, ReadStateEntry } from "@tincan/shared";
 import { api, ApiError, type UploadResult } from "../api/client.js";
 import { useCommunity } from "./community.js";
 import {
@@ -28,6 +28,8 @@ export interface PendingMessage {
   content: string;
   replyToId: string | undefined;
   attachments: UploadResult[];
+  /** A picked GIF, for the optimistic render; the server re-resolves it before storing. */
+  gif: MessageGif | undefined;
   status: "sending" | "failed";
   error?: string;
   createdAt: number;
@@ -51,7 +53,13 @@ interface ChatState {
   jumpToLatest: (channelId: string) => Promise<void>;
   send: (
     channelId: string,
-    input: { content: string; replyToId?: string; attachments?: UploadResult[]; nonce?: string },
+    input: {
+      content: string;
+      replyToId?: string;
+      attachments?: UploadResult[];
+      gif?: MessageGif;
+      nonce?: string;
+    },
   ) => Promise<void>;
   retry: (channelId: string, nonce: string) => Promise<void>;
   discard: (channelId: string, nonce: string) => void;
@@ -194,6 +202,7 @@ export const useChat = create<ChatState>((set, get) => {
         content: input.content,
         replyToId: input.replyToId,
         attachments: input.attachments ?? [],
+        gif: input.gif,
         status: "sending",
         createdAt: Date.now(),
       };
@@ -209,6 +218,7 @@ export const useChat = create<ChatState>((set, get) => {
           nonce,
           ...(input.replyToId ? { replyToId: input.replyToId } : {}),
           ...(entry.attachments.length ? { attachmentIds: entry.attachments.map((a) => a.id) } : {}),
+          ...(input.gif ? { gif: { provider: input.gif.provider, id: input.gif.id } } : {}),
         });
         // The REST answer and the MESSAGE_CREATE event may arrive in either order; both apply idempotently.
         get().apply("MESSAGE_CREATE", { message: m });
@@ -238,6 +248,7 @@ export const useChat = create<ChatState>((set, get) => {
         content: p.content,
         nonce,
         attachments: p.attachments,
+        gif: p.gif,
         ...(p.replyToId ? { replyToId: p.replyToId } : {}),
       });
     },

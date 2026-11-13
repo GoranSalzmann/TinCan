@@ -10,7 +10,9 @@ import {
   has,
   newId,
   type Attachment,
+  type GifRef,
   type Message,
+  type MessageGif,
   type PermissionName,
 } from "@tincan/shared";
 import type { EventBus } from "../../framework/events.js";
@@ -19,6 +21,7 @@ import type { GatewayRegistrar } from "../../framework/types.js";
 import { enforceRateLimit } from "../../http/rate-limit.js";
 import type { AccountsApi } from "../accounts/api.js";
 import type { ChannelRecord, ChannelsApi } from "../channels/api.js";
+import type { GifsApi } from "../gifs/api.js";
 import type { RolesApi } from "../roles/api.js";
 import type { UploadsApi } from "../uploads/api.js";
 import type { SearchDocument } from "./api.js";
@@ -37,6 +40,8 @@ export interface TextChatDeps {
   channels: ChannelsApi;
   accounts: AccountsApi;
   uploads: UploadsApi | undefined;
+  /** Optional module: resolves a picked GIF's `{provider, id}` to render metadata. */
+  gifs: GifsApi | undefined;
   gateway: GatewayRegistrar;
   events: EventBus;
   outbox: OutboxRegistrar;
@@ -63,6 +68,22 @@ export function searchText(content: string): string {
 
 const EDIT_RATE = { max: 20, windowMs: 10_000 };
 const NONCE_TTL_MS = 5 * 60_000;
+
+/** The stored JSON of a picked GIF; anything unreadable renders as no GIF rather than breaking the message. */
+function parseGif(raw: string | null): MessageGif | null {
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as MessageGif;
+  } catch {
+    return null;
+  }
+}
+
+/** What a reply excerpt shows for a message that is only a GIF. */
+function gifExcerpt(raw: string | null): string {
+  const gif = parseGif(raw);
+  return gif ? gif.title || "GIF" : "";
+}
 
 export class TextChatService {
   readonly #d: TextChatDeps;
@@ -141,7 +162,7 @@ export class TextChatService {
     const replies = replyIds.length
       ? await db.query
           .selectFrom("message")
-          .select(["id", "author_id", "content", "deleted_at"])
+          .select(["id", "author_id", "content", "deleted_at", "gif"])
           .where("id", "in", replyIds)
           .execute()
       : [];
@@ -182,7 +203,10 @@ export class TextChatService {
               id: r.reply_to_id,
               authorId: reply?.author_id ?? null,
               authorName: reply ? (users.get(reply.author_id)?.displayName ?? null) : null,
-              excerpt: reply && reply.deleted_at === null ? searchText(reply.content).slice(0, 120) : "",
+              excerpt:
+                reply && reply.deleted_at === null
+                  ? (searchText(reply.content) || gifExcerpt(reply.gif)).slice(0, 120)
+                  : "",
               deleted: !reply || reply.deleted_at !== null,
             }
           : null,
@@ -190,6 +214,7 @@ export class TextChatService {
         editedAt: r.edited_at === null ? null : new Date(r.edited_at).toISOString(),
         pinned: (r.flags & FLAG_PINNED) !== 0,
         attachments: attachments.get(r.id) ?? [],
+        gif: parseGif(r.gif),
         mentions: {
           users: mine.filter((m) => m.target_type === "user").map((m) => m.target_id),
           roles: mine.filter((m) => m.target_type === "role").map((m) => m.target_id),
@@ -221,6 +246,7 @@ export class TextChatService {
       content: string;
       replyToId?: string | undefined;
       attachmentIds?: string[] | undefined;
+      gif?: GifRef | undefined;
       nonce?: string | undefined;
     },
     requestId?: string,
@@ -266,6 +292,7 @@ export class TextChatService {
       content: string;
       replyToId?: string | undefined;
       attachmentIds?: string[] | undefined;
+      gif?: GifRef | undefined;
       nonce?: string | undefined;
     },
     nonceKey: string | null,
@@ -279,12 +306,18 @@ export class TextChatService {
         fields: { content: "too long" },
       });
     }
-    if (content.length === 0 && attachmentIds.length === 0)
+    if (content.length === 0 && attachmentIds.length === 0 && !input.gif)
       throw new AppError("VALIDATION_FAILED", "A message needs some text or a file.", {
         fields: { content: "empty" },
       });
     if (attachmentIds.length > 0 && !this.#d.uploads)
       throw new AppError("FEATURE_DISABLED", "Uploads are turned off on this server.");
+    if (input.gif && !this.#d.gifs)
+      throw new AppError("FEATURE_DISABLED", "GIFs are turned off on this server.");
+    // The client sends just the reference; the server resolves it so titles and sizes can't be faked.
+    const gif = input.gif ? await this.#d.gifs!.describe(input.gif.provider, input.gif.id) : null;
+    if (input.gif && !gif)
+      throw new AppError("BAD_REQUEST", "That GIF could not be found.", { fields: { gif: "not found" } });
 
     const perms = await this.#d.roles.permissionsIn(actorId, channel.id);
     await enforceRateLimit(this.#d.kv, {
@@ -328,6 +361,7 @@ export class TextChatService {
       edited_at: null,
       deleted_at: null,
       flags: 0,
+      gif: gif ? JSON.stringify(gif) : null,
     };
     await this.#d.db.transaction(async (tx) => {
       await tx.query.insertInto("message").values(row).execute();

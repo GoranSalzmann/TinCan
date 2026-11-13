@@ -72,6 +72,11 @@ adapters:
   auth: { kinds: [local] }
 modules:
   accounts: { signup: invite-only }
+  # GIFs: search and send Tenor/GIPHY GIFs through a server-side proxy (17 §10). Keys stay on the server.
+  gifs:
+    tenorKey: ""
+    giphyKey: ""
+    rating: medium # off|low|medium|high
 log:
   level: info
 `;
@@ -224,7 +229,7 @@ ${TURN_CADDY_SITE}
       : "";
   const scheme = v.insecureHttp ? "ws" : "wss";
   // Scripts and styles only from self; Radix positions popovers with inline style attributes, hence style-src-attr.
-  const csp = `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ${scheme}://{hostport}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
+  const csp = `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ${scheme}://{hostport} http://127.0.0.1:19477; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
   const headers = `	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer

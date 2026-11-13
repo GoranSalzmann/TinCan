@@ -7,3 +7,6 @@ coverage/
 data/
 /deploy/generated/
 .DS_Store
+/apps/audio-helper/target/
+/apps/web/public/helpers/tincan-audio-linux-amd64.tar.gz
+/apps/web/public/helpers/SHA256SUMS

@@ -26,6 +26,7 @@ Server side first, then client side.
 | `reactions` | Emoji reactions | text-chat | db |
 | `search` | Full-text message search | text-chat | db |
 | `link-previews` | Server-side URL unfurling | text-chat, uploads | storage (cache) |
+| `gifs` | Tenor/GIPHY picker; server proxies and re-hosts the media | none (text-chat takes it as optional) | db, storage, pubsub |
 | `voice` | Voice channels, LiveKit tokens, presence | channels, roles | livekit |
 | `video` | Camera publishing permission/presets | voice | livekit |
 | `screenshare` | Screenshare presets/permission | voice | livekit |

@@ -122,7 +122,7 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | Method & path | Purpose |
 |---|---|
 | GET `/channels/:id/messages` | History (before/after/around) |
-| POST `/channels/:id/messages` | Create `{content, replyToId?, attachmentIds?, nonce}` |
+| POST `/channels/:id/messages` | Create `{content, replyToId?, attachmentIds?, gif?, nonce}`; `gif` is `{provider, id}` — the server resolves it to `{provider, id, title, width, height}` (module `gifs`) |
 | PATCH `/channels/:id/messages/:mid` | Edit own message |
 | DELETE `/channels/:id/messages/:mid` | Delete own / any with MANAGE_MESSAGES |
 | PUT/DELETE `/channels/:id/pins/:mid` | Pin / unpin |
@@ -130,6 +130,10 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | POST `/channels/:id/typing` | Typing hint (also available via gateway) |
 | POST `/channels/:id/ack` | Mark read up to `{messageId}`; never moves the read position backwards (module `read-state`, 06 §3.8) |
 | GET `/search` | `q`, optional `channelId`, `authorId`, `before`, `after`, paged (module `search`) |
+| GET `/gifs/search` | `provider` (`tenor`\|`giphy`), `q`, `pos` cursor → `{items, next}`; item URLs are same-origin `/gifs/media/…` (module `gifs`) |
+| GET `/gifs/trending` | `provider`, `pos` cursor → `{items, next}` (module `gifs`) |
+| GET `/gifs/media/:provider/:id/:variant` | Re-hosted GIF bytes (`preview`\|`full` = `image/gif`, `still` = `image/webp`); member-auth, so provider hosts never reach the browser |
+GIF picker limits: `gif:search` 30/min per member on the two list routes, `gif:up` 60/min per member and 600/min per server on upstream provider calls, `gif:media` 120/min per member on media. Picker pages are cached (`gifs.searchCacheSecs`); a provider without a key answers 400 with `details.reason = gif_provider`.
 
 ### 3.7 Uploads (module `uploads`)
 | Method & path | Purpose |

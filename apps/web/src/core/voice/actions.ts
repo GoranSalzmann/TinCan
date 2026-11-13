@@ -3,6 +3,7 @@ import { ApiError } from "../api/client.js";
 import { playSfx } from "../sfx/sfx.js";
 import { useVoice } from "./store.js";
 import type { StreamQuality, StreamSource, VideoPrefs } from "./video.js";
+import type { HelperSelection } from "./audio-helper.js";
 
 /**
  * Thin entry points for the UI. livekit-client and the denoiser are large, so the manager loads on the first join
@@ -81,9 +82,14 @@ export const setPlaybackVolume = async (userId: string, volume: number) =>
 // ---- video (M4) ------------------------------------------------------------------------------
 
 export const toggleCamera = async () => (await manager()).setCamera(!useVoice.getState().cameraOn);
-export const startScreenShare = async (o: { hint: "detail" | "motion"; audio: boolean }) => {
-  await (await manager()).startScreenShare(o);
+export const startScreenShare = async (o: {
+  hint: "detail" | "motion";
+  audio: boolean;
+  helper?: HelperSelection;
+}) => {
+  const started = await (await manager()).startScreenShare(o);
   if (useVoice.getState().screenOn) playSfx("shareStart");
+  return started;
 };
 export const stopScreenShare = async () => {
   await (await manager()).stopScreenShare();

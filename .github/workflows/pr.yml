@@ -15,6 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  audio-helper:
+    uses: ./.github/workflows/audio-helper.yml
+
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15

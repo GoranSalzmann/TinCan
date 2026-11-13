@@ -9,3 +9,6 @@ LICENSE
 *.generated.*
 .claude
 CODE_OF_CONDUCT.md
+apps/audio-helper/target
+apps/web/public/helpers/*.tar.gz
+apps/web/public/helpers/SHA256SUMS
