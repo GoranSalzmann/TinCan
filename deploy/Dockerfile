@@ -10,6 +10,16 @@
 
 ARG NODE_VERSION=24
 
+# The companion download is x86-64 on both server architectures.
+FROM --platform=linux/amd64 rust:1.100-alpine AS audio-helper-build
+WORKDIR /repo
+COPY apps/audio-helper apps/audio-helper
+COPY scripts/package-audio-helper.sh scripts/package-audio-helper.sh
+COPY apps/web/public/helpers/install.sh apps/web/public/helpers/install.sh
+COPY LICENSE LICENSE
+RUN cargo build --locked --release --manifest-path apps/audio-helper/Cargo.toml \
+ && sh scripts/package-audio-helper.sh apps/audio-helper/target/release/tincan-audio /out/helpers
+
 FROM node:${NODE_VERSION}-bookworm-slim AS build
 # Only needed if a native dependency has no prebuilt binary for this platform.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
@@ -34,4 +44,5 @@ CMD ["node", "dist/cli.js", "serve"]
 
 FROM caddy:2 AS web
 COPY --from=build /repo/apps/web/dist /srv/web
+COPY --from=audio-helper-build /out/helpers /srv/web/helpers
 COPY LICENSE /srv/web/LICENSE.txt

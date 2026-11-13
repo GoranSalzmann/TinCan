@@ -12,6 +12,7 @@ export default tseslint.config(
       "**/dist-types/**",
       "**/node_modules/**",
       "**/coverage/**",
+      "apps/audio-helper/target/**",
       "spikes/**",
       "docs/**",
       ".claude/**",

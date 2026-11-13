@@ -2,6 +2,9 @@
 **/dist
 **/dist-types
 **/coverage
+**/target
+apps/web/public/helpers/*.tar.gz
+apps/web/public/helpers/SHA256SUMS
 .git
 .claude
 spikes
