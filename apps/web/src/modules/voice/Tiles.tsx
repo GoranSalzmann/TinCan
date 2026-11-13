@@ -57,7 +57,7 @@ export function TileGrid({
       ref={ref}
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={`m-0 grid list-none gap-3 p-0 ${className}`}
+      className={`m-0 grid shrink-0 list-none gap-3 p-0 ${className}`}
     >
       {children}
     </ul>
@@ -65,7 +65,7 @@ export function TileGrid({
 }
 
 const frame = (speaking: boolean) =>
-  `relative flex aspect-video min-h-36 flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 bg-bg-sidebar focus-visible:outline-2 ${speaking ? "border-success" : "border-transparent"}`;
+  `relative flex min-w-0 aspect-video min-h-52 flex-col items-center justify-center gap-2 p-3 overflow-hidden rounded-lg border-2 bg-bg-sidebar focus-visible:outline-2 ${speaking ? "border-success" : "border-transparent"}`;
 
 function Badge({ children }: { children: ReactNode }) {
   return (
