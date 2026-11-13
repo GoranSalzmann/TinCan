@@ -40,7 +40,7 @@
 		Referrer-Policy no-referrer
 		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=()"
 		Cross-Origin-Opener-Policy same-origin
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' wss://{hostport}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' wss://{hostport} http://127.0.0.1:19477; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 		Strict-Transport-Security "max-age=31536000"
 	}
 }
