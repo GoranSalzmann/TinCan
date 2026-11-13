@@ -81,6 +81,7 @@ export default defineModule({
     });
 
     ctx.events.on("message.created", (e) => svc.notifyMessage(e));
+    ctx.events.on("nudge.sent", (e) => svc.notifyNudge(e));
     ctx.events.on("session.revoked", ({ sessionId }) => svc.removeForSession(sessionId));
 
     const http = ctx.http.withTypeProvider<ZodTypeProvider>();

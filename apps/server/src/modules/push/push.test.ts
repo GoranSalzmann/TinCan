@@ -133,6 +133,32 @@ describe("push", () => {
     sock.close();
   });
 
+  it("pushes a nudge to an offline member, but not while they have a live socket", async () => {
+    await api(bo.token).put("/push/subscription", sub("bo1"));
+    const res = await api(ann.token).post(`/members/${bo.id}/nudge`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ online: false });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sent.map((x) => x.endpoint)).toEqual([sub("bo1").endpoint]);
+    expect(sent[0]!.payload).toMatchObject({ tag: "nudge", title: "ann nudged you" });
+    expect(sent[0]!.urgency).toBe("high");
+
+    // A live socket already shows the nudge in the app; no push needed.
+    const sock = s.connect();
+    await sock.next();
+    sock.send({
+      op: Op.IDENTIFY,
+      d: { token: bo.token, client: { name: "t", version: "1", platform: "node" } },
+    });
+    await sock.next((f) => f.t === "READY");
+    await s.running.ports.pubsub.kv.del(`rl:nudge:pair:${ann.id}:${bo.id}`);
+    const res2 = await api(ann.token).post(`/members/${bo.id}/nudge`);
+    expect(res2.body).toEqual({ online: true });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(sent).toHaveLength(1);
+    sock.close();
+  });
+
   it("drops a subscription the push service reports gone", async () => {
     await api(bo.token).put("/push/subscription", sub("bo1"));
     failWith = 410;

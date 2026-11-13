@@ -8,6 +8,7 @@ import { Avatar, PresenceDot } from "../../ui/Avatar.js";
 import { Button } from "../../ui/Button.js";
 import { Modal } from "../../ui/Dialog.js";
 import { ModerationActions } from "./ModerationActions.js";
+import { NudgeAction } from "./NudgeAction.js";
 
 interface Group {
   key: string;
@@ -108,6 +109,7 @@ function MemberCard({ member, onClose }: { member: Member; onClose: () => void }
             {t("member.manage")}
           </Button>
         ) : null}
+        <NudgeAction member={member} />
         <ModerationActions member={member} onDone={onClose} />
       </div>
     </Modal>

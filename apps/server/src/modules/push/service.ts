@@ -153,6 +153,24 @@ export class PushService {
       );
   }
 
+  /** A nudge is a deliberate ping: while the target has no live socket it goes out as a push. */
+  async notifyNudge(e: { senderId: string; senderName: string; targetId: string }): Promise<void> {
+    if (this.#d.isOnline(e.targetId)) return;
+    const subs = await this.#d.db.query
+      .selectFrom("push_subscription")
+      .selectAll()
+      .where("user_id", "=", e.targetId)
+      .execute();
+    if (subs.length === 0) return;
+    const generic = this.#d.contentMode === "generic";
+    const payload = JSON.stringify({
+      tag: "nudge",
+      title: generic ? "Someone nudged you" : `${e.senderName} nudged you`,
+      body: "",
+    } satisfies PushPayload);
+    for (const sub of subs) await this.#deliver(sub, payload, true, "nudge");
+  }
+
   #mentions(m: Message, userId: string, roleIds: readonly string[]): boolean {
     return (
       m.mentions.everyone ||

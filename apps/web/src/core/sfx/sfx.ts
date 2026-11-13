@@ -22,6 +22,7 @@ export type SfxName =
   | "shareStart"
   | "shareStop"
   | "disconnected"
+  | "nudge"
   | "error";
 
 interface Note {
@@ -91,6 +92,10 @@ export const RECIPES: Record<SfxName, Recipe> = {
       n(330, 0.14, 0.16, 0.45, "triangle"),
       n(247, 0.28, 0.3, 0.45, "triangle"),
     ],
+  },
+  nudge: {
+    category: "alerts",
+    notes: [n(988, 0, 0.08, 0.5, "triangle"), n(988, 0.12, 0.08, 0.5, "triangle"), n(1319, 0.24, 0.18, 0.5)],
   },
   error: { category: "alerts", notes: [n(311, 0, 0.1, 0.4, "triangle"), n(233, 0.09, 0.2, 0.4, "triangle")] },
 };

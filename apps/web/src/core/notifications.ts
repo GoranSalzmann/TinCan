@@ -142,7 +142,8 @@ export function useNotificationPermission(): PermissionState {
 
 export interface NotificationClickMessage {
   type: "notification-click";
-  channelId: string;
+  /** Absent for notifications that do not belong to a channel, like member nudges. */
+  channelId?: string;
   messageId?: string;
 }
 
@@ -154,7 +155,8 @@ export function showNotification(opts: {
   title: string;
   body: string;
   tag: string;
-  channelId: string;
+  /** Channel a click opens; absent for notifications without one (nudges). */
+  channelId?: string;
   messageId?: string;
   onClick: () => void;
 }): void {
@@ -191,7 +193,7 @@ export function listenForNotificationClicks(
   if (!sw) return () => undefined;
   const handler = (e: MessageEvent) => {
     const d = e.data as NotificationClickMessage | undefined;
-    if (d?.type === "notification-click") open(d.channelId, d.messageId);
+    if (d?.type === "notification-click" && typeof d.channelId === "string") open(d.channelId, d.messageId);
     else if ((e.data as { type?: string } | undefined)?.type === "push-resubscribe") resubscribe?.();
   };
   sw.addEventListener("message", handler);

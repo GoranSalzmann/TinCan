@@ -54,6 +54,7 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | read endpoints | 120 / min per user |
 | voice join | 10 / min per user |
 | typing | 1 / 3 s per channel (silently coalesced) |
+| nudge | 1 / 60 s per member pair, plus 10 / min per member (module `nudge`, `modules.nudge.*`) |
 
 ## 3. REST API
 
@@ -100,6 +101,7 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 | GET `/members/:userId` | Single member |
 | PATCH `/members/@me` | Own nickname |
 | PATCH `/members/:userId` | Nickname / roles (permission-gated) |
+| POST `/members/:userId/nudge` | Ping a member ("anstupsen", module `nudge`) — `NUDGE_RECEIVED` to their sockets, Web Push while offline; `429` on the pair cooldown |
 
 ### 3.4 Roles & permissions (module `roles`)
 | Method & path | Purpose |
@@ -235,6 +237,7 @@ Delivered only to sockets whose user currently has the necessary visibility.
 | text-chat | `MESSAGE_CREATE/UPDATE/DELETE`, `MESSAGE_PIN`, `TYPING_START` |
 | reactions | `REACTION_ADD/REMOVE` |
 | read-state | `READ_STATE_UPDATE` (multi-device sync) |
+| nudge | `NUDGE_RECEIVED` (`{senderId, senderName}`, to the target only) |
 | voice | `VOICE_STATE_UPDATE` (`{channelId, userId, joined/left, sources, muted, deafened}`), `VOICE_SERVER_DISCONNECT` (`{reason}`: kicked, moved, joined_elsewhere, e2ee_mode_changed, permission_lost) |
 | voice-e2ee | `E2EE_KEY_UPDATE` (`{channelId, keyIndex, key, epoch}`, only to current participants; 10 §4) |
 | moderation | `MEMBER_BAN`, `MEMBER_KICK` (to admins), `YOU_WERE_KICKED` (to target before disconnect) |

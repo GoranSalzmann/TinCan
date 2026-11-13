@@ -17,8 +17,11 @@ export const PushKeyResponseSchema = z.object({ publicKey: z.string().min(1) });
 
 /** What the service worker receives. Kept small: push services cap payloads near 4 KB. */
 export interface PushPayload {
-  channelId: string;
-  messageId: string;
+  /** Channel the notification opens; absent for member nudges, which have none. */
+  channelId?: string;
+  messageId?: string;
+  /** Collapses repeats of one kind of push: the channel for messages, "nudge" for nudges. */
+  tag?: string;
   title: string;
   body: string;
 }
