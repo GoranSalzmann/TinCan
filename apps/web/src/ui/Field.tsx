@@ -19,7 +19,7 @@ export function Field({ label, hint, error, trailing, className = "", ...input }
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="text-sm font-medium text-text">
         {label}
       </label>
       <div className="flex items-stretch gap-2">
@@ -27,7 +27,7 @@ export function Field({ label, hint, error, trailing, className = "", ...input }
           id={id}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={`min-h-9 min-w-0 flex-1 rounded-md border border-border-control bg-bg-input px-3 py-1.5 text-base text-text placeholder:text-text-muted ${className}`}
+          className={`min-h-10 min-w-0 flex-1 rounded-md border border-border-control bg-bg-input px-3 py-2 text-base text-text placeholder:text-text-muted hover:border-text-muted aria-invalid:border-danger ${className}`}
           {...input}
         />
         {trailing}
@@ -60,7 +60,7 @@ export function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
           type="button"
           aria-pressed={shown}
           onClick={() => setShown((s) => !s)}
-          className="rounded-md px-3 text-sm text-accent-text hover:bg-bg-hover"
+          className="meta rounded-md border border-border px-3 text-accent-text hover:bg-bg-hover"
         >
           {shown ? t("field.hide") : t("field.show")}
         </button>

@@ -97,7 +97,7 @@ export function RolesPane() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl">{t("settings.roles")}</h2>
+      <h2 className="text-4xl leading-none font-bold">{t("settings.roles")}</h2>
       <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
         <div className={card}>
           <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label={t("settings.roles")}>
@@ -352,7 +352,7 @@ export function MembersPane() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl">{t("settings.members")}</h2>
+      <h2 className="text-4xl leading-none font-bold">{t("settings.members")}</h2>
       <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
         <div className={card}>
           <Field

@@ -36,7 +36,7 @@ export function ServerPane() {
   const [name, setNameDraft] = useState(caps?.server.name ?? "");
   return (
     <section className="flex max-w-2xl flex-col gap-6">
-      <h2 className="text-2xl">{t("settings.server")}</h2>
+      <h2 className="text-4xl leading-none font-bold">{t("settings.server")}</h2>
       <form
         className={card}
         onSubmit={(e) => {
@@ -456,13 +456,13 @@ export function ChannelsPane() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl">{t("settings.channels")}</h2>
+      <h2 className="text-4xl leading-none font-bold">{t("settings.channels")}</h2>
       <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
         <div className={card}>
           {categories.map((cat) => (
             <div key={cat.id}>
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">{cat.name}</h3>
+                <h3 className="meta text-text-muted">{cat.name}</h3>
                 {canManage ? (
                   <button type="button" className="text-xs underline" onClick={() => setDelCat(cat.id)}>
                     {t("common.delete")}
@@ -628,7 +628,7 @@ export function InvitesPane() {
 
   return (
     <section className="flex max-w-3xl flex-col gap-6">
-      <h2 className="text-2xl">{t("settings.invites")}</h2>
+      <h2 className="text-4xl leading-none font-bold">{t("settings.invites")}</h2>
       <form
         className={card}
         onSubmit={(e) => {

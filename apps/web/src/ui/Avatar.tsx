@@ -3,7 +3,10 @@ import { useState } from "react";
 import { avatarUrl } from "../core/api/client.js";
 import type { PresenceStatus } from "../core/state/community.js";
 
-/** Presence is shown by shape as well as colour (style guide §4): filled, hollow, bar-through, empty. */
+/**
+ * Presence is shown by shape as well as colour (style guide §4): filled, hollow, bar-through, empty. Over an avatar,
+ * pass an `outline-*` class in the surface colour: it cuts the dot out of the picture without touching its fill.
+ */
 export function PresenceDot({ status, className = "" }: { status: PresenceStatus; className?: string }) {
   const base = "inline-block size-2.5 shrink-0 rounded-full border-2";
   const look =
@@ -40,7 +43,7 @@ export function Avatar({
         loading="lazy"
         onError={() => setFailed(true)}
         style={style}
-        className={`shrink-0 rounded-full bg-bg-input object-cover ${className}`}
+        className={`shrink-0 rounded-md bg-bg-input object-cover ${className}`}
       />
     );
   }
@@ -48,7 +51,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       style={style}
-      className={`flex shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-text-on-accent ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/12 font-display font-bold text-accent-text ${className}`}
     >
       <bdi>{[...name][0]?.toUpperCase() ?? "?"}</bdi>
     </span>

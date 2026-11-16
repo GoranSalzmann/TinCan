@@ -12,7 +12,7 @@ interface Stored {
   accent: AccentName;
 }
 
-const DEFAULTS: Stored = { theme: "system", accent: "teal" };
+const DEFAULTS: Stored = { theme: "system", accent: "ember" };
 
 function read(): Stored {
   try {
@@ -33,8 +33,8 @@ function read(): Stored {
 export function applyAppearance(s: Stored, root: HTMLElement = document.documentElement): void {
   if (s.theme === "system") delete root.dataset.theme;
   else root.dataset.theme = s.theme;
-  // High contrast keeps its own accent (style guide §3.2); teal is the default values and needs no attribute.
-  if (s.accent === "teal" || s.theme === "hc") delete root.dataset.accent;
+  // High contrast keeps its own accent (style guide §3.2); ember is the default values and needs no attribute.
+  if (s.accent === "ember" || s.theme === "hc") delete root.dataset.accent;
   else root.dataset.accent = s.accent;
 }
 

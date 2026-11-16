@@ -61,10 +61,10 @@ function MemberCard({ member, onClose }: { member: Member; onClose: () => void }
         <div className="flex items-center gap-3">
           <Avatar name={memberName(member)} avatarKey={member.avatarKey} size={56} />
           <div className="min-w-0">
-            <div className="text-lg font-semibold">
+            <div className="font-display text-xl font-bold tracking-tight">
               <bdi>{member.displayName}</bdi>
             </div>
-            <div className="text-sm text-text-muted">@{member.username}</div>
+            <div className="meta text-text-muted">@{member.username}</div>
             <div className="flex items-center gap-1 text-sm">
               <PresenceDot status={presence} /> {t(`user.status.${presence}`)}
             </div>
@@ -72,11 +72,9 @@ function MemberCard({ member, onClose }: { member: Member; onClose: () => void }
         </div>
         {member.statusText ? <p className="text-sm">{member.statusText}</p> : null}
         <div>
-          <h3 className="mb-1 text-sm font-semibold">{t("member.roles")}</h3>
+          <h3 className="meta mb-1.5 text-text-muted">{t("member.roles")}</h3>
           <ul className="m-0 flex list-none flex-wrap gap-1 p-0">
-            {member.isOwner ? (
-              <li className="rounded-full border border-border px-2 text-xs">{t("member.owner")}</li>
-            ) : null}
+            {member.isOwner ? <li className="tag">{t("member.owner")}</li> : null}
             {mine.length === 0 && !member.isOwner ? (
               <li className="text-sm text-text-muted">{t("member.noRoles")}</li>
             ) : null}
@@ -84,18 +82,18 @@ function MemberCard({ member, onClose }: { member: Member; onClose: () => void }
               // Role colours never colour text (design U7): a dot and a pill border.
               <li
                 key={r.id}
-                className="flex items-center gap-1 rounded-full border px-2 text-xs"
+                className="meta flex min-h-5 items-center gap-1.5 rounded-sm border border-border px-1.5"
                 style={r.color ? { borderColor: r.color } : undefined}
               >
                 {r.color ? (
-                  <span aria-hidden="true" className="size-2 rounded-full" style={{ background: r.color }} />
+                  <span aria-hidden="true" className="size-2" style={{ background: r.color }} />
                 ) : null}
                 {r.name}
               </li>
             ))}
           </ul>
         </div>
-        <div className="text-xs text-text-muted">
+        <div className="meta text-text-muted">
           {t("member.joined", { date: new Date(member.joinedAt).toLocaleDateString() })}
         </div>
         {canRoles ? (
@@ -134,11 +132,13 @@ export function MemberList() {
     [all, roles, presence, t],
   );
   return (
-    <div className="flex-1 overflow-y-auto pb-4">
+    <div className="flex-1 overflow-y-auto pt-1 pb-4">
       {groups.map((g) => (
         <section key={g.key} aria-label={`${g.title} — ${g.members.length}`}>
-          <h3 className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
-            {g.title} — {g.members.length}
+          <h3 className="meta flex items-center gap-2 ps-4 pe-4 pt-4 pb-1.5 text-text-muted">
+            <span className="truncate">{g.title}</span>
+            <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-border" />
+            <span>{g.members.length}</span>
           </h3>
           <ul className="m-0 list-none p-0 px-2">
             {g.members.map((m) => {
@@ -152,7 +152,10 @@ export function MemberList() {
                   >
                     <span className="relative">
                       <Avatar name={memberName(m)} avatarKey={m.avatarKey} size={28} />
-                      <PresenceDot status={status} className="absolute -end-0.5 -bottom-0.5 bg-bg-sidebar" />
+                      <PresenceDot
+                        status={status}
+                        className="absolute -end-1 -bottom-1 outline-2 outline-bg-sidebar"
+                      />
                     </span>
                     <span className="min-w-0 flex-1">
                       <bdi className="block truncate text-sm">{memberName(m)}</bdi>

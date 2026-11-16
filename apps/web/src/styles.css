@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
+@import "./fonts.css";
 @import "tailwindcss";
 @import "./theme/tokens.generated.css";
 
@@ -7,6 +8,11 @@
     font-family: var(--font-sans);
     background: var(--color-bg);
     color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Inter: open digits and the single-storey a read calmer at chat sizes. */
+    font-feature-settings: "cv11", "ss01";
   }
   body {
     margin: 0;
@@ -15,12 +21,30 @@
     background: var(--color-bg);
     color: var(--color-text);
   }
+  /* Headings are set in the display face, tight, the way the brand wordmark is (style guide §5.3). */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
   button,
   input,
   select,
   textarea {
     font: inherit;
     color: inherit;
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-feature-settings: normal;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 32%, transparent);
+    color: var(--color-text);
   }
   /* Focus is never removed (style guide §11): 2 px ring, 2 px offset, its own colour so it never looks like selection. */
   :focus-visible {
@@ -34,6 +58,13 @@
   a {
     color: var(--color-text-link);
     text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  /* Thin scrollbars in the surface colours, so the panes read as one sheet. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-bg-selected) transparent;
   }
 }
 
@@ -49,17 +80,17 @@
   }
 }
 
-/* Elevation (style guide §8): dark uses a border, high contrast uses a 2 px border and no shadow. */
+/* Elevation (style guide §8): a hairline everywhere; light adds a short, tight shadow, high contrast a 2 px border. */
 @utility elev-2 {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow:
-    0 4px 12px #1018281f,
-    0 1px 3px #10182814;
+    0 12px 32px -12px #0f0e0c33,
+    0 1px 2px #0f0e0c14;
 }
 [data-theme="dark"] .elev-2 {
-  box-shadow: 0 4px 16px #00000073;
+  box-shadow: 0 16px 40px -12px #000000b3;
 }
 [data-theme="hc"] .elev-2 {
   box-shadow: none;
@@ -67,8 +98,94 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .elev-2 {
-    box-shadow: 0 4px 16px #00000073;
+    box-shadow: 0 16px 40px -12px #000000b3;
   }
+}
+
+/*
+ * The grille (style guide §5.4): a dot matrix like the perforated face of a speaker, the one decorative device in the
+ * app. It sits behind the sign-in screens and empty rooms, fading out from a glow.
+ */
+@utility grille {
+  background-image: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-accent) 70%, transparent) 0 1.15px,
+    transparent 1.6px
+  );
+  background-size: 11px 11px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 35%, #000 0%, #0009 35%, transparent 80%);
+}
+@utility grille-soft {
+  background-image: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-text-muted) 45%, transparent) 0 0.9px,
+    transparent 1.3px
+  );
+  background-size: 9px 9px;
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, #000 0%, transparent 75%);
+}
+@utility glow {
+  background: radial-gradient(
+    ellipse 60% 45% at 50% 30%,
+    color-mix(in srgb, var(--color-accent) 16%, transparent),
+    transparent 70%
+  );
+}
+[data-theme="hc"] .grille,
+[data-theme="hc"] .grille-soft,
+[data-theme="hc"] .glow {
+  display: none;
+}
+@media (forced-colors: active) {
+  .grille,
+  .grille-soft,
+  .glow {
+    display: none;
+  }
+}
+
+/* The instance name on the sign-in screens: the one oversized line in the app. */
+@utility display-hero {
+  font-size: clamp(3rem, 9vw, 8.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  text-wrap: balance;
+}
+
+/* Metadata in the mono face: timestamps, counts, category labels (style guide §5.3). Never upper-cased. */
+@utility meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-feature-settings: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A tag: mono text on a 10 % accent wash with a 25 % accent hairline (roles, "owner", counts). */
+@utility tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-inline: 0.375rem;
+  min-height: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-accent-text);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+  letter-spacing: 0.02em;
+}
+[data-theme="hc"] .tag {
+  border-color: var(--color-text);
+  background: transparent;
+  color: var(--color-text);
 }
 
 /* The logo comes in a light and a dark variant; the theme picks one (default and light show the light one). */

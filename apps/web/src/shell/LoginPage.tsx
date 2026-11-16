@@ -76,11 +76,9 @@ export function LoginPage() {
           autoComplete="current-password"
           required
         />
-        <div className="flex justify-end">
-          <Button type="submit" disabled={busy || limited || !username || !password}>
-            {t("login.submit")}
-          </Button>
-        </div>
+        <Button type="submit" className="mt-1 w-full" disabled={busy || limited || !username || !password}>
+          {t("login.submit")}
+        </Button>
         <p className="text-sm text-text-muted">
           {t("login.haveReset")} <Link to="/reset">{t("login.useReset")}</Link>
         </p>

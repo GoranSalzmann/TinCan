@@ -242,7 +242,7 @@ export function VoicePane() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <h2 className="m-0 text-xl font-semibold">{t("voice.pane.title")}</h2>
+      <h2 className="m-0 text-4xl leading-none font-bold">{t("voice.pane.title")}</h2>
 
       <section className="grid grid-cols-[12rem_1fr] items-center gap-3">
         <label htmlFor="in-dev">{t("voice.pane.input")}</label>

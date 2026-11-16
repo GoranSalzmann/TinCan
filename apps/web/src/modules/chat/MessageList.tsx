@@ -255,9 +255,12 @@ export function MessageList({
           </div>
         ) : null}
         {empty ? (
-          <div className="p-6">
-            <h2 className="text-2xl">{t("message.empty.title")}</h2>
-            <p className="text-text-muted">{t("message.empty.body")}</p>
+          <div className="relative overflow-hidden px-5 pt-16 pb-6">
+            <div aria-hidden="true" className="grille-soft absolute inset-0" />
+            <div className="relative flex max-w-prose flex-col gap-2">
+              <h2 className="text-3xl leading-tight font-bold">{t("message.empty.title")}</h2>
+              <p className="text-text-muted">{t("message.empty.body")}</p>
+            </div>
           </div>
         ) : null}
         <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>
@@ -277,19 +280,21 @@ export function MessageList({
                 }}
               >
                 {row.kind === "date" ? (
-                  <div className="my-2 flex items-center gap-3 px-4 text-xs text-text-muted" role="separator">
-                    <span className="h-px flex-1 bg-border" />
+                  <div
+                    className="meta mt-4 mb-1 flex items-center gap-3 px-5 text-text-muted"
+                    role="separator"
+                  >
+                    <span aria-hidden="true" className="h-px w-8 bg-accent" />
                     {row.label}
-                    <span className="h-px flex-1 bg-border" />
+                    <span aria-hidden="true" className="h-px flex-1 bg-border" />
                   </div>
                 ) : row.kind === "unread" ? (
                   <div
-                    className="my-1 flex items-center gap-3 px-4 text-xs font-semibold text-danger-text"
+                    className="meta my-1 flex items-center gap-3 px-5 font-medium text-danger-text"
                     role="separator"
                   >
-                    <span className="h-px flex-1 bg-danger" />
+                    <span aria-hidden="true" className="h-px flex-1 bg-danger" />
                     {t("message.new")}
-                    <span className="h-px flex-1 bg-danger" />
                   </div>
                 ) : row.kind === "message" ? (
                   <MessageItem
@@ -322,7 +327,7 @@ export function MessageList({
               });
             } else scrollToBottom();
           }}
-          className="absolute end-4 bottom-3 shadow-md"
+          className="absolute end-5 bottom-3 shadow-lg"
         >
           <ArrowDown aria-hidden="true" size={16} />
           {readInfo && readInfo.mentionCount > 0

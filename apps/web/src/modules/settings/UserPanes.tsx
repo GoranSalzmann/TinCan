@@ -21,7 +21,7 @@ import { formatSize } from "../chat/MessageItem.js";
 function Pane({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex max-w-2xl flex-col gap-6">
-      <h2 className="text-2xl">{title}</h2>
+      <h2 className="text-4xl leading-none font-bold">{title}</h2>
       {children}
     </section>
   );
