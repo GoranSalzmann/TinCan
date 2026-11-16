@@ -26,6 +26,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ### Added
 
+- **Themes.** The accent colour setting is now a Theme setting (Settings → Appearance, or the user menu) with seven whole looks, each in light and dark: Ember (the current look, and the default), Phosphor, Broadsheet, Marshmallow, Synthwave, Fjord and Brutalist. A theme changes colours, type, corners, shadows and the shape of the panes, not just the accent. A previously chosen accent colour is not carried over: everyone starts on Ember. High contrast keeps its own colours. The old Theme setting (light, dark, high contrast) is now called Mode.
 - **Link previews in other apps.** A Tin Can link pasted into WhatsApp, Discord, Slack or iMessage now shows a card with the Tin Can logo instead of a bare address. Invite links say which community they lead to and how many members it has. An invite that is unknown, expired, revoked or used up shows only the generic card. Nothing else is visible to link crawlers, because every other page needs a sign-in.
 
 ### Fixed
