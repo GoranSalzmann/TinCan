@@ -8,7 +8,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ### Before you upgrade
 
-- **Invite link previews need one Caddyfile change** on servers set up before this version (`tincan init` writes it for new ones). Without it nothing breaks: links show the generic Tin Can card. To get the community's name on invite links, add this block to your `Caddyfile` just above the `# Build files carry a hash` line, then `docker compose up -d`:
+- **Invite link previews need one Caddyfile change** on servers set up before this version (`tincan init` writes it for new ones). Without it nothing breaks: links show the generic Tin Can card. To get the community's name on invite links, add this block to your `Caddyfile` just above the `# Build files carry a hash` line. If you edit it before upgrading, the upgrade's `docker compose up -d` loads it with the new web image; if you edit it afterwards, run `docker compose up -d --force-recreate caddy` (plain `up -d` does not notice a changed Caddyfile):
 
   ```
   	@page path / /invite/*
