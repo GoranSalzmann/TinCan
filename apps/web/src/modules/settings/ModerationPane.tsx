@@ -5,9 +5,10 @@ import { api } from "../../core/api/client.js";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { memberName, useCan, useCommunity } from "../../core/state/community.js";
 import { Button } from "../../ui/Button.js";
+import { selectClass } from "../../ui/Controls.js";
 import { toast, toastError } from "../../ui/toast.js";
+import { Panel, PanelNote, Row, SettingsPage, SettingsSection } from "./layout.js";
 
-const card = "flex max-w-3xl flex-col gap-3 rounded-lg border border-border p-4";
 const FILTERS = [
   ["", "audit.filter.all"],
   ["member.", "audit.filter.member"],
@@ -17,13 +18,14 @@ const FILTERS = [
 
 /** Audit log (VIEW_AUDIT_LOG) and the list of banned people (BAN_MEMBERS) (11 §3, W-48). */
 export function ModerationPane() {
+  const t = useT();
   const canAudit = useCan("VIEW_AUDIT_LOG");
   const canBans = useCan("BAN_MEMBERS");
   return (
-    <section className="flex flex-col gap-6">
-      {canAudit ? <AuditCard /> : null}
+    <SettingsPage title={t("settings.moderation")} description={t("settings.moderation.description")}>
       {canBans ? <BansCard /> : null}
-    </section>
+      {canAudit ? <AuditCard /> : null}
+    </SettingsPage>
   );
 }
 
@@ -69,16 +71,13 @@ function AuditCard() {
   };
 
   return (
-    <div className={card}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="m-0 text-lg">{t("audit.title")}</h3>
-        <label className="flex items-center gap-2 text-sm">
-          {t("audit.filter")}
-          <select
-            className="min-h-9 rounded-md border border-border-control bg-bg-input px-2 text-base text-text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
+    <SettingsSection
+      title={t("audit.title")}
+      description={t("audit.description")}
+      aside={
+        <label className="flex flex-col gap-1">
+          <span className="meta text-text-muted">{t("audit.filter")}</span>
+          <select className={selectClass} value={filter} onChange={(e) => setFilter(e.target.value)}>
             {FILTERS.map(([v, label]) => (
               <option key={v} value={v}>
                 {t(label)}
@@ -86,27 +85,34 @@ function AuditCard() {
             ))}
           </select>
         </label>
-      </div>
-      {loaded && items.length === 0 ? <p className="m-0 text-text-muted">{t("audit.empty")}</p> : null}
-      <ol className="m-0 flex list-none flex-col gap-2 p-0">
-        {items.map((e) => (
-          <li key={e.id} className="border-b border-border pb-2 last:border-b-0">
-            <div className="text-sm">{sentence(e)}</div>
-            <div className="text-xs text-text-muted">
-              <time dateTime={e.at}>{new Date(e.at).toLocaleString()}</time>
-              {e.reason ? ` · ${t("audit.reason", { reason: e.reason })}` : ""}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {next ? (
-        <div>
-          <Button variant="ghost" onClick={() => void load(next)}>
-            {t("audit.more")}
-          </Button>
-        </div>
-      ) : null}
-    </div>
+      }
+    >
+      <Panel
+        label={t("audit.title")}
+        footer={
+          next ? (
+            <Button variant="ghost" onClick={() => void load(next)}>
+              {t("audit.more")}
+            </Button>
+          ) : undefined
+        }
+      >
+        {loaded && items.length === 0 ? <PanelNote>{t("audit.empty")}</PanelNote> : null}
+        {items.length > 0 ? (
+          <ol className="m-0 flex list-none flex-col divide-y divide-border p-0">
+            {items.map((e) => (
+              <li key={e.id} className="flex flex-col gap-0.5 px-5 py-3">
+                <span className="text-sm">{sentence(e)}</span>
+                <span className="meta flex flex-wrap gap-x-3 text-text-muted">
+                  <time dateTime={e.at}>{new Date(e.at).toLocaleString()}</time>
+                  {e.reason ? <span>{t("audit.reason", { reason: e.reason })}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </Panel>
+    </SettingsSection>
   );
 }
 
@@ -116,38 +122,43 @@ function BansCard() {
   const refresh = useCallback(() => void api.bans().then(setBans).catch(toastError), []);
   useEffect(refresh, [refresh]);
   return (
-    <div className={card}>
-      <h3 className="m-0 text-lg">{t("bans.title")}</h3>
-      {bans && bans.length === 0 ? <p className="m-0 text-text-muted">{t("bans.empty")}</p> : null}
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+    <SettingsSection title={t("bans.title")} description={t("bans.description")}>
+      <Panel label={t("bans.title")}>
+        {bans && bans.length === 0 ? <PanelNote>{t("bans.empty")}</PanelNote> : null}
         {(bans ?? []).map((b) => (
-          <li key={b.userId} className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate">
-                <bdi>{b.displayName}</bdi> <span className="text-text-muted">@{b.username}</span>
-              </div>
-              <div className="text-xs text-text-muted">
-                {t("bans.since", { date: new Date(b.bannedAt).toLocaleDateString() })}
-                {b.reason ? ` · ${b.reason}` : ""}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              onClick={() =>
-                void api
-                  .unban(b.userId)
-                  .then(() => {
-                    toast(t("mod.done"));
-                    refresh();
-                  })
-                  .catch(toastError)
-              }
-            >
-              {t("bans.unban")}
-            </Button>
-          </li>
+          <Row
+            key={b.userId}
+            label={
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                <bdi className="truncate">{b.displayName}</bdi>
+                <span className="meta text-text-muted">@{b.username}</span>
+              </span>
+            }
+            description={
+              <span className="meta flex flex-wrap gap-x-3">
+                <span>{t("bans.since", { date: new Date(b.bannedAt).toLocaleDateString() })}</span>
+                {b.reason ? <span>{b.reason}</span> : null}
+              </span>
+            }
+            control={
+              <Button
+                variant="ghost"
+                onClick={() =>
+                  void api
+                    .unban(b.userId)
+                    .then(() => {
+                      toast(t("mod.done"));
+                      refresh();
+                    })
+                    .catch(toastError)
+                }
+              >
+                {t("bans.unban")}
+              </Button>
+            }
+          />
         ))}
-      </ul>
-    </div>
+      </Panel>
+    </SettingsSection>
   );
 }

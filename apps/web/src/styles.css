@@ -61,6 +61,13 @@
     text-decoration-thickness: 1px;
     text-underline-offset: 0.2em;
   }
+  /* Native checkboxes, radios, sliders and meters take the accent instead of the browser's blue. */
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  progress {
+    accent-color: var(--color-accent);
+  }
   /* Thin scrollbars in the surface colours, so the panes read as one sheet. */
   * {
     scrollbar-width: thin;
@@ -143,6 +150,55 @@
   .glow {
     display: none;
   }
+}
+
+/*
+ * A switch (ui/Controls.tsx): a checkbox drawn as a track and knob. The knob moves with the reading direction; the
+ * on state is shown by position and fill, never fill alone (style guide §4).
+ */
+@utility switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-input);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-move),
+    border-color var(--duration-fast) var(--ease-move);
+  &::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    inset-inline-start: 2px;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: var(--radius-full);
+    background: var(--color-text-muted);
+    transition: translate var(--duration-fast) var(--ease-move);
+  }
+  &:checked {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+  &:checked::before {
+    background: var(--color-text-on-accent);
+    translate: 1rem 0;
+  }
+  &:dir(rtl):checked::before {
+    translate: -1rem 0;
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+[data-theme="hc"] .switch {
+  border: 2px solid var(--color-text);
 }
 
 /* The instance name on the sign-in screens: the one oversized line in the app. */

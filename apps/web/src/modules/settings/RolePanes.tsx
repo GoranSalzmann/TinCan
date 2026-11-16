@@ -2,20 +2,45 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsParams } from "./params.js";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { PERM, namesOf, type Member, type PermissionName, type Role } from "@tincan/shared";
 import { api } from "../../core/api/client.js";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { memberName, useCan, useCommunity } from "../../core/state/community.js";
 import { Avatar } from "../../ui/Avatar.js";
 import { Button } from "../../ui/Button.js";
+import { selectClass } from "../../ui/Controls.js";
 import { ConfirmDialog } from "../../ui/Dialog.js";
 import { Field } from "../../ui/Field.js";
 import { toast, toastError } from "../../ui/toast.js";
+import {
+  DetailHeader,
+  EmptyDetail,
+  FooterNote,
+  MasterDetail,
+  Panel,
+  PanelNote,
+  Row,
+  SaveBar,
+  SettingsPage,
+  SubHeading,
+  SwitchRow,
+  listItemClass,
+} from "./layout.js";
 import { SERVER_PERMISSIONS, TEXT_PERMISSIONS, VOICE_PERMISSIONS, toBig, toStr } from "./permissions.js";
 
-const card = "flex flex-col gap-3 rounded-lg border border-border p-4";
 const PALETTE = ["#3ba55d", "#e5a23d", "#5865f2", "#eb459e", "#ed4245", "#2ea4b8", "#8b6cef", "#8a93a2"];
+
+/** A role's colour as a small square; hollow when it has none (style guide §3: role colours never colour text). */
+function RoleDot({ color, size = "size-2.5" }: { color: string | null; size?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`${size} shrink-0 rounded-sm border border-border-control`}
+      style={color ? { background: color, borderColor: color } : undefined}
+    />
+  );
+}
 
 function PermissionToggles({
   value,
@@ -31,32 +56,23 @@ function PermissionToggles({
 }) {
   const t = useT();
   const group = (title: MessageKey, names: PermissionName[]) => (
-    <fieldset key={title} className="flex flex-col gap-1">
-      <legend className="mb-1 text-sm font-semibold">{t(title)}</legend>
+    <Panel key={title} label={t(title)}>
+      <div className="meta px-5 pt-3 pb-1 text-text-muted">{t(title)}</div>
       {names.map((n) => {
         const on = (value & PERM[n]) !== 0n;
         const can = disabled ? false : on || (holdable & PERM[n]) !== 0n;
         return (
-          <label
+          <SwitchRow
             key={n}
-            className={`flex items-start gap-2 rounded-md px-1 py-0.5 ${can ? "" : "opacity-60"}`}
-          >
-            <input
-              type="checkbox"
-              role="switch"
-              checked={on}
-              disabled={!can}
-              onChange={(e) => onChange(e.target.checked ? value | PERM[n] : value & ~PERM[n])}
-              className="mt-1"
-            />
-            <span>
-              <span className="block text-sm font-medium">{t(`perm.${n}` as MessageKey)}</span>
-              <span className="block text-xs text-text-muted">{t(`perm.${n}.hint` as MessageKey)}</span>
-            </span>
-          </label>
+            label={t(`perm.${n}` as MessageKey)}
+            description={t(`perm.${n}.hint` as MessageKey)}
+            checked={on}
+            disabled={!can}
+            onChange={(next) => onChange(next ? value | PERM[n] : value & ~PERM[n])}
+          />
         );
       })}
-    </fieldset>
+    </Panel>
   );
   return (
     <div className="flex flex-col gap-4">
@@ -96,32 +112,39 @@ export function RolesPane() {
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-4xl leading-none font-bold">{t("settings.roles")}</h2>
-      <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
-        <div className={card}>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label={t("settings.roles")}>
+    <SettingsPage
+      wide
+      title={t("settings.roles")}
+      description={t("settings.roles.description")}
+      actions={
+        canManage ? (
+          <Button onClick={() => void create()}>
+            <Plus aria-hidden="true" size={16} />
+            {t("roles.create")}
+          </Button>
+        ) : null
+      }
+    >
+      <MasterDetail
+        list={
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0" aria-label={t("settings.roles")}>
             {ordered.map((r) => (
-              <li key={r.id} className="flex items-center gap-1">
+              <li key={r.id} className="group flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => void navigate(`/settings/roles/${r.id}`)}
                   aria-current={selected?.id === r.id ? "true" : undefined}
-                  className={`flex min-h-8 flex-1 items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${selected?.id === r.id ? "bg-bg-selected" : ""}`}
+                  className={listItemClass(selected?.id === r.id)}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="size-3 shrink-0 rounded-full border border-border-control"
-                    style={r.color ? { background: r.color } : undefined}
-                  />
+                  <RoleDot color={r.color} />
                   <bdi className="truncate">{r.name}</bdi>
                 </button>
                 {canManage && !r.isDefault ? (
-                  <>
+                  <span className="flex opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
                     <button
                       type="button"
                       aria-label={t("roles.moveUp", { name: r.name })}
-                      className="rounded-md p-1 hover:bg-bg-hover"
+                      className="rounded-md p-1.5 text-text-muted hover:bg-bg-hover hover:text-text"
                       onClick={() => void move(r, 1)}
                     >
                       <ArrowUp aria-hidden="true" size={14} />
@@ -129,25 +152,25 @@ export function RolesPane() {
                     <button
                       type="button"
                       aria-label={t("roles.moveDown", { name: r.name })}
-                      className="rounded-md p-1 hover:bg-bg-hover"
+                      className="rounded-md p-1.5 text-text-muted hover:bg-bg-hover hover:text-text"
                       onClick={() => void move(r, -1)}
                     >
                       <ArrowDown aria-hidden="true" size={14} />
                     </button>
-                  </>
+                  </span>
                 ) : null}
               </li>
             ))}
           </ul>
-          {canManage ? <Button onClick={() => void create()}>{t("roles.create")}</Button> : null}
-        </div>
+        }
+      >
         {selected ? (
           <RoleEditor key={selected.id} role={selected} canManage={canManage} holdable={myPerms} />
         ) : (
-          <p className="text-text-muted">{t("roles.pick")}</p>
+          <EmptyDetail>{t("roles.pick")}</EmptyDetail>
         )}
-      </div>
-    </section>
+      </MasterDetail>
+    </SettingsPage>
   );
 }
 
@@ -177,70 +200,89 @@ function RoleEditor({ role, canManage, holdable }: { role: Role; canManage: bool
       toastError(e);
     }
   };
+  const reset = () => {
+    setName(role.name);
+    setColor(role.color ?? "");
+    setHoist(role.hoist);
+    setPerms(toBig(role.permissions));
+  };
 
   return (
-    <div className={card}>
-      {role.isDefault ? <p className="text-sm text-text-muted">{t("roles.everyone.note")}</p> : null}
-      {!role.isDefault ? (
-        <>
-          <Field
-            label={t("roles.name")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={32}
-            disabled={readOnly}
-          />
-          <fieldset className="flex flex-col gap-1">
-            <legend className="text-sm font-medium">{t("roles.color")}</legend>
-            <div className="flex flex-wrap items-center gap-2">
-              {PALETTE.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-label={c}
-                  aria-pressed={color.toLowerCase() === c}
-                  disabled={readOnly}
-                  onClick={() => setColor(c)}
-                  style={{ background: c }}
-                  className={`size-6 rounded-full border-2 ${color.toLowerCase() === c ? "border-text" : "border-transparent"}`}
-                />
-              ))}
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={() => setColor("")}
-                className="rounded-md px-2 text-sm underline"
-              >
-                {t("roles.color.none")}
-              </button>
-            </div>
-            <p className="text-xs text-text-muted">{t("roles.color.note")}</p>
-          </fieldset>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={hoist}
-              disabled={readOnly}
-              onChange={(e) => setHoist(e.target.checked)}
-            />
-            {t("roles.hoist")}
-          </label>
-        </>
-      ) : null}
-      <PermissionToggles value={perms} onChange={setPerms} disabled={readOnly} holdable={holdable} />
-      {canManage ? (
-        <div className="flex justify-between gap-2">
-          {!role.isDefault ? (
+    <>
+      <DetailHeader
+        icon={<RoleDot color={color || null} size="size-11" />}
+        title={<bdi>{name || role.name}</bdi>}
+        subtitle={role.isDefault ? t("roles.everyone.note") : undefined}
+        actions={
+          canManage && !role.isDefault ? (
             <Button variant="ghost" className="text-danger-text" onClick={() => setConfirm(true)}>
+              <Trash2 aria-hidden="true" size={14} />
               {t("roles.delete")}
             </Button>
-          ) : (
-            <span />
-          )}
-          <Button disabled={!dirty} onClick={() => void save()}>
-            {t("common.save")}
-          </Button>
+          ) : null
+        }
+      />
+      {!role.isDefault ? (
+        <div className="flex flex-col gap-4">
+          <SubHeading title={t("roles.display")} description={t("roles.display.description")} />
+          <Panel label={t("roles.display")}>
+            <Field
+              layout="row"
+              label={t("roles.name")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={32}
+              disabled={readOnly}
+            />
+            <Row
+              label={t("roles.color")}
+              description={t("roles.color.note")}
+              control={
+                <div
+                  role="group"
+                  aria-label={t("roles.color")}
+                  className="flex flex-wrap items-center gap-1.5"
+                >
+                  {PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={c}
+                      aria-pressed={color.toLowerCase() === c}
+                      disabled={readOnly}
+                      onClick={() => setColor(c)}
+                      style={{ background: c }}
+                      className={`size-6 rounded-sm outline-offset-2 ${color.toLowerCase() === c ? "outline-2 outline-text" : ""}`}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    aria-pressed={color === ""}
+                    onClick={() => setColor("")}
+                    className={`meta ms-1 rounded-md border px-2 py-1 ${color === "" ? "border-text text-text" : "border-border text-text-muted hover:text-text"}`}
+                  >
+                    {t("roles.color.none")}
+                  </button>
+                </div>
+              }
+            />
+            <SwitchRow label={t("roles.hoist")} checked={hoist} disabled={readOnly} onChange={setHoist} />
+          </Panel>
         </div>
+      ) : null}
+      <div className="flex flex-col gap-4">
+        <SubHeading title={t("roles.permissions")} description={t("roles.permissions.description")} />
+        <PermissionToggles value={perms} onChange={setPerms} disabled={readOnly} holdable={holdable} />
+      </div>
+      {canManage && dirty ? (
+        <SaveBar>
+          <FooterNote>{t("settings.unsaved")}</FooterNote>
+          <Button variant="ghost" onClick={reset}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={() => void save()}>{t("common.save")}</Button>
+        </SaveBar>
       ) : null}
       <ConfirmDialog
         open={confirm}
@@ -257,7 +299,7 @@ function RoleEditor({ role, canManage, holdable }: { role: Role; canManage: bool
           }
         }}
       />
-    </div>
+    </>
   );
 }
 
@@ -277,48 +319,63 @@ function Preview({ member }: { member: Member }) {
   }, [member.userId, channelId]);
   const allowed = result ? namesOf(toBig(result.permissions)) : [];
   return (
-    <div className="flex flex-col gap-2">
-      <label className="flex items-center gap-2 text-sm">
-        {t("members.preview.in")}
-        <select
-          value={channelId}
-          onChange={(e) => setChannelId(e.target.value)}
-          className="rounded-md border border-border-control bg-bg-input px-2 py-1"
-        >
-          {channels.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.type === "voice" ? "🔊 " : "# "}
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
+    <Panel label={t("members.preview")}>
+      <Row
+        label={t("members.preview.in")}
+        htmlFor="preview-channel"
+        control={
+          <select
+            id="preview-channel"
+            value={channelId}
+            onChange={(e) => setChannelId(e.target.value)}
+            className={`${selectClass} w-56`}
+          >
+            {channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.type === "voice" ? "🔊 " : "# "}
+                {c.name}
+              </option>
+            ))}
+          </select>
+        }
+      />
       {result ? (
         <>
-          <ol className="m-0 ps-5 text-sm">
+          <ol className="m-0 flex list-none flex-col gap-2 px-5 py-4">
             {result.steps.map((s, i) => {
               const gained = namesOf(toBig(s.after) & ~toBig(s.before));
               const lost = namesOf(toBig(s.before) & ~toBig(s.after));
               return (
-                <li key={i}>
-                  {s.step}
+                <li key={i} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2 text-sm">
+                  <span className="meta pt-0.5 text-text-muted">{i + 1}</span>
+                  <span>{s.step}</span>
                   {gained.length ? (
-                    <span className="block text-xs text-success-text">+ {gained.join(", ")}</span>
+                    <span className="meta col-start-2 text-success-text">+ {gained.join(", ")}</span>
                   ) : null}
                   {lost.length ? (
-                    <span className="block text-xs text-danger-text">− {lost.join(", ")}</span>
+                    <span className="meta col-start-2 text-danger-text">− {lost.join(", ")}</span>
                   ) : null}
                 </li>
               );
             })}
           </ol>
-          <p className="text-sm">
-            <span className="font-medium">{t("members.preview.can")}</span>{" "}
-            {allowed.length ? allowed.join(", ") : t("members.preview.nothing")}
-          </p>
+          <div className="flex flex-col gap-1.5 px-5 py-4">
+            <span className="text-sm font-medium">{t("members.preview.can")}</span>
+            {allowed.length ? (
+              <span className="flex flex-wrap gap-1.5">
+                {allowed.map((p) => (
+                  <span key={p} className="meta rounded-sm border border-border px-1.5 py-0.5 text-text">
+                    {p}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="text-sm text-text-muted">{t("members.preview.nothing")}</span>
+            )}
+          </div>
         </>
       ) : null}
-    </div>
+    </Panel>
   );
 }
 
@@ -351,105 +408,112 @@ export function MembersPane() {
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-4xl leading-none font-bold">{t("settings.members")}</h2>
-      <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
-        <div className={card}>
-          <Field
-            label={t("members.filter")}
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            type="search"
-          />
-          <ul className="m-0 flex max-h-[60dvh] list-none flex-col gap-1 overflow-y-auto p-0">
-            {list.map((m) => (
-              <li key={m.userId}>
-                <button
-                  type="button"
-                  aria-current={selected?.userId === m.userId ? "true" : undefined}
-                  onClick={() => void navigate(`/settings/members/${m.userId}`)}
-                  className={`flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${selected?.userId === m.userId ? "bg-bg-selected" : ""}`}
-                >
-                  <Avatar name={memberName(m)} avatarKey={m.avatarKey} size={24} />
-                  <bdi className="truncate">{memberName(m)}</bdi>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <SettingsPage wide title={t("settings.members")} description={t("settings.members.description")}>
+      <MasterDetail
+        list={
+          <>
+            <Field
+              label={t("members.filter")}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              type="search"
+            />
+            <ul className="m-0 flex max-h-[60dvh] list-none flex-col gap-0.5 overflow-y-auto p-0">
+              {list.map((m) => (
+                <li key={m.userId}>
+                  <button
+                    type="button"
+                    aria-current={selected?.userId === m.userId ? "true" : undefined}
+                    onClick={() => void navigate(`/settings/members/${m.userId}`)}
+                    className={listItemClass(selected?.userId === m.userId)}
+                  >
+                    <Avatar name={memberName(m)} avatarKey={m.avatarKey} size={24} />
+                    <bdi className="min-w-0 flex-1 truncate">{memberName(m)}</bdi>
+                    {m.isOwner ? <span className="tag">{t("member.owner")}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        }
+      >
         {selected ? (
-          <div className={card}>
-            <div className="flex items-center gap-3">
-              <Avatar name={memberName(selected)} avatarKey={selected.avatarKey} size={48} />
-              <div>
-                <div className="text-lg font-semibold">
-                  <bdi>{selected.displayName}</bdi>
-                </div>
-                <div className="text-sm text-text-muted">
+          <>
+            <DetailHeader
+              icon={<Avatar name={memberName(selected)} avatarKey={selected.avatarKey} size={48} />}
+              title={<bdi>{selected.displayName}</bdi>}
+              subtitle={
+                <span className="flex flex-wrap items-center gap-2">
                   @{selected.username}
-                  {selected.isOwner ? ` · ${t("member.owner")}` : ""}
-                </div>
-              </div>
-            </div>
-            <fieldset className="flex flex-col gap-1">
-              <legend className="mb-1 text-sm font-semibold">{t("member.roles")}</legend>
-              {roles.length === 0 ? <p className="text-sm text-text-muted">{t("members.noRoles")}</p> : null}
-              {[...roles]
-                .sort((a, b) => b.position - a.position)
-                .map((r) => (
-                  <label key={r.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                  {selected.isOwner ? <span className="tag">{t("member.owner")}</span> : null}
+                </span>
+              }
+            />
+            <div className="flex flex-col gap-4">
+              <SubHeading title={t("member.roles")} description={t("members.roles.description")} />
+              <Panel label={t("member.roles")}>
+                {roles.length === 0 ? <PanelNote>{t("members.noRoles")}</PanelNote> : null}
+                {[...roles]
+                  .sort((a, b) => b.position - a.position)
+                  .map((r) => (
+                    <SwitchRow
+                      key={r.id}
+                      label={
+                        <span className="flex items-center gap-2">
+                          <RoleDot color={r.color} />
+                          {r.name}
+                        </span>
+                      }
                       checked={selected.roleIds.includes(r.id)}
                       disabled={!canRoles || selected.isOwner}
-                      onChange={(e) => void toggle(selected, r.id, e.target.checked)}
+                      onChange={(on) => void toggle(selected, r.id, on)}
                     />
-                    <span
-                      aria-hidden="true"
-                      className="size-3 rounded-full border border-border-control"
-                      style={r.color ? { background: r.color } : undefined}
-                    />
-                    {r.name}
-                  </label>
-                ))}
-            </fieldset>
+                  ))}
+              </Panel>
+            </div>
             {canReset ? (
-              <div className="flex flex-col gap-2">
-                <div>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      void api
-                        .resetToken(selected.userId)
-                        .then((r) => setCode({ userId: selected.userId, ...r }))
-                        .catch(toastError)
+              <div className="flex flex-col gap-4">
+                <Panel label={t("members.reset.title")}>
+                  <Row
+                    label={t("members.reset.title")}
+                    description={t("members.reset.description")}
+                    control={
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          void api
+                            .resetToken(selected.userId)
+                            .then((r) => setCode({ userId: selected.userId, ...r }))
+                            .catch(toastError)
+                        }
+                      >
+                        {t("members.reset")}
+                      </Button>
                     }
-                  >
-                    {t("members.reset")}
-                  </Button>
-                </div>
-                {code?.userId === selected.userId ? (
-                  <div className="rounded-md border border-border bg-bg-sidebar p-3" role="status">
-                    <p className="text-sm">{t("members.reset.shown")}</p>
-                    <p className="my-1 font-mono text-xl tracking-wider select-all">{code.code}</p>
-                    <p className="text-xs text-text-muted">
-                      {t("members.reset.expires", { time: new Date(code.expiresAt).toLocaleTimeString() })}
-                    </p>
-                  </div>
-                ) : null}
+                  />
+                  {code?.userId === selected.userId ? (
+                    <div className="flex flex-col gap-1 bg-bg-sidebar px-5 py-4" role="status">
+                      <p className="text-sm">{t("members.reset.shown")}</p>
+                      <p className="font-mono text-2xl tracking-wider select-all">{code.code}</p>
+                      <p className="meta text-text-muted">
+                        {t("members.reset.expires", { time: new Date(code.expiresAt).toLocaleTimeString() })}
+                      </p>
+                    </div>
+                  ) : null}
+                </Panel>
               </div>
             ) : null}
             {canRoles ? (
-              <div>
-                <h3 className="mb-1 text-sm font-semibold">{t("members.preview")}</h3>
+              <div className="flex flex-col gap-4">
+                <SubHeading title={t("members.preview")} description={t("members.preview.description")} />
                 <Preview member={selected} />
               </div>
             ) : null}
-          </div>
+          </>
         ) : (
-          <p className="text-text-muted">{t("members.pick")}</p>
+          <EmptyDetail>{t("members.pick")}</EmptyDetail>
         )}
-      </div>
-    </section>
+      </MasterDetail>
+    </SettingsPage>
   );
 }
