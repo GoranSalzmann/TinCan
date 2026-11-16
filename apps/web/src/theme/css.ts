@@ -34,8 +34,8 @@ const RADII: [string, string][] = [
 /** Style guide §6, §8, §9: layout, stacking and motion tokens that are not colours. */
 const PLAIN_TOKENS: [string, string][] = [
   ["--size-rail", "4.5rem"],
-  ["--size-sidebar", "15rem"],
-  ["--size-members", "15rem"],
+  ["--size-sidebar", "17rem"],
+  ["--size-members", "17rem"],
   ["--size-header", "3rem"],
   ["--size-user-panel", "3.25rem"],
   ["--size-target", "1.5rem"],

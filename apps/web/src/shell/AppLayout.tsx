@@ -87,8 +87,8 @@ function useViewportWidth(): number {
 }
 
 /** Side panel widths in px: what a fresh viewer gets, and how far the handles go (the main column keeps at least 360). */
-const SIDEBAR = { def: 240, min: 200, max: 480, key: "tincan.sidebarWidth" } as const;
-const MEMBERS = { def: 240, min: 200, max: 480, key: "tincan.membersWidth" } as const;
+const SIDEBAR = { def: 272, min: 200, max: 480, key: "tincan.sidebarWidth" } as const;
+const MEMBERS = { def: 272, min: 200, max: 480, key: "tincan.membersWidth" } as const;
 const MAIN_MIN = 360;
 
 function AppearanceItems() {
@@ -421,10 +421,10 @@ export function AppLayout() {
               />
             </span>
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-sm font-medium">
+              <div className="truncate text-base font-medium">
                 <bdi>{memberName(me, user.displayName)}</bdi>
               </div>
-              <div className="meta truncate text-text-muted">{t(`user.status.${presence}`)}</div>
+              <div className="meta truncate text-sm text-text-muted">{t(`user.status.${presence}`)}</div>
             </div>
             <button
               type="button"
@@ -523,7 +523,7 @@ export function AppLayout() {
               max={membersMax}
             />
           ) : null}
-          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border ps-4 pe-2 font-display text-sm font-semibold">
+          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border ps-4 pe-2 font-display text-base font-semibold">
             {t("layout.members")}
             {overlayMembers ? (
               <button

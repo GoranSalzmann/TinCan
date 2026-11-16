@@ -135,7 +135,7 @@ export function MemberList() {
     <div className="flex-1 overflow-y-auto pt-1 pb-4">
       {groups.map((g) => (
         <section key={g.key} aria-label={`${g.title} — ${g.members.length}`}>
-          <h3 className="meta flex items-center gap-2 ps-4 pe-4 pt-4 pb-1.5 text-text-muted">
+          <h3 className="meta text-sm flex items-center gap-2 ps-4 pe-4 pt-4 pb-1.5 text-text-muted">
             <span className="truncate">{g.title}</span>
             <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-border" />
             <span>{g.members.length}</span>
@@ -148,17 +148,17 @@ export function MemberList() {
                   <button
                     type="button"
                     onClick={() => setCard(m)}
-                    className={`flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${status === "offline" ? "opacity-60" : ""}`}
+                    className={`flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${status === "offline" ? "opacity-60" : ""}`}
                   >
                     <span className="relative">
-                      <Avatar name={memberName(m)} avatarKey={m.avatarKey} size={28} />
+                      <Avatar name={memberName(m)} avatarKey={m.avatarKey} size={34} />
                       <PresenceDot
                         status={status}
                         className="absolute -end-1 -bottom-1 outline-2 outline-bg-sidebar"
                       />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <bdi className="block truncate text-sm">{memberName(m)}</bdi>
+                      <bdi className="block truncate text-base">{memberName(m)}</bdi>
                       <span className="sr-only">{t(`user.status.${status}`)}</span>
                     </span>
                   </button>
