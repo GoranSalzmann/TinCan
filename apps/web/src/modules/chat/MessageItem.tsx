@@ -148,7 +148,7 @@ export const MessageItem = memo(function MessageItem({
       id={`m-${m.id}`}
       data-testid="message"
       aria-label={t("message.aria", { name, time: time.format(new Date(m.createdAt)) })}
-      className={`group relative flex gap-3 px-5 ${grouped ? "py-0.5" : "pt-3 pb-0.5"} ${mentioned ? "bg-bg-mention before:absolute before:inset-y-0 before:start-0 before:w-0.75 before:bg-warning" : ""} ${highlight ? "bg-bg-selected" : "hover:bg-bg-hover"}`}
+      className={`msg group relative flex gap-3 px-5 ${grouped ? "py-0.5" : "msg-head pt-3 pb-0.5"} ${mentioned ? "bg-bg-mention before:absolute before:inset-y-0 before:start-0 before:w-0.75 before:bg-warning" : ""} ${highlight ? "bg-bg-selected" : "hover:bg-bg-hover"}`}
     >
       <div className="w-10 shrink-0">
         {grouped ? (
@@ -183,7 +183,7 @@ export const MessageItem = memo(function MessageItem({
         ) : null}
         {!grouped ? (
           <div className="flex items-baseline gap-2.5">
-            <bdi className="font-semibold tracking-[-0.005em]">{name}</bdi>
+            <bdi className="msg-author font-semibold tracking-[-0.005em]">{name}</bdi>
             <time
               dateTime={m.createdAt}
               title={full.format(new Date(m.createdAt))}

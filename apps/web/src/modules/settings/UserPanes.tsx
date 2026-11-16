@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Monitor, Moon, Contrast, Sun, type LucideIcon } from "lucide-react";
 import type { SessionInfo } from "@tincan/shared";
@@ -10,7 +10,7 @@ import { usePushState } from "../../core/push.js";
 import { useFeature, useSession } from "../../core/session/store.js";
 import { playSfx, useSfxPrefs, type SfxCategory } from "../../core/sfx/sfx.js";
 import { memberName, useCommunity } from "../../core/state/community.js";
-import { ACCENT_NAMES, ACCENT_PRESETS } from "../../theme/tokens.js";
+import { FONTS, SKIN_NAMES, SKINS, type SkinName } from "../../theme/tokens.js";
 import { useAppearance, type ThemePreference } from "../../theme/store.js";
 import { Avatar } from "../../ui/Avatar.js";
 import { Button } from "../../ui/Button.js";
@@ -239,8 +239,8 @@ const THEME_ICONS: Record<ThemePreference, LucideIcon> = {
   hc: Contrast,
 };
 
-/** A small picture of the theme: page, sidebar and accent, in that theme's own colours. */
-function ThemeSwatch({ theme }: { theme: ThemePreference }) {
+/** A small picture of the mode: page, sidebar and accent, in the chosen theme's colours for that mode. */
+function ThemeSwatch({ theme, skin }: { theme: ThemePreference; skin: SkinName }) {
   const one = (bg: string, side: string, line: string, accent: string) => (
     <span className="flex h-full flex-1" style={{ background: bg }}>
       <span className="w-1/3" style={{ background: side }} />
@@ -251,8 +251,12 @@ function ThemeSwatch({ theme }: { theme: ThemePreference }) {
       </span>
     </span>
   );
-  const light = one("#F8F6F2", "#EFEBE4", "#C9C3BA", "#C24E00");
-  const dark = one("#151412", "#0F0E0C", "#3A3631", "#E86101");
+  const pick = (m: "light" | "dark") => {
+    const c = SKINS[skin][m];
+    return one(c["--color-bg"], c["--color-bg-sidebar"], c["--color-border"], c["--color-accent"]);
+  };
+  const light = pick("light");
+  const dark = pick("dark");
   const hc = one("#000000", "#000000", "#FFFFFF", "#FF9F43");
   return (
     <span aria-hidden="true" className="flex h-16 w-full overflow-hidden rounded-sm border border-border">
@@ -272,13 +276,136 @@ function ThemeSwatch({ theme }: { theme: ThemePreference }) {
   );
 }
 
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+const subscribeDark = (cb: () => void) => {
+  const m = window.matchMedia?.(DARK_QUERY);
+  m?.addEventListener?.("change", cb);
+  return () => m?.removeEventListener?.("change", cb);
+};
+/** Light or dark as the page shows it now, for the theme previews. */
+function useResolvedMode(theme: ThemePreference): "light" | "dark" {
+  const systemDark = useSyncExternalStore(
+    subscribeDark,
+    () => window.matchMedia?.(DARK_QUERY).matches ?? false,
+  );
+  return theme === "light" ? "light" : theme === "system" && !systemDark ? "light" : "dark";
+}
+
+/**
+ * A small window in the theme's own colours, faces and corners: rail, sidebar with the selected channel, a heading,
+ * two lines of text and a primary button. Drawn from tokens.ts, so it shows the theme without applying it.
+ */
+function SkinPreview({ skin, mode }: { skin: SkinName; mode: "light" | "dark" }) {
+  const s = SKINS[skin];
+  const c = s[mode];
+  const r = s.props["--radius-md"] ?? "2px";
+  const pill = skin === "marshmallow" ? "9999px" : r;
+  const heavy = skin === "brutalist";
+  const line = (w: string, color = c["--color-text-muted"]) => (
+    <span className="h-1 shrink-0" style={{ width: w, background: color, opacity: 0.55, borderRadius: r }} />
+  );
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-20 w-full overflow-hidden"
+      style={{
+        background: c["--color-bg"],
+        border: `${heavy ? 2 : 1}px solid ${heavy ? c["--color-text"] : c["--color-border"]}`,
+        borderRadius: s.props["--radius-lg"] ?? "2px",
+      }}
+    >
+      <span className="w-[12%] shrink-0" style={{ background: c["--color-bg-rail"] }} />
+      <span
+        className="flex w-[30%] shrink-0 flex-col gap-1.5 px-1.5 py-2"
+        style={{ background: c["--color-bg-sidebar"] }}
+      >
+        {line("80%")}
+        <span
+          className="h-2.5 shrink-0"
+          style={{
+            background: c["--color-bg-selected"],
+            borderInlineStart: `2px solid ${c["--color-accent"]}`,
+            borderRadius: r,
+          }}
+        />
+        {line("60%")}
+        {line("70%")}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5 px-2.5 py-2">
+        <span
+          className="text-base leading-none font-bold"
+          style={{
+            color: c["--color-text"],
+            fontFamily: s.props["--font-display"] ?? FONTS.display,
+            letterSpacing: s.props["--tracking-display"] ?? "-0.02em",
+          }}
+        >
+          Aa
+        </span>
+        {line("85%", c["--color-text"])}
+        {line("60%", c["--color-text"])}
+        <span
+          className="mt-auto h-3 w-2/5 shrink-0"
+          style={{
+            background: c["--color-accent"],
+            borderRadius: pill,
+            border: heavy ? `1.5px solid ${c["--color-text"]}` : undefined,
+            boxShadow: heavy
+              ? `2px 2px 0 ${c["--color-text"]}`
+              : skin === "synthwave" || (skin === "phosphor" && mode === "dark")
+                ? `0 0 8px -1px ${c["--color-accent"]}`
+                : undefined,
+          }}
+        />
+      </span>
+    </span>
+  );
+}
+
 export function AppearancePane() {
   const t = useT();
-  const { theme, accent, setTheme, setAccent } = useAppearance();
+  const { theme, skin, setTheme, setSkin } = useAppearance();
+  const mode = useResolvedMode(theme);
   const sync = (key: string, value: string) =>
     void api.patchSettings({ [key]: value }).catch(() => undefined);
   return (
     <SettingsPage title={t("settings.appearance")} description={t("settings.appearance.description")}>
+      <SettingsSection title={t("appearance.skin")} description={t("appearance.skin.description")}>
+        <div
+          role="radiogroup"
+          aria-label={t("appearance.skin")}
+          className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${theme === "hc" ? "opacity-50" : ""}`}
+        >
+          {SKIN_NAMES.map((v) => (
+            <label
+              key={v}
+              className="flex cursor-pointer flex-col gap-2.5 rounded-lg border border-border bg-bg-elevated p-2.5 hover:border-text-muted has-checked:border-accent has-checked:outline-1 has-checked:outline-accent has-disabled:cursor-not-allowed has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus"
+            >
+              <input
+                type="radio"
+                name="skin"
+                className="sr-only"
+                checked={skin === v}
+                disabled={theme === "hc"}
+                onChange={() => {
+                  setSkin(v);
+                  sync("appearance.skin", v);
+                }}
+              />
+              <SkinPreview skin={v} mode={mode} />
+              <span className="flex flex-col gap-0.5">
+                <span
+                  className="text-sm font-semibold"
+                  style={{ fontFamily: SKINS[v].props["--font-display"] ?? FONTS.display }}
+                >
+                  {t(`skin.${v}` as MessageKey)}
+                </span>
+                <span className="text-xs text-text-muted">{t(`skin.${v}.description` as MessageKey)}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </SettingsSection>
       <SettingsSection title={t("appearance.theme")} description={t("appearance.theme.description")}>
         <div
           role="radiogroup"
@@ -302,7 +429,7 @@ export function AppearancePane() {
                     sync("appearance.theme", v === "hc" ? "dark" : v);
                   }}
                 />
-                <ThemeSwatch theme={v} />
+                <ThemeSwatch theme={v} skin={skin} />
                 <span className="flex items-center gap-2 text-sm font-medium">
                   <Icon aria-hidden="true" size={14} className="text-text-muted" />
                   {t(`appearance.theme.${v}` as MessageKey)}
@@ -310,37 +437,6 @@ export function AppearancePane() {
               </label>
             );
           })}
-        </div>
-      </SettingsSection>
-      <SettingsSection title={t("appearance.accent")} description={t("appearance.accent.description")}>
-        <div
-          role="radiogroup"
-          aria-label={t("appearance.accent")}
-          className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-        >
-          {ACCENT_NAMES.map((v) => (
-            <label
-              key={v}
-              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border bg-bg-elevated px-3 text-sm hover:border-text-muted has-checked:border-accent has-checked:font-medium has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus"
-            >
-              <input
-                type="radio"
-                name="accent"
-                className="sr-only"
-                checked={accent === v}
-                disabled={theme === "hc"}
-                onChange={() => {
-                  setAccent(v);
-                  sync("appearance.accent", v);
-                }}
-              />
-              <span aria-hidden="true" className="flex size-5 shrink-0 overflow-hidden rounded-sm">
-                <span className="flex-1" style={{ background: ACCENT_PRESETS[v].light.accent }} />
-                <span className="flex-1" style={{ background: ACCENT_PRESETS[v].dark.accent }} />
-              </span>
-              {t(`accent.${v}` as MessageKey)}
-            </label>
-          ))}
         </div>
       </SettingsSection>
     </SettingsPage>

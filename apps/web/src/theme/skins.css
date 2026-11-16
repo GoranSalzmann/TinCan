@@ -1,0 +1,597 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
+/*
+ * Themes (style guide §3.2): everything a theme changes beyond its tokens. Each theme reshapes the shell, not just
+ * its colours: borders, backgrounds, textures, avatars, the selected channel, message authors, the composer.
+ *
+ * - `data-skin` is never set in high contrast or forced colours (theme/store.ts), so nothing here steps aside for them.
+ * - Light/dark differences go through the generated `--fx-*` variables (tokens.ts `fx`), never duplicated selectors.
+ * - The hooks (`shell`, `shell-sidebar`, `shell-main`, `shell-members`, `shell-brand`, `shell-pane-header`,
+ *   `shell-userbar`, `channel-header`, `channel-row`, `msg`, `msg-head`, `msg-author`, `avatar`, `composer`, `btn`,
+ *   `btn-<variant>`) carry no styles of their own.
+ * - Motion stops under reduced motion (styles.css); text keeps the contrast the token tests check: where a theme
+ *   paints text on a new background, it uses a pairing from style guide §3.1.
+ */
+
+@keyframes tc-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes tc-grid {
+  to {
+    background-position: 0 40px;
+  }
+}
+
+/* ---- Phosphor: a CRT terminal ---------------------------------------------------------------------------------- */
+
+[data-skin="phosphor"] {
+  caret-color: var(--color-accent);
+
+  & .shell {
+    text-shadow: var(--fx-text-glow);
+  }
+  /* Scanlines and a vignette over the whole screen, dialogs included. Never takes clicks. */
+  & .shell::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(to bottom, var(--fx-scanline) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse 130% 110% at 50% 50%, transparent 55%, var(--fx-vignette) 100%);
+  }
+  /* Green-bar printout behind the conversation. */
+  & .shell-main {
+    background: repeating-linear-gradient(to bottom, transparent 0 2.75rem, var(--fx-bar) 2.75rem 5.5rem);
+  }
+  &
+    :is(
+      .shell-sidebar,
+      .shell-members,
+      .shell-brand,
+      .shell-pane-header,
+      .channel-header,
+      .shell-userbar,
+      .composer
+    ) {
+    border-style: dashed;
+  }
+  & :is(h1, h2, h3, .display-hero) {
+    text-shadow: var(--fx-heading-glow);
+  }
+  /* A blinking block cursor after the channel name. */
+  & .channel-header h1::after {
+    content: "\2588";
+    margin-inline-start: 0.2em;
+    color: var(--color-accent);
+    animation: tc-blink 1.1s steps(1) infinite;
+  }
+  /* IRC-style <author>. */
+  & .msg-author::before {
+    content: "<";
+    color: var(--color-text-muted);
+  }
+  & .msg-author::after {
+    content: ">";
+    color: var(--color-text-muted);
+  }
+  /* The selected channel in inverse video. */
+  & .channel-row[aria-current="page"] {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    text-shadow: none;
+    &::before {
+      content: none;
+    }
+    & * {
+      color: inherit;
+      opacity: 1;
+    }
+  }
+  & .avatar {
+    border-radius: 0;
+    image-rendering: pixelated;
+    filter: grayscale(1) sepia(1) hue-rotate(65deg) saturate(2.6);
+  }
+  & textarea {
+    caret-shape: block;
+  }
+  & .btn-primary:not(:disabled) {
+    box-shadow: var(--fx-button-glow);
+  }
+  & .tag {
+    border-radius: 0;
+  }
+  & ::selection {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+  }
+  & * {
+    scrollbar-color: var(--color-border-control) transparent;
+  }
+  & .grille {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-accent) 22%, transparent) 0 1px,
+      transparent 1px 4px
+    );
+    background-size: auto;
+  }
+  & .grille-soft {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-text-muted) 18%, transparent) 0 1px,
+      transparent 1px 4px
+    );
+    background-size: auto;
+  }
+}
+
+/* ---- Broadsheet: a newspaper ----------------------------------------------------------------------------------- */
+
+[data-skin="broadsheet"] {
+  /* Newsprint grain on every sheet. */
+  & :is(.shell, .shell-sidebar, .shell-members, .elev-2) {
+    background-image: var(--fx-paper);
+  }
+  /* Column rules in ink; double rules under every header. */
+  & :is(.shell-sidebar, .shell-members) {
+    border-color: var(--color-text);
+  }
+  & :is(.shell-brand, .shell-pane-header, .channel-header) {
+    border-bottom: 4px double var(--color-text);
+  }
+  & .shell-userbar {
+    border-top: 1px solid var(--color-text);
+  }
+  /* The masthead. */
+  & .shell-brand {
+    height: auto;
+    min-height: 3.5rem;
+    justify-content: center;
+    gap: 0.5rem;
+    & bdi {
+      font-size: 1.625rem;
+      font-style: italic;
+      letter-spacing: -0.02em;
+    }
+  }
+  & :is(h1, h2, h3) {
+    font-weight: 700;
+  }
+  & .channel-header h1 {
+    font-size: 1.375rem;
+    font-style: italic;
+  }
+  & .shell-pane-header {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.08em;
+    font-size: 1.0625rem;
+  }
+  & .display-hero {
+    font-style: italic;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  /* Bylines in small capitals; datelines in italic rather than mono. */
+  & .msg-author {
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.06em;
+    font-size: 1.0625em;
+  }
+  & .meta {
+    font-family: var(--font-sans);
+    font-style: italic;
+    letter-spacing: 0;
+  }
+  & .msg-head {
+    border-top: 1px solid color-mix(in srgb, var(--color-text) 14%, transparent);
+  }
+  /* The selected channel is underlined twice, not filled. */
+  & .channel-row[aria-current="page"] {
+    background: transparent;
+    font-weight: 700;
+    text-decoration: underline double;
+    text-underline-offset: 0.3em;
+    &::before {
+      content: none;
+    }
+  }
+  /* Halftone portraits. */
+  & .avatar {
+    filter: grayscale(1) contrast(1.25);
+    border: 1px solid var(--color-text);
+  }
+  & .composer {
+    border-width: 1px 0;
+    border-color: var(--color-text);
+    background: transparent;
+  }
+  & .elev-2 {
+    border-color: var(--color-text);
+  }
+  & .btn {
+    letter-spacing: 0.04em;
+    font-variant-caps: all-small-caps;
+    font-size: var(--text-base);
+  }
+  & .grille {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-text) 14%, transparent) 0 1px,
+      transparent 1px 7px
+    );
+    background-size: auto;
+  }
+  & .glow {
+    display: none;
+  }
+}
+
+/* ---- Marshmallow: floating soft cards -------------------------------------------------------------------------- */
+
+[data-skin="marshmallow"] {
+  /* The panes float as rounded cards over a pastel backdrop. */
+  & .shell {
+    gap: 0.625rem;
+    padding: 0.625rem;
+    background: var(--fx-backdrop);
+  }
+  & .shell-main,
+  & :is(.shell-sidebar, .shell-members):not(.fixed) {
+    border: 0;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow: var(--fx-card-shadow);
+  }
+  & .shell-main {
+    background: var(--color-bg);
+  }
+  & :is(.shell-brand, .shell-pane-header, .channel-header) {
+    border-bottom-color: transparent;
+  }
+  /* The user panel is a pill inside the sidebar card. */
+  & .shell-userbar {
+    margin: 0.5rem;
+    border: 0;
+    border-radius: var(--radius-full);
+  }
+  & .channel-row {
+    border-radius: var(--radius-full);
+    padding-inline: 0.875rem;
+  }
+  & .channel-row[aria-current="page"] {
+    background: color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-sidebar));
+    font-weight: 600;
+    &::before {
+      content: none;
+    }
+  }
+  & .msg {
+    margin-inline: 0.5rem;
+    border-radius: 1rem;
+  }
+  & .avatar {
+    border-radius: var(--radius-full);
+  }
+  & .composer {
+    border-radius: 1.5rem;
+    padding-inline: 0.75rem;
+  }
+  & .elev-2 {
+    border-radius: 1.25rem;
+  }
+  /* Bouncy, puffy buttons. */
+  & .btn,
+  & .tag {
+    border-radius: var(--radius-full);
+  }
+  & .btn {
+    padding-inline: 1.25rem;
+    transition:
+      scale var(--duration-base) cubic-bezier(0.34, 1.56, 0.64, 1),
+      background-color var(--duration-fast) var(--ease-move);
+  }
+  & .btn:hover:not(:disabled) {
+    scale: 1.04;
+  }
+  & .btn:active:not(:disabled) {
+    scale: 0.96;
+  }
+  & .grille {
+    background-image: radial-gradient(
+      circle at center,
+      color-mix(in srgb, var(--color-accent) 45%, transparent) 0 2.4px,
+      transparent 3px
+    );
+    background-size: 18px 18px;
+  }
+}
+
+/* ---- Synthwave: neon over a horizon grid ------------------------------------------------------------------------ */
+
+[data-skin="synthwave"] {
+  & .shell {
+    background: var(--fx-sky);
+  }
+  /* A receding grid at the foot of the conversation, rolling towards you. */
+  & .shell-main {
+    position: relative;
+    isolation: isolate;
+  }
+  & .shell-main::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    z-index: -1;
+    height: 45%;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--fx-grid) 2px, transparent 2px),
+      linear-gradient(90deg, var(--fx-grid) 2px, transparent 2px);
+    background-size: 40px 40px;
+    transform: perspective(240px) rotateX(55deg);
+    transform-origin: bottom;
+    mask-image: linear-gradient(to bottom, transparent, #000 70%);
+    animation: tc-grid 2.4s linear infinite;
+  }
+  /* Neon edges between panes and under headers. */
+  & .shell-sidebar:not(.fixed) {
+    border-inline-end-color: var(--color-accent);
+    box-shadow: 0 0 20px -6px var(--color-accent);
+  }
+  & .shell-members:not(.fixed) {
+    border-inline-start-color: var(--color-accent);
+    box-shadow: 0 0 20px -6px var(--color-accent);
+  }
+  & :is(.shell-brand, .shell-pane-header, .channel-header) {
+    border-image: linear-gradient(90deg, var(--color-accent), var(--color-text-link)) 1;
+  }
+  /* Chrome-lettered headings: upper case, wide, a pink-to-cyan gradient. */
+  & :is(.channel-header h1, .shell-brand bdi, .shell-pane-header) {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  & :is(.channel-header h1, .shell-brand bdi, .display-hero) {
+    background: linear-gradient(90deg, var(--color-accent-text), var(--color-text-link));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  & :is(h1, h2, .display-hero) {
+    filter: var(--fx-heading-filter);
+  }
+  & .channel-row[aria-current="page"] {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-accent) 30%, var(--color-bg-sidebar)),
+      var(--color-bg-sidebar)
+    );
+    box-shadow: inset 3px 0 0 var(--color-accent);
+    &::before {
+      content: none;
+    }
+  }
+  & .msg-author {
+    color: var(--color-text-link);
+  }
+  & .avatar {
+    box-shadow:
+      0 0 0 2px var(--color-accent),
+      0 0 12px -2px var(--color-accent);
+  }
+  & .composer {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 16px -4px var(--color-accent);
+  }
+  & .btn-primary:not(:disabled) {
+    box-shadow: 0 0 18px -4px var(--color-accent);
+  }
+  & .tag {
+    box-shadow: 0 0 10px -3px var(--color-accent);
+  }
+  & ::selection {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+  }
+  & * {
+    scrollbar-color: var(--color-accent) transparent;
+  }
+  & .glow {
+    background:
+      radial-gradient(
+        ellipse 55% 40% at 50% 28%,
+        color-mix(in srgb, var(--color-accent) 22%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 45% 35% at 70% 55%,
+        color-mix(in srgb, var(--color-text-link) 16%, transparent),
+        transparent 70%
+      );
+  }
+  & .grille {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--color-accent) 45%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--color-text-link) 35%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom, transparent 30%, #000 75%, transparent 100%);
+  }
+}
+
+/* ---- Fjord: frosted glass and northern light -------------------------------------------------------------------- */
+
+[data-skin="fjord"] {
+  /* A faint aurora at the top of the side panes. */
+  & :is(.shell-sidebar, .shell-members) {
+    background-image: var(--fx-aurora);
+  }
+  /* Headers float on a soft shadow instead of a rule. */
+  & :is(.shell-brand, .shell-pane-header, .channel-header) {
+    border-bottom-color: transparent;
+    box-shadow: var(--fx-header-shadow);
+    position: relative;
+    z-index: 1;
+  }
+  & :is(h1, h2, h3) {
+    font-weight: 600;
+  }
+  /* Frosted popovers, menus and dialogs. */
+  & .elev-2 {
+    background-color: color-mix(in srgb, var(--color-bg-elevated) 86%, transparent);
+    backdrop-filter: blur(18px) saturate(1.6);
+  }
+  & .channel-row {
+    min-height: 2.5rem;
+  }
+  & .channel-row[aria-current="page"] {
+    box-shadow: inset 0 0 0 1px var(--color-border);
+    &::before {
+      content: none;
+    }
+  }
+  & .msg {
+    padding-inline: 1.75rem;
+  }
+  & .msg-head {
+    padding-top: 1rem;
+  }
+  & .avatar {
+    border-radius: 32%;
+  }
+  & .composer {
+    border-radius: 0.75rem;
+    box-shadow: 0 6px 20px -12px color-mix(in srgb, var(--color-text) 40%, transparent);
+  }
+  & .grille {
+    opacity: 0.45;
+  }
+}
+
+/* ---- Brutalist: a poster -------------------------------------------------------------------------------------- */
+
+[data-skin="brutalist"] {
+  /* Thick ink rules everywhere. */
+  & .shell-sidebar:not(.fixed) {
+    border-inline-end: 3px solid var(--color-text);
+  }
+  & .shell-members:not(.fixed) {
+    border-inline-start: 3px solid var(--color-text);
+  }
+  & :is(.shell-brand, .shell-pane-header, .channel-header) {
+    border-bottom: 3px solid var(--color-text);
+  }
+  & :is(h1, h2, h3) {
+    font-weight: 800;
+  }
+  & :is(.channel-header h1, .shell-brand bdi, .shell-pane-header) {
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  & .channel-header h1 {
+    font-size: 1.5rem;
+  }
+  /* The user panel in reverse: page colour on ink. */
+  & .shell-userbar {
+    border-top: 3px solid var(--color-text);
+    background: var(--color-text);
+    color: var(--color-bg);
+    & * {
+      color: inherit;
+    }
+    & button:hover {
+      background: var(--color-accent);
+      color: var(--color-text-on-accent);
+    }
+  }
+  /* The selected channel: an accent block with a hard shadow. */
+  & .channel-row {
+    border: 2px solid transparent;
+  }
+  & .channel-row:hover {
+    border-color: var(--color-text);
+  }
+  & .channel-row[aria-current="page"] {
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
+    border-color: var(--color-text);
+    box-shadow: 3px 3px 0 var(--color-text);
+    &::before {
+      content: none;
+    }
+    & * {
+      color: inherit;
+      opacity: 1;
+    }
+  }
+  /* Authors as reversed labels; a heavy rule above each group. */
+  & .msg-author {
+    background: var(--color-text);
+    color: var(--color-bg);
+    padding-inline: 0.35em;
+  }
+  & .msg-head {
+    border-top: 2px solid var(--color-text);
+    margin-top: 0.5rem;
+  }
+  & .avatar {
+    border: 2px solid var(--color-text);
+    box-shadow: 3px 3px 0 var(--color-text);
+  }
+  & .composer {
+    border: 3px solid var(--color-text);
+    box-shadow: 6px 6px 0 var(--color-text);
+  }
+  & a:hover {
+    background: var(--color-text-link);
+    color: var(--color-bg);
+    text-decoration: none;
+  }
+  & ::selection {
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+  & .elev-2 {
+    border-width: 2px;
+    border-color: var(--color-text);
+  }
+  & .btn {
+    border-width: 2px;
+    border-color: var(--color-text);
+    box-shadow: 3px 3px 0 var(--color-text);
+    transition:
+      translate var(--duration-fast) var(--ease-move),
+      box-shadow var(--duration-fast) var(--ease-move),
+      background-color var(--duration-fast) var(--ease-move);
+  }
+  & .btn:active:not(:disabled) {
+    translate: 3px 3px;
+    box-shadow: 0 0 0 var(--color-text);
+  }
+  & .btn:disabled {
+    box-shadow: none;
+  }
+  & :is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select) {
+    border-width: 2px;
+  }
+  & .tag {
+    border: 2px solid var(--color-text);
+    background: transparent;
+    color: var(--color-text);
+    rotate: -2deg;
+  }
+  & .switch {
+    border-width: 2px;
+  }
+  & .grille {
+    background-image: radial-gradient(circle at center, var(--color-text) 0 2px, transparent 2.5px);
+    background-size: 14px 14px;
+  }
+  & .glow {
+    display: none;
+  }
+}
