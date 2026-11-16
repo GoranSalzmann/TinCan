@@ -6,6 +6,7 @@ import type { Db, ModuleMigrations } from "@tincan/db";
 import type { PubSub } from "@tincan/pubsub";
 import type { Storage } from "@tincan/storage";
 import type { CoreConfig } from "../config/schema.js";
+import type { PageMeta } from "../http/shell.js";
 import type { EventBus } from "./events.js";
 import type { JobScheduler } from "./jobs.js";
 import type { OutboxRegistrar } from "./outbox.js";
@@ -116,6 +117,18 @@ export interface Logger {
   error(obj: unknown, msg?: string): void;
 }
 
+/** Link-preview tags for a page of the web client (http/shell.ts). */
+export interface PageRegistrar {
+  /**
+   * The app serves the web shell at `path`, a root path such as `/invite/:code` (not under /api/v1), with the tags `fn`
+   * returns. Null, or a throw, gives the instance's generic tags. Crawlers fetch this without a session.
+   */
+  preview(
+    path: string,
+    fn: (params: Record<string, string>, req: FastifyRequest) => Promise<PageMeta | null>,
+  ): void;
+}
+
 export interface ModuleContext<C = unknown, P extends PortName = PortName> {
   readonly id: string;
   readonly config: C;
@@ -128,6 +141,7 @@ export interface ModuleContext<C = unknown, P extends PortName = PortName> {
   readonly gateway: GatewayRegistrar;
   readonly capabilities: CapabilityRegistrar;
   readonly security: SecurityRegistrar;
+  readonly pages: PageRegistrar;
   readonly jobs: JobScheduler;
   readonly outbox: OutboxRegistrar;
   readonly api: ApiRegistry;

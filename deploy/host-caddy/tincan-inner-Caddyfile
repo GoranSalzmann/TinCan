@@ -26,6 +26,19 @@
 		uri strip_prefix /livekit
 		reverse_proxy host.docker.internal:7880
 	}
+	# The app serves the start page and invite links itself, with link-preview tags for other apps (WhatsApp,
+	# Discord). A server without the web shell answers 404, and the static file is served instead.
+	@page path / /invite/*
+	handle @page {
+		reverse_proxy tincan:3000 {
+			@noshell status 404
+			handle_response @noshell {
+				root * /srv/web
+				rewrite * /index.html
+				file_server
+			}
+		}
+	}
 	# Build files carry a hash in their name; the worker and manifest must be re-checked on every load.
 	header /assets/* Cache-Control "public, max-age=31536000, immutable"
 	@pwa path /sw.js /manifest.webmanifest
