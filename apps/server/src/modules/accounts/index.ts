@@ -62,7 +62,8 @@ export default defineModule({
 
     const settings = new UserSettings(db);
     settings.register("appearance.theme", z.enum(["light", "dark", "system"]));
-    settings.register("appearance.accent", z.string().min(1).max(32));
+    settings.register("appearance.accent", z.string().min(1).max(32)); // before themes; no longer written
+    settings.register("appearance.skin", z.string().min(1).max(32));
     settings.register("appearance.density", z.enum(["comfortable", "compact"]));
     settings.register("locale", z.string().min(2).max(16));
     const presence = new Presence(ctx.gateway);

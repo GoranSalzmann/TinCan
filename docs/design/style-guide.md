@@ -24,11 +24,11 @@ Everything here becomes CSS variables and Tailwind theme entries in M1 (12 §2, 
 |---|---|---|
 | Light | Appearance setting, or System when the OS is in light mode | Default for `prefers-color-scheme: light` |
 | Dark | Appearance setting, or System when the OS is in dark mode | Default for `prefers-color-scheme: dark` |
-| High contrast | Appearance setting, or System when `prefers-contrast: more` | Dark-based; text ≥ 7:1, every boundary drawn, no shadows; ignores the custom accent |
+| High contrast | Appearance setting, or System when `prefers-contrast: more` | Dark-based; text ≥ 7:1, every boundary drawn, no shadows; ignores the chosen theme (§3.2) |
 | Forced colours | Automatic when `forced-colors: active` (Windows contrast themes) | Tokens give way to system colours (`Canvas`, `CanvasText`, `Highlight`, `ButtonText`, `LinkText`); icons use `currentColor`; focus and selection use `Highlight` |
 
 - The resolved theme is set as `data-theme="light|dark|hc"` on `<html>`. A `prefers-color-scheme` block in the generated CSS covers first paint before settings load, because the CSP forbids inline scripts (12 §15).
-- Theme and accent are **synced** settings; text size, density and reduced motion are **device-local** (12 §8).
+- Mode and theme (§3.2) are **synced** settings; text size, density and reduced motion are **device-local** (12 §8).
 - The instance name and icon are Host-customisable (12 §13); they never change theme colours.
 
 ## 3. Colour tokens
@@ -243,49 +243,29 @@ edit by hand). High contrast is checked against the same minimums but is designe
 | `--color-warning` | `--color-bg-mention` | 3 | 4.17 | 9.69 | 12.22 |
 <!-- contrast:end -->
 
-### 3.2 Accent presets
+### 3.2 Themes
 
-The accent is customisable per user (12 §13) from a **curated set** rather than a free colour
-picker (U6, approved), so every option is checked in advance. The high-contrast theme keeps its own accent.
-Ember (the orange of the Tin Can mark) is the default and matches the token table above. It replaced Teal as the default and Amber as a preset in the 2026-11 visual overhaul; a stored Amber falls back to Ember.
+Besides the mode (light, dark, high contrast), each user picks a **theme** from a curated set (12 §13; U6, approved,
+widened from accent presets to whole themes in 2026-11). A theme is more than a colour: it sets the surface, text and
+accent tokens for light and dark, and the type faces, corner radii, floating-surface shadow (`--shadow-elev`) and
+heading tracking (`--tracking-display`). A few touches that tokens cannot express (scanlines, glows, offset shadows,
+pill buttons) live in `styles.css` under `[data-skin="…"]`; buttons carry `btn btn-<variant>` as hooks for them.
 
-| Accent preset | Theme | `--color-accent` | `--color-accent-hover` | `--color-accent-text` | `--color-text-on-accent` |
-|---|---|---|---|---|---|
-| Ember | Light | `#C24E00` | `#A04000` | `#983D00` | `#FFFFFF` |
-| Ember | Dark | `#E86101` | `#FF7A1F` | `#FF9450` | `#0F0E0C` |
-| Teal | Light | `#0F766E` | `#0B5F58` | `#0B6A62` | `#FFFFFF` |
-| Teal | Dark | `#34C3B0` | `#5ED6C5` | `#63DCCB` | `#04211D` |
-| Blue | Light | `#2557D6` | `#1C45AD` | `#1F4FC4` | `#FFFFFF` |
-| Blue | Dark | `#6C9BFF` | `#93B5FF` | `#8DB1FF` | `#06142E` |
-| Violet | Light | `#6D3FD1` | `#5730A8` | `#6236C2` | `#FFFFFF` |
-| Violet | Dark | `#A58BFF` | `#BDA9FF` | `#B9A5FF` | `#160B33` |
-| Rose | Light | `#C0245C` | `#9C1C4A` | `#AE1F53` | `#FFFFFF` |
-| Rose | Dark | `#FF7AA8` | `#FF9DBE` | `#FF94B9` | `#33081A` |
-| Green | Light | `#13773F` | `#0E5F32` | `#0F6D39` | `#FFFFFF` |
-| Green | Dark | `#45C97A` | `#6CD898` | `#62D690` | `#052211` |
-| Graphite | Light | `#3A3631` | `#26231F` | `#3A3631` | `#FFFFFF` |
-| Graphite | Dark | `#C9C3BA` | `#DDD8D0` | `#D2CCC3` | `#0F0E0C` |
+The palettes live in `apps/web/src/theme/tokens.ts` (`SKINS`; "skin" in code so it never collides with the mode,
+which the code calls theme). Status colours (danger, warning, success, presence, video) come from the mode.
+`theme.test.ts` checks **every** pairing in §3.1 for every theme in both light and dark, so a theme cannot ship
+below AA. High contrast and forced colours ignore the theme entirely (`data-skin` is not set). A stored accent from
+before themes existed falls back to Ember.
 
-Each preset is checked against every accent pairing in §3.1 for its theme:
-
-<!-- accents:begin -->
-| Preset | Theme | Pairings | Lowest ratio | Lowest pairing |
+| Theme | Character | Faces | Corners | Signature |
 |---|---|---|---|---|
-| Ember | Light | 10 | 4.79 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Ember | Dark | 10 | 5.64 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Teal | Light | 10 | 4.60 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Teal | Dark | 10 | 7.72 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Blue | Light | 10 | 5.03 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Blue | Dark | 10 | 6.77 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Violet | Light | 10 | 5.30 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Violet | Dark | 10 | 6.85 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Rose | Light | 10 | 4.80 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Rose | Dark | 10 | 7.21 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Green | Light | 10 | 4.58 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Green | Dark | 10 | 7.95 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
-| Graphite | Light | 10 | 8.54 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Graphite | Dark | 10 | 9.32 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-<!-- accents:end -->
+| **Ember** | The house look (default): warm graphite, the orange of the mark | Space Grotesk, Inter | Near-square (1–3 px) | The grille |
+| **Phosphor** | A green-screen terminal; light is the green-bar printout | IBM Plex Mono throughout | Square | Scanlines, phosphor glow in dark |
+| **Broadsheet** | A newspaper: ink on newsprint, one red | System serif (Charter, Iowan, Georgia) | Square | Ink-ruled panels, italic masthead, small-caps buttons |
+| **Marshmallow** | Soft pastel pink; dark is plum | System rounded face where present | Round (6–20 px) | Pill buttons and tags, big soft shadows |
+| **Synthwave** | Neon pink and cyan on deep indigo; light is vaporwave pastel | Space Grotesk, Inter | Small (2–8 px) | Glowing buttons and headings, horizon grid |
+| **Fjord** | Cool, quiet blue-grey slate | Inter throughout | Soft (4–12 px) | Light shadows, lighter headings |
+| **Brutalist** | A poster: black on white, ultramarine; dark is black with yellow | Space Grotesk, Inter | Square | 2 px ink rules, hard offset shadows that press in |
 
 ## 4. State without colour
 
@@ -358,7 +338,8 @@ Rules:
 
 The one decorative device: a dot matrix like the perforated face of a speaker (`grille`, `grille-soft`, `glow`
 utilities in `styles.css`). It sits behind the instance name on the sign-in screens and, softened, behind an empty
-channel. It is hidden in high contrast and forced colours. Nothing else in the app is decorative.
+channel. It is hidden in high contrast and forced colours. Nothing else in the app is decorative. Themes (§3.2) may
+redraw it (scanlines, a horizon grid, ruled lines) but keep it in the same places.
 
 ## 6. Spacing, sizing and layout
 
@@ -409,7 +390,7 @@ targets to 44 px.
 | `--radius-xl` | 3px | Dialogs, sheets, stream tiles, instance icons |
 | `--radius-full` | 9999px | Presence, switch (shapes whose roundness carries meaning) |
 
-Corners are near-square throughout; avatars are square tiles.
+Corners are near-square throughout; avatars are square tiles. These are Ember's values: a theme (§3.2) may set its own radii.
 
 Instance icons keep one shape (no morph-on-hover animation).
 
@@ -541,7 +522,7 @@ Built in `apps/web/src/ui/` (12 §3) on Radix Primitives plus Tailwind. Radix Th
 | Combobox | Custom (ARIA combobox) + `Popover` | Mention autocomplete, add-override picker, quick switcher | Radix has none; cmdk (MIT) is a candidate for the quick switcher (open item) |
 | Checkbox | `Checkbox` | Forms, picker options | |
 | Switch | `Switch` | Settings toggles, role permissions | Label at the start, switch at the end |
-| Radio group | `RadioGroup` | Theme, accent swatches, transmit mode, source cards | |
+| Radio group | `RadioGroup` | Mode, theme cards, transmit mode, source cards | |
 | Segmented control | `RadioGroup` styled as segments | Audio preset, Focus/Grid, quality Auto/High/Low, permission Deny/Inherit/Allow | Radio semantics, so screen readers say "2 of 3" |
 | Slider | `Slider` | Volumes, input gain, denoiser strength, sensitivity, release delay, text size | Shows value text; `aria-valuetext` with units; follows `dir` |
 | Tabs | `Tabs` | Source picker (Screens/Windows), role editor, channel settings | |
@@ -582,7 +563,7 @@ and `Menubar` (the macOS app menu is native, 13 §4.3).
 [data-theme="dark"]         { --color-bg: #1D2026; --color-text: #ECEFF3; /* … */ }
 [data-theme="hc"]           { --color-bg: #000000; --color-text: #FFFFFF; /* … */ }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) { /* dark values, first paint */ } }
-[data-accent="blue"][data-theme="light"] { --color-accent: #2557D6; /* … */ }
+[data-skin="fjord"][data-theme="light"] { --color-bg: #F4F7FA; /* … */ }
 @media (forced-colors: active) { :root { --color-focus: Highlight; --color-accent: Highlight; /* … */ } }
 ```
 
@@ -595,6 +576,6 @@ until then.
 
 - Composer: plain `textarea` (recommended for v1) vs a rich editor (Lexical, Slate) for inline mention chips.
 - Quick switcher library (cmdk vs custom combobox) once 12's "command palette in v1" is decided.
-- Free custom accent colour (with automatic contrast correction) in addition to presets: later.
+- Free custom accent colour (with automatic contrast correction) on top of a theme: later.
 - Web shortcut defaults that browsers do not let pages intercept: check per browser in M1.
 - App icon, logo and brand basics are a separate M0 item (17 §3), not drawn here.

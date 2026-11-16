@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderTokensCss } from "./css.js";
-import { ACCENT_PRESETS, COLOR_TOKENS } from "./tokens.js";
+import { COLOR_TOKENS, SKIN_NAMES, SKINS } from "./tokens.js";
 
 const doc = readFileSync(join(import.meta.dirname, "../../../../docs/design/style-guide.md"), "utf8");
 const generated = readFileSync(join(import.meta.dirname, "tokens.generated.css"), "utf8");
@@ -58,24 +58,10 @@ describe("tokens.ts matches the approved style guide (§3)", () => {
     }
   });
 
-  it("has the seven accent presets of §3.2", () => {
-    const sec = doc.slice(doc.indexOf("### 3.2 Accent presets"), doc.indexOf("## 4. State without colour"));
-    const rows = [
-      ...sec.matchAll(/^\| (\w+) \| (Light|Dark) \| `(#\w+)` \| `(#\w+)` \| `(#\w+)` \| `(#\w+)` \|/gm),
-    ];
-    expect(rows).toHaveLength(14);
-    for (const [, name, theme, accent, hover, text, onAccent] of rows) {
-      const set =
-        ACCENT_PRESETS[name!.toLowerCase() as keyof typeof ACCENT_PRESETS][
-          theme!.toLowerCase() as "light" | "dark"
-        ];
-      expect(set, `${name} ${theme}`).toEqual({
-        accent: accent!.toUpperCase(),
-        hover: hover!.toUpperCase(),
-        text: text!.toUpperCase(),
-        onAccent: onAccent!.toUpperCase(),
-      });
-    }
+  it("lists every theme in §3.2", () => {
+    const sec = doc.slice(doc.indexOf("### 3.2 Themes"), doc.indexOf("## 4. State without colour"));
+    const names = [...sec.matchAll(/^\| \*\*(\w+)\*\* \|/gm)].map((m) => m[1]!.toLowerCase());
+    expect(names).toEqual([...SKIN_NAMES]);
   });
 });
 
@@ -119,22 +105,31 @@ describe("contrast (WCAG 2.2 AA, style guide §3.1)", () => {
     }
   });
 
-  it("every accent preset keeps the accent pairings in its own theme", () => {
-    const accentPairings = pairings.filter((p) => /accent/.test(p.fg + p.bg));
-    for (const [name, sets] of Object.entries(ACCENT_PRESETS)) {
-      for (const theme of ["light", "dark"] as const) {
-        const t = tokenMap(theme === "light" ? 1 : 2);
-        const a = sets[theme];
-        t.set("--color-accent", a.accent);
-        t.set("--color-accent-hover", a.hover);
-        t.set("--color-accent-text", a.text);
-        t.set("--color-text-on-accent", a.onAccent);
-        for (const p of accentPairings) {
-          expect(
-            contrast(t.get(p.fg)!, t.get(p.bg)!),
-            `${name} ${theme}: ${p.fg} on ${p.bg}`,
-          ).toBeGreaterThanOrEqual(p.min);
-        }
+  it("ember is the token table", () => {
+    expect(SKINS.ember.light).toEqual(Object.fromEntries(tokenMap(1)));
+    expect(SKINS.ember.dark).toEqual(Object.fromEntries(tokenMap(2)));
+  });
+
+  it.each(SKIN_NAMES.flatMap((n) => (["light", "dark"] as const).map((m) => [n, m] as const)))(
+    "every pairing meets its minimum in the %s theme, %s",
+    (name, mode) => {
+      const t = tokenMap(mode === "light" ? 1 : 2);
+      for (const [k, v] of Object.entries(SKINS[name][mode])) t.set(k, v);
+      const failures: string[] = [];
+      for (const p of pairings) {
+        const r = contrast(t.get(p.fg)!, t.get(p.bg)!);
+        if (r < p.min) failures.push(`${p.fg} on ${p.bg}: ${r.toFixed(2)} < ${p.min}`);
+      }
+      expect(failures).toEqual([]);
+    },
+  );
+
+  it("every theme sets only known tokens", () => {
+    const known = new Set(COLOR_TOKENS.map((r) => r[0]));
+    for (const name of SKIN_NAMES) {
+      for (const mode of ["light", "dark"] as const) {
+        for (const k of Object.keys(SKINS[name][mode]))
+          expect(known.has(k), `${name} ${mode} ${k}`).toBe(true);
       }
     }
   });

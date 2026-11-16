@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ACCENT_NAMES, ACCENT_PRESETS, COLOR_TOKENS, type ThemeName } from "./tokens.js";
+import {
+  COLOR_TOKENS,
+  FONTS,
+  SHADOW_ELEV,
+  SKIN_NAMES,
+  SKINS,
+  type SkinName,
+  type ThemeName,
+} from "./tokens.js";
 
 /**
  * Generates tokens.generated.css from tokens.ts (style guide §16). `pnpm --filter @tincan/web gen:tokens`
  * rewrites the file; `theme.test.ts` fails when it is stale.
  */
-
-// Bundled faces first (src/fonts.css, served from our own origin: the CSP allows `font-src 'self'` only), then the
-// system stack, which still covers scripts the bundled faces do not (CJK, Arabic, Hebrew, Thai) and emoji.
-const FONT_DISPLAY = `"Space Grotesk Variable", "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
-const FONT_SANS = `"Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
-const FONT_MONO = `"IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", "DejaVu Sans Mono", Menlo, monospace`;
 
 /** Style guide §5.2: size, line height, weight. */
 const TYPE_SCALE: [string, string, string, number][] = [
@@ -42,6 +44,7 @@ const PLAIN_TOKENS: [string, string][] = [
   ["--size-dialog-sm", "27.5rem"],
   ["--size-dialog-md", "36rem"],
   ["--size-content-max", "46rem"],
+  ["--tracking-display", "-0.02em"],
   ["--z-sticky", "10"],
   ["--z-banner", "20"],
   ["--z-overlay", "40"],
@@ -62,21 +65,19 @@ const THEME_INDEX: Record<ThemeName, 1 | 2 | 3> = { light: 1, dark: 2, hc: 3 };
 function declarations(theme: ThemeName, indent = "  "): string {
   const i = THEME_INDEX[theme];
   const lines = COLOR_TOKENS.map((row) => `${indent}${row[0]}: ${row[i]};`);
+  lines.push(`${indent}--shadow-elev: ${SHADOW_ELEV[i - 1]};`);
   return `${indent}color-scheme: ${theme === "light" ? "light" : "dark"};\n${lines.join("\n")}`;
 }
 
-function accentDeclarations(
-  theme: "light" | "dark",
-  name: (typeof ACCENT_NAMES)[number],
-  indent: string,
-): string {
-  const a = ACCENT_PRESETS[name][theme];
-  return [
-    `${indent}--color-accent: ${a.accent};`,
-    `${indent}--color-accent-hover: ${a.hover};`,
-    `${indent}--color-accent-text: ${a.text};`,
-    `${indent}--color-text-on-accent: ${a.onAccent};`,
-  ].join("\n");
+/**
+ * A skin's colours and shadow for one mode. Every block sets the same keys, so the light block (which also matches a
+ * dark root through `:root`) never leaks a value into dark.
+ */
+function skinDeclarations(name: SkinName, theme: "light" | "dark", indent: string): string {
+  const skin = SKINS[name];
+  const lines = Object.entries(skin[theme]).map(([k, v]) => `${indent}${k}: ${v};`);
+  lines.push(`${indent}--shadow-elev: ${skin.shadow[theme]};`);
+  return lines.join("\n");
 }
 
 export function renderTokensCss(): string {
@@ -90,9 +91,9 @@ export function renderTokensCss(): string {
   out.push("@theme {", "  --color-*: initial;");
   for (const row of COLOR_TOKENS) out.push(`  ${row[0]}: ${row[1]};`);
   out.push(
-    `  --font-sans: ${FONT_SANS};`,
-    `  --font-display: ${FONT_DISPLAY};`,
-    `  --font-mono: ${FONT_MONO};`,
+    `  --font-sans: ${FONTS.sans};`,
+    `  --font-display: ${FONTS.display};`,
+    `  --font-mono: ${FONTS.mono};`,
   );
   for (const [n, size, lh, weight] of TYPE_SCALE) {
     out.push(
@@ -124,15 +125,18 @@ export function renderTokensCss(): string {
     "",
   );
 
-  out.push("/* Accent presets (style guide §3.2). High contrast keeps its own accent. */");
-  for (const name of ACCENT_NAMES) {
+  out.push(
+    "/* Themes (style guide §3.2). `data-skin` is set by the Appearance setting, never in high contrast. */",
+  );
+  for (const name of SKIN_NAMES) {
     if (name === "ember") continue; // the default values above
+    const sel = `[data-skin="${name}"]`;
+    const props = Object.entries(SKINS[name].props).map(([k, v]) => `  ${k}: ${v};`);
+    if (props.length) out.push(`${sel} {\n${props.join("\n")}\n}`);
+    out.push(`${sel}:is(:root, [data-theme="light"]) {\n${skinDeclarations(name, "light", "  ")}\n}`);
+    out.push(`${sel}[data-theme="dark"] {\n${skinDeclarations(name, "dark", "  ")}\n}`);
     out.push(
-      `[data-accent="${name}"]:is(:root, [data-theme="light"]) {\n${accentDeclarations("light", name, "  ")}\n}`,
-    );
-    out.push(`[data-accent="${name}"][data-theme="dark"] {\n${accentDeclarations("dark", name, "  ")}\n}`);
-    out.push(
-      `@media (prefers-color-scheme: dark) {\n  [data-accent="${name}"]:root:not([data-theme]) {\n${accentDeclarations("dark", name, "    ")}\n  }\n}`,
+      `@media (prefers-color-scheme: dark) {\n  ${sel}:root:not([data-theme]) {\n${skinDeclarations(name, "dark", "    ")}\n  }\n}`,
     );
   }
   out.push("");

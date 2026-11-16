@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation, useMatch, useNavigate } from "react-router-dom";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, LogOut, Menu as MenuIcon, Settings, Users, X } from "lucide-react";
-import { ACCENT_NAMES } from "../theme/tokens.js";
+import { SKIN_NAMES, type SkinName } from "../theme/tokens.js";
 import { useAppearance, type ThemePreference } from "../theme/store.js";
 import { PSEUDO_LOCALES, useLocale, useT, type Locale, type MessageKey } from "../core/i18n/index.js";
 import { syncPush, usePushSync } from "../core/push.js";
@@ -93,7 +93,7 @@ const MAIN_MIN = 360;
 
 function AppearanceItems() {
   const t = useT();
-  const { theme, accent, setTheme, setAccent } = useAppearance();
+  const { theme, skin, setTheme, setSkin } = useAppearance();
   const { locale, setLocale } = useLocale();
   return (
     <>
@@ -109,14 +109,14 @@ function AppearanceItems() {
         ))}
       </Menu.RadioGroup>
       <Menu.Separator className="my-1 h-px bg-border" />
-      <Menu.Label className={menuLabel}>{t("appearance.accent")}</Menu.Label>
-      <Menu.RadioGroup value={accent} onValueChange={(v) => setAccent(v as (typeof ACCENT_NAMES)[number])}>
-        {ACCENT_NAMES.map((v) => (
-          <Menu.RadioItem key={v} value={v} className={menuItem}>
+      <Menu.Label className={menuLabel}>{t("appearance.skin")}</Menu.Label>
+      <Menu.RadioGroup value={skin} onValueChange={(v) => setSkin(v as SkinName)}>
+        {SKIN_NAMES.map((v) => (
+          <Menu.RadioItem key={v} value={v} className={menuItem} disabled={theme === "hc"}>
             <span className="inline-block w-4 text-center" aria-hidden="true">
               <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
             </span>
-            {t(`accent.${v}` as MessageKey)}
+            {t(`skin.${v}` as MessageKey)}
           </Menu.RadioItem>
         ))}
       </Menu.RadioGroup>

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """WCAG 2.x contrast check for the Tin Can colour tokens.
 
-Reads the colour token table, the pairing table and the accent preset table from
-docs/design/style-guide.md, computes the contrast ratio of every pairing in every theme
-(and of every accent pairing for every preset), and prints Markdown results tables.
+Reads the colour token table and the pairing table from docs/design/style-guide.md,
+computes the contrast ratio of every pairing in every theme, and prints a Markdown results
+table. Themes (style guide §3.2) are checked by apps/web/src/theme/theme.test.ts.
 Exits 1 if any pairing is below its minimum.
 
     python docs/design/tools/check_contrast.py           # check and print
@@ -19,7 +19,6 @@ import sys
 from pathlib import Path
 
 GUIDE = Path(__file__).resolve().parent.parent / "style-guide.md"
-ACCENT_TOKENS = ("--color-accent", "--color-accent-hover", "--color-accent-text", "--color-text-on-accent")
 THEMES = ("Light", "Dark", "High contrast")
 TOKEN = re.compile(r"`(--color-[a-z0-9-]+)`")
 HEX = re.compile(r"`(#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)`")
@@ -54,11 +53,6 @@ def parse_pairs(text: str):
             yield fg.group(1), bg.group(1), float(cells[2]), cells[3]
 
 
-def parse_presets(text: str):
-    for cells in rows(text, "| Accent preset |"):
-        values = [HEX.search(c) for c in cells[2:6]]
-        if cells[1] in THEMES and all(values):
-            yield cells[0], cells[1], dict(zip(ACCENT_TOKENS, (v.group(1) for v in values)))
 
 
 def rgba(hex_: str) -> tuple[float, float, float, float]:
@@ -126,31 +120,12 @@ def main() -> int:
             cells.append(f"{r:.2f}" + ("" if ok else " **FAIL**"))
         out.append(f"| `{fg}` | `{bg}` | {minimum:g} | " + " | ".join(cells) + " |")
 
-    accent_pairs = [p for p in pairs if p[0] in ACCENT_TOKENS or p[1] in ACCENT_TOKENS]
-    acc = ["| Preset | Theme | Pairings | Lowest ratio | Lowest pairing |", "|---|---|---|---|---|"]
-    presets = list(parse_presets(text))
-    for preset, theme, values in presets:
-        palette = {name: v[theme] for name, v in tokens.items()} | values
-        worst = None
-        for fg, bg, minimum, _rule in accent_pairs:
-            r = ratio(palette[fg], palette[bg])
-            margin = r / minimum
-            if worst is None or margin < worst[0]:
-                worst = (margin, r, minimum, fg, bg)
-        failures += worst[0] + 1e-9 < 1
-        status = "" if worst[0] + 1e-9 >= 1 else " **FAIL**"
-        acc.append(f"| {preset} | {theme} | {len(accent_pairs)} | {worst[1]:.2f} (min {worst[2]:g}){status} "
-                   f"| `{worst[3]}` on `{worst[4]}` |")
-
     print("\n".join(out))
-    print()
-    print("\n".join(acc))
     print(f"\n{len(tokens)} tokens, {len(pairs)} pairings x {len(THEMES)} themes, "
-          f"{len(presets)} accent preset/theme rows, {failures} failing", file=sys.stderr)
+          f"{failures} failing", file=sys.stderr)
 
     if "--write" in sys.argv:
         text = replace_block(text, "contrast", "\n".join(out))
-        text = replace_block(text, "accents", "\n".join(acc))
         GUIDE.write_text(text, encoding="utf-8", newline="\n")
     return 1 if failures else 0
 
