@@ -20,11 +20,11 @@
     "@tincan/storage": "workspace:*",
     "fastify": "^5.12.8",
     "fastify-type-provider-zod": "^7.0.0",
-    "livekit-server-sdk": "2.19.2",
+    "livekit-server-sdk": "2.19.3",
     "pino": "^10.4.0",
     "sharp": "^0.35.5",
     "web-push": "^4.0.0",
-    "ws": "^8.22.2",
+    "ws": "^8.23.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
