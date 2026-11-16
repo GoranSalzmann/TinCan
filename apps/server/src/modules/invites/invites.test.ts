@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Op } from "@tincan/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { OWNER, startTestServer, type TestServer } from "../../testing/harness.js";
@@ -349,5 +352,83 @@ describe("profile, settings and presence", () => {
     });
     watcher.close();
     sock.close();
+  });
+});
+
+describe("invite link previews", () => {
+  // A server whose image ships the web shell (config `server.webIndex`).
+  async function withShell(name = "Friends of Tin") {
+    await s.close();
+    const webIndex = join(mkdtempSync(join(tmpdir(), "tincan-shell-")), "index.html");
+    writeFileSync(
+      webIndex,
+      '<html><head>\n    <title>Tin Can</title>\n    <meta property="og:title" content="Tin Can" />\n  </head><body><div id="root"></div></body></html>',
+    );
+    s = await startTestServer({
+      config: {
+        instance: { name: "Test Place", publicUrl: "https://chat.example.com" },
+        server: { host: "127.0.0.1", port: 0, webIndex },
+        modules: { accounts: { signup: "invite-only", argon2 } },
+      },
+    });
+    const res = await s.request("POST", "/api/v1/auth/setup", {
+      body: { token: s.setupToken(), ...OWNER, instanceName: name },
+    });
+    owner = res.body.token;
+  }
+  const page = async (path: string) => {
+    const res = await s.request("GET", path);
+    return { status: res.status, type: res.headers.get("content-type"), html: res.bytes.toString("utf8") };
+  };
+
+  it("names the community and its size on a valid invite", async () => {
+    await withShell();
+    const invite = (await call(owner).post("/invites", {})).body;
+    const p = await page(`/invite/${invite.code}`);
+    expect(p.status).toBe(200);
+    expect(p.type).toContain("text/html");
+    expect(p.html).toContain('<meta property="og:title" content="Join Friends of Tin on Tin Can" />');
+    expect(p.html).toContain("a private chat community with 1 member.");
+    expect(p.html).toContain(`content="https://chat.example.com/invite/${invite.code}"`);
+    expect(p.html.match(/og:title/g)).toHaveLength(1);
+    expect(p.html).toContain('<div id="root"></div>');
+  });
+
+  it("gives only the generic tags for unknown, revoked and used-up invites", async () => {
+    await withShell();
+    const used = (await call(owner).post("/invites", { maxUses: 1 })).body;
+    await reg("ann", used.code);
+    const revoked = (await call(owner).post("/invites", {})).body;
+    await call(owner).del(`/invites/${revoked.id}`);
+    for (const code of ["nope-nope-nope", used.code, revoked.code]) {
+      const p = await page(`/invite/${code}`);
+      expect(p.status).toBe(200);
+      expect(p.html).toContain('<meta property="og:title" content="Friends of Tin" />');
+      expect(p.html).not.toContain("member");
+    }
+  });
+
+  it("serves the start page with the community name, and escapes it", async () => {
+    await withShell(`<b>"Tin" & co</b>`);
+    const p = await page("/");
+    expect(p.status).toBe(200);
+    expect(p.html).toContain("<title>&lt;b&gt;&quot;Tin&quot; &amp; co&lt;/b&gt;</title>");
+    expect(p.html).not.toContain("<b>");
+  });
+
+  it("falls back to the generic tags when one address asks too often", async () => {
+    await withShell();
+    const invite = (await call(owner).post("/invites", {})).body;
+    for (let i = 0; i < 120; i++)
+      await s.running.ports.pubsub.kv.incr("rl:invite-page:ip:127.0.0.1", { ttlMs: 60_000 });
+    const p = await page(`/invite/${invite.code}`);
+    expect(p.status).toBe(200);
+    expect(p.html).not.toContain("Join Friends of Tin");
+  });
+
+  it("does not exist without a web shell, so Caddy serves the static file", async () => {
+    const invite = (await call(owner).post("/invites", {})).body;
+    expect((await page(`/invite/${invite.code}`)).status).toBe(404);
+    expect((await page("/")).status).toBe(404);
   });
 });

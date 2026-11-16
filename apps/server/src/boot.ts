@@ -22,6 +22,7 @@ import type {
   GatewayRegistrar,
   Logger,
   ModuleContext,
+  PageRegistrar,
   PortName,
   Ports,
   SecurityRegistrar,
@@ -29,6 +30,7 @@ import type {
 import { handleConnection } from "./gateway/connection.js";
 import { GatewayHub } from "./gateway/hub.js";
 import { createHttpApp, NODE_ID, type SecurityState } from "./http/app.js";
+import { loadShell, renderShell, type PageMeta } from "./http/shell.js";
 import { ALL_MODULES } from "./modules/index.js";
 import { API_VERSION, VERSION } from "./version.js";
 
@@ -373,6 +375,11 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
     addGate: (fn) => void security.gates.push(fn),
   };
 
+  const pagePreviews: { path: string; fn: Parameters<PageRegistrar["preview"]>[1] }[] = [];
+  const pageRegistrar: PageRegistrar = {
+    preview: (path, fn) => void pagePreviews.push({ path, fn }),
+  };
+
   const makeLogger = (id: string): Logger => logger.child({ module: id });
   for (const m of graph.order) {
     await app.register(
@@ -387,6 +394,7 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
           gateway: gatewayRegistrar,
           capabilities,
           security: securityRegistrar,
+          pages: pageRegistrar,
           jobs: scheduler,
           outbox,
           api: apis,
@@ -399,6 +407,45 @@ export async function boot(opts: BootOptions): Promise<RunningApp> {
   }
 
   scheduler.every("gateway.sweep", 30_000, () => void hub.sweep());
+
+  // The web shell with link-preview tags (http/shell.ts). Without the file the routes do not exist, the app answers
+  // 404 and Caddy serves the static shell instead.
+  const shell = loadShell(resolve(config.server.webIndex));
+  if (shell) {
+    const communityName = () => capabilities.info().name ?? config.instance.name;
+    const generic = (path: string): PageMeta => ({
+      title: communityName(),
+      description: `${communityName()} is a private chat community on Tin Can.`,
+      path,
+    });
+    const page = (meta: PageMeta) => renderShell(shell, meta, config.instance.publicUrl, "Tin Can");
+    app.get("/", (_req, reply) =>
+      reply
+        .type("text/html; charset=utf-8")
+        .header("Cache-Control", "no-cache")
+        .send(page(generic("/"))),
+    );
+    for (const p of pagePreviews) {
+      app.get(p.path, async (req, reply) => {
+        const path = req.url.split("?")[0]!;
+        let meta: PageMeta | null = null;
+        try {
+          meta = await p.fn(req.params as Record<string, string>, req);
+        } catch (err) {
+          req.log.debug({ err }, "page preview fell back to the generic tags");
+        }
+        return reply
+          .type("text/html; charset=utf-8")
+          .header("Cache-Control", "no-cache")
+          .send(page(meta ?? generic(path)));
+      });
+    }
+  } else if (pagePreviews.length > 0) {
+    logger.info(
+      { webIndex: config.server.webIndex },
+      "no web shell at server.webIndex; link previews use the static tags",
+    );
+  }
 
   // 6: freeze registries, then listen.
   await app.ready();

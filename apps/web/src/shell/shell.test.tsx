@@ -298,17 +298,17 @@ describe("side panels", () => {
     fakeServer({ setupRequired: false, loggedIn: true });
     renderApp("/login");
     const channels = await screen.findByRole("separator", { name: "Resize the channel list" });
-    expect(channels).toHaveAttribute("aria-valuenow", "240");
+    expect(channels).toHaveAttribute("aria-valuenow", "272");
     channels.focus();
     await user.keyboard("{ArrowRight}");
-    expect(channels).toHaveAttribute("aria-valuenow", "256");
-    expect(localStorage.getItem("tincan.sidebarWidth")).toBe("256");
-    expect(screen.getByRole("navigation", { name: "Channels" })).toHaveStyle({ width: "256px" });
+    expect(channels).toHaveAttribute("aria-valuenow", "288");
+    expect(localStorage.getItem("tincan.sidebarWidth")).toBe("288");
+    expect(screen.getByRole("navigation", { name: "Channels" })).toHaveStyle({ width: "288px" });
 
     const members = screen.getByRole("separator", { name: "Resize the member list" });
     members.focus();
     await user.keyboard("{ArrowLeft}");
-    expect(members).toHaveAttribute("aria-valuenow", "256");
+    expect(members).toHaveAttribute("aria-valuenow", "288");
     expect(screen.queryByRole("button", { name: "Close the member list" })).not.toBeInTheDocument();
   });
 

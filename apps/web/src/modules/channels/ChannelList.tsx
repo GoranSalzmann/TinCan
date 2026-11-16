@@ -79,14 +79,14 @@ function ChannelRow({
       {isVoice ? (
         <Volume2
           aria-hidden="true"
-          size={16}
+          size={18}
           strokeWidth={1.75}
           className="shrink-0 opacity-70 group-aria-[current=page]/row:text-accent-text group-aria-[current=page]/row:opacity-100"
         />
       ) : (
         <Hash
           aria-hidden="true"
-          size={16}
+          size={18}
           strokeWidth={1.75}
           className="shrink-0 opacity-70 group-aria-[current=page]/row:text-accent-text group-aria-[current=page]/row:opacity-100"
         />
@@ -106,7 +106,7 @@ function ChannelRow({
           onClick={() => void joinVoice(channel.id).catch(toastError)}
           aria-label={t("channel.voice.join", { name: channel.name })}
           className={({ isActive }) =>
-            `group/row relative flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : "text-text-muted"}`
+            `group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : "text-text-muted"}`
           }
         >
           {label}
@@ -115,7 +115,7 @@ function ChannelRow({
         <NavLink
           to={`/channels/${channel.id}`}
           className={({ isActive }) =>
-            `group/row relative flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm no-underline hover:bg-bg-hover hover:text-text ${isActive ? "bg-bg-selected text-text before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : unread || mentions > 0 ? "text-text" : "text-text-muted"} ${muted ? "text-text-muted" : ""}`
+            `group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base no-underline hover:bg-bg-hover hover:text-text ${isActive ? "bg-bg-selected text-text before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : unread || mentions > 0 ? "text-text" : "text-text-muted"} ${muted ? "text-text-muted" : ""}`
           }
           aria-label={
             mentions > 0
@@ -292,7 +292,7 @@ function CategoryGroup({
           type="button"
           aria-expanded={open}
           onClick={() => setOpen(!open)}
-          className="meta flex min-h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-text-muted hover:text-text"
+          className="meta text-sm flex min-h-8 min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-text-muted hover:text-text"
         >
           {open ? (
             <ChevronDown aria-hidden="true" size={12} className="shrink-0" />

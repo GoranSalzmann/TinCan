@@ -43,6 +43,8 @@ FROM node:${NODE_VERSION}-bookworm-slim AS server
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /out/server /app
+# The web shell, so the app can serve / and /invite/<code> with link-preview tags (config `server.webIndex`).
+COPY --from=build /repo/apps/web/dist/index.html /app/web/index.html
 COPY LICENSE /app/LICENSE
 # Runs as a non-root user; /data is the only writable path (14 §2). `docker compose` passes the host user's uid:gid.
 USER node
