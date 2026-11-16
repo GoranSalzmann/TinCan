@@ -18,6 +18,7 @@ import { CameraSection } from "./CameraSection.js";
 import { Button } from "../../ui/Button.js";
 import { Segmented, selectClass } from "../../ui/Controls.js";
 import { toast, toastError } from "../../ui/toast.js";
+import { DeepFilterNote, DeepFilterProgress } from "../voice/DeepFilterProgress.js";
 import { FooterNote, Panel, Row, SettingsPage, SettingsSection, SwitchRow } from "./layout.js";
 
 const PRESET_ORDER: Preset[] = ["standard", "aggressive", "natural", "studio", "custom"];
@@ -48,6 +49,8 @@ function MicTest() {
   const [secs, setSecs] = useState<number | null>(null);
   const [level, setLevel] = useState(0);
   const [clips, setClips] = useState<{ processed: string; raw: string; tier: NoiseTier } | null>(null);
+  /** From the click until the clips are ready, including the first-use DeepFilterNet download. */
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const urls = useRef<string[]>([]);
 
@@ -60,6 +63,7 @@ function MicTest() {
 
   const record = async () => {
     setError(null);
+    setBusy(true);
     for (const u of urls.current.splice(0)) URL.revokeObjectURL(u);
     setClips(null);
     let pipeline: Pipeline | null = null;
@@ -95,6 +99,7 @@ function MicTest() {
       setError((e as Error).message);
     } finally {
       pipeline?.stop();
+      setBusy(false);
       setSecs(null);
       setLevel(0);
     }
@@ -105,13 +110,14 @@ function MicTest() {
       <Panel label={t("voice.pane.micTest")} footer={<FooterNote>{t("voice.pane.micTestNote")}</FooterNote>}>
         <div className="flex flex-col gap-4 px-5 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" disabled={secs !== null} onClick={() => void record()}>
+            <Button variant="ghost" disabled={busy} onClick={() => void record()}>
               {secs !== null ? t("voice.pane.recording", { s: secs }) : t("voice.pane.record")}
             </Button>
             <div className="min-w-40 flex-1">
               <Meter level={level} label={t("voice.pane.level")} />
             </div>
           </div>
+          <DeepFilterProgress />
           {clips ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <span className="flex flex-col gap-1.5 text-sm">
@@ -384,7 +390,14 @@ export function VoicePane() {
                 ))}
               </select>
             }
-          />
+          >
+            {/* Below the choice, full width: beside it, the text squeezes into a narrow column. */}
+            {effective.noiseTier === "deepfilternet" ? (
+              <p className="m-0 max-w-prose text-sm text-text-muted">
+                <DeepFilterNote />
+              </p>
+            ) : null}
+          </Row>
           <SwitchRow
             label={t("voice.pane.gate")}
             checked={effective.noiseGate}

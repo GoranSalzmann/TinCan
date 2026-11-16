@@ -17,8 +17,9 @@ sh scripts/build-deepfilternet.sh
 ```
 
 This writes `apps/web/public/denoise/deepfilternet3/` (git-ignored): the module, the upstream model archive from
-the same pinned checkout (its SHA-256 is checked), both licence texts and `SHA256SUMS`. `pnpm build` then copies
-them into the PWA. The web Docker image runs the same script.
+the same pinned checkout (its SHA-256 is checked), both licence texts, `SHA256SUMS`, and `manifest.json` with
+the two files' sizes. The client reads the manifest for the download progress and to learn that the server has
+the tier at all. `pnpm build` then copies them into the PWA. The web Docker image runs the same script.
 
 Without these files the client still works: choosing DeepFilterNet falls back to RNNoise and says so.
 

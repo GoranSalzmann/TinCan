@@ -13,6 +13,7 @@ The release workflow copies the section for the tagged version into the GitHub R
 ### Added
 
 - **DeepFilterNet 3 noise suppression** under Settings → Voice & audio → Advanced. A neural denoiser that handles keyboards, fans and other changing noise better than RNNoise, at more CPU, about 40 ms of added delay and a one-time download the first time it is used (an 8 MB model plus an 11 MB module that compresses to 2.7 MB). Built from upstream DeepFilterNet and served by your own server: nothing is fetched from a third party. If it cannot load or uses too much CPU it steps down to RNNoise, then to the browser's own, and says which one runs. Presets still use RNNoise.
+- Choosing DeepFilterNet shows how much the first use downloads, or that the server does not have it. While it downloads and starts, the voice dock and the mic test show progress, and the mic test's Record button waits for it.
 - The mic test says which noise suppression it recorded with.
 
 ### Fixed

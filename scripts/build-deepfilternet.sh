@@ -8,6 +8,7 @@
 #   deepfilternet3-model.bin   upstream models/DeepFilterNet3_onnx.tar.gz from the pinned commit, byte for byte
 #                              (renamed so no server or dev proxy decides to gunzip it on the way)
 #   LICENSE-MIT, LICENSE-APACHE, SHA256SUMS
+#   manifest.json              the two files' sizes, for the client's download progress
 # Without these files the web client still works: choosing DeepFilterNet falls back to RNNoise and says so.
 set -eu
 out=${1:-apps/web/public/denoise/deepfilternet3}
@@ -37,5 +38,11 @@ cp "$target_dir/wasm32-unknown-unknown/release/tincan_denoise.wasm" "$out/deepfi
 cp "$upstream/models/DeepFilterNet3_onnx.tar.gz" "$out/deepfilternet3-model.bin"
 cp "$upstream/LICENSE-MIT" "$out/LICENSE-MIT"
 cp "$upstream/LICENSE-APACHE" "$out/LICENSE-APACHE"
-(cd "$out" && sha256sum deepfilternet3.wasm deepfilternet3-model.bin >SHA256SUMS)
+(
+    cd "$out"
+    sha256sum deepfilternet3.wasm deepfilternet3-model.bin >SHA256SUMS
+    # Byte sizes for the download progress; the client also reads this file to learn that the server has the tier.
+    printf '{"wasm":%s,"model":%s}\n' "$(wc -c <deepfilternet3.wasm | tr -d ' ')" \
+        "$(wc -c <deepfilternet3-model.bin | tr -d ' ')" >manifest.json
+)
 echo "DeepFilterNet3 written to $out"

@@ -7,6 +7,7 @@ import { joinVoice, leaveVoice, toggleDeafen, toggleMute } from "../../core/voic
 import { useAudioPrefs } from "../../core/voice/prefs.js";
 import { useVoice } from "../../core/voice/store.js";
 import { Banner } from "../../ui/Banner.js";
+import { DeepFilterProgress } from "./DeepFilterProgress.js";
 import { toastError } from "../../ui/toast.js";
 
 const btn = "shrink-0 rounded-md p-1.5 hover:bg-bg-hover focus-visible:outline-2";
@@ -60,6 +61,7 @@ export function VoiceDock() {
       className="flex flex-col gap-2 border-t border-border bg-bg-sidebar p-2"
     >
       {notices}
+      <DeepFilterProgress />
       <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
         <div className="min-w-24 flex-1" title={detail}>
           <div className="line-clamp-2 text-sm font-medium break-words" role="status">
