@@ -68,6 +68,14 @@ describe("voice files", () => {
     expect(caddy).toContain("handle /livekit/rtc*");
   });
 
+  it("lets the app serve the start page and invite links, with the static shell as the fallback", () => {
+    const caddy = caddyfile(values);
+    expect(caddy).toContain("@page path / /invite/*");
+    expect(caddy).toContain("@noshell status 404");
+    // The page route comes before the catch-all that serves the static shell.
+    expect(caddy.indexOf("handle @page")).toBeLessThan(caddy.indexOf("try_files {path} /index.html"));
+  });
+
   it("keeps the metrics endpoint off the internet and the dashboards on loopback", () => {
     expect(caddyfile(values)).toContain("/api/v1/metrics");
     const compose = composeFile(values);

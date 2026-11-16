@@ -21,6 +21,11 @@ export const CoreConfigSchema = z.strictObject({
       trustProxy: z.boolean().default(false),
       /** Extra browser origins allowed to open the gateway (dev servers). The public URL is always allowed. */
       allowedOrigins: z.array(z.url()).default([]),
+      /**
+       * The web client's built index.html. With it the app serves / and /invite/<code> itself, with link-preview tags
+       * for other apps; without it Caddy serves the static file there too. The server image ships it at this path.
+       */
+      webIndex: z.string().min(1).default("./web/index.html"),
     })
     .prefault({}),
   /** Holds the setup token and pre-migration backups. */

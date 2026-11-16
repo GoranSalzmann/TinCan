@@ -51,7 +51,7 @@ catalogue, and the security process.
 | Fixation / CSRF | Token rotation on login; CSRF header in cookie mode; Origin checks |
 | Account takeover via reset | No email reset; admin-issued one-time codes; revoke sessions on use |
 | Unclaimed fresh instance | One-time setup token (11 §1.4) |
-| Invite abuse / enumeration | ≥60-bit codes, rate limit, expiry, max uses, audit |
+| Invite abuse / enumeration | ≥60-bit codes, rate limit, expiry, max uses, audit. The invite link-preview page (14 §2.4) shows no more than the public invite preview, has its own rate limit, and gives generic tags for any invalid code |
 
 ### 4.2 API & gateway
 | Threat | Control |

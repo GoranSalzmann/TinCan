@@ -77,6 +77,18 @@ export default defineModule({
       },
     });
 
+    /** Where an invite leads, or a NOT_FOUND / INVITE_EXPIRED / INVITE_EXHAUSTED error (W-32). */
+    async function preview(code: string) {
+      const now = Date.now();
+      const row = await db.query.selectFrom("invite").selectAll().where("code", "=", code).executeTakeFirst();
+      if (!row || row.revoked_at !== null) throw new AppError("NOT_FOUND", "That invite is not valid.");
+      if (row.expires_at !== null && row.expires_at <= now)
+        throw new AppError("INVITE_EXPIRED", "That invite has expired.");
+      if (row.max_uses !== null && row.uses >= row.max_uses)
+        throw new AppError("INVITE_EXHAUSTED", "That invite has been used up.");
+      return { instanceName: await accounts.instanceName(), memberCount: await accounts.memberCount() };
+    }
+
     const http = ctx.http.withTypeProvider<ZodTypeProvider>();
 
     http.post(
@@ -190,20 +202,25 @@ export default defineModule({
           { key: `invite-preview:ip:${req.ip}`, max: 30, windowMs: 15 * 60_000 },
           reply,
         );
-        const now = Date.now();
-        const row = await db.query
-          .selectFrom("invite")
-          .selectAll()
-          .where("code", "=", req.params.code)
-          .executeTakeFirst();
-        if (!row || row.revoked_at !== null) throw new AppError("NOT_FOUND", "That invite is not valid.");
-        if (row.expires_at !== null && row.expires_at <= now)
-          throw new AppError("INVITE_EXPIRED", "That invite has expired.");
-        if (row.max_uses !== null && row.uses >= row.max_uses)
-          throw new AppError("INVITE_EXHAUSTED", "That invite has been used up.");
-        return { instanceName: await accounts.instanceName(), memberCount: await accounts.memberCount() };
+        return preview(req.params.code);
       },
     );
+
+    // The same facts as link-preview tags, for the page a crawler fetches when the link is pasted into another app.
+    // Its own counter, looser than the API's: chat apps fetch from a few shared addresses. Any failure (unknown code,
+    // expired, rate limited) gives the generic tags, so the page never says more than the API would.
+    ctx.pages.preview("/invite/:code", async (params, req) => {
+      const code = params.code ?? "";
+      if (code.length < 4 || code.length > 64) return null;
+      await enforceRateLimit(kv, { key: `invite-page:ip:${req.ip}`, max: 120, windowMs: 15 * 60_000 });
+      const { instanceName, memberCount } = await preview(code);
+      const members = memberCount === 1 ? "1 member" : `${memberCount} members`;
+      return {
+        title: `Join ${instanceName} on Tin Can`,
+        description: `You have been invited to ${instanceName}, a private chat community with ${members}.`,
+        path: `/invite/${encodeURIComponent(code)}`,
+      };
+    });
 
     ctx.jobs.every("invites.purge", 60 * 60_000, async () => {
       const cutoff = Date.now() - 30 * DAY;

@@ -9,6 +9,27 @@ The release workflow copies the section for the tagged version into the GitHub R
 ### Fixed
 
 - **Long text channels** open on the newest message and stay at the very bottom, even while images and link previews load. Older messages load only when you scroll up, without the view jumping, and at most 400 messages stay loaded however long the channel is.
+### Before you upgrade
+
+- **Invite link previews need one Caddyfile change** on servers set up before this version (`tincan init` writes it for new ones). Without it nothing breaks: links show the generic Tin Can card. To get the community's name on invite links, add this block to your `Caddyfile` just above the `# Build files carry a hash` line, then `docker compose up -d`:
+
+  ```
+  	@page path / /invite/*
+  	handle @page {
+  		reverse_proxy tincan:3000 {
+  			@noshell status 404
+  			handle_response @noshell {
+  				root * /srv/web
+  				rewrite * /index.html
+  				file_server
+  			}
+  		}
+  	}
+  ```
+
+### Added
+
+- **Link previews in other apps.** A Tin Can link pasted into WhatsApp, Discord, Slack or iMessage now shows a card with the Tin Can logo instead of a bare address. Invite links say which community they lead to and how many members it has. An invite that is unknown, expired, revoked or used up shows only the generic card. Nothing else is visible to link crawlers, because every other page needs a sign-in.
 
 ## [2.0.0] - 2026-11-16
 

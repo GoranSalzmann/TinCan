@@ -37,4 +37,4 @@ Moderators can time you out (you can read but not write or speak until it ends),
 
 ## Staying safe
 
-Do not share your password or reset code; admins never need it. Treat invite links like keys: anyone with the link can join. Report problems to your admin.
+Do not share your password or reset code; admins never need it. Treat invite links like keys: anyone with the link can join. Pasted into a chat app such as WhatsApp or Discord, an invite link shows a card with the community's name and how many members it has, and nothing else; links to channels show only a generic Tin Can card. Report problems to your admin.
