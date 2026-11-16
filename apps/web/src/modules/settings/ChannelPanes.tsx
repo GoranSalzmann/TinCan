@@ -2,18 +2,33 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsParams } from "./params.js";
-import { Hash, Volume2 } from "lucide-react";
+import { Hash, Pencil, Plus, Trash2, Volume2 } from "lucide-react";
 import type { Channel, Invite, Overwrite } from "@tincan/shared";
 import { api } from "../../core/api/client.js";
 import { useT, type MessageKey } from "../../core/i18n/index.js";
 import { useSession } from "../../core/session/store.js";
 import { memberName, useCan, useCommunity } from "../../core/state/community.js";
 import { Button } from "../../ui/Button.js";
+import { Switch, selectClass } from "../../ui/Controls.js";
 import { ConfirmDialog } from "../../ui/Dialog.js";
 import { Field } from "../../ui/Field.js";
 import { toast, toastError } from "../../ui/toast.js";
 import { CreateChannelDialog } from "../channels/CreateChannelDialog.js";
 import { LinkPreviewsCard } from "./LinkPreviewsCard.js";
+import {
+  DetailHeader,
+  EmptyDetail,
+  FooterNote,
+  MasterDetail,
+  Panel,
+  PanelNote,
+  Row,
+  SettingsPage,
+  SettingsSection,
+  SubHeading,
+  SwitchRow,
+  listItemClass,
+} from "./layout.js";
 import {
   TEXT_PERMISSIONS,
   VOICE_PERMISSIONS,
@@ -24,8 +39,6 @@ import {
   type Tri,
 } from "./permissions.js";
 
-const card = "flex flex-col gap-3 rounded-lg border border-border p-4";
-
 // ---- Server ------------------------------------------------------------------------------------------------------------
 
 export function ServerPane() {
@@ -33,48 +46,76 @@ export function ServerPane() {
   const caps = useSession((s) => s.capabilities);
   const setName = useSession((s) => s.setInstanceName);
   const owner = useSession((s) => s.user?.isInstanceOwner ?? false);
+  const voiceOn = useSession((s) => Boolean(s.capabilities?.features.voice));
   const [name, setNameDraft] = useState(caps?.server.name ?? "");
+  const dirty = name.trim() !== (caps?.server.name ?? "");
   return (
-    <section className="flex max-w-2xl flex-col gap-6">
-      <h2 className="text-2xl">{t("settings.server")}</h2>
-      <form
-        className={card}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void api
-            .renameInstance(name.trim())
-            .then((r) => {
-              setName(r.name);
-              toast(t("settings.saved"));
-            })
-            .catch(toastError);
-        }}
+    <SettingsPage title={t("settings.server")} description={t("settings.server.description")}>
+      <SettingsSection
+        title={t("settings.server.general")}
+        description={t("settings.server.general.description")}
       >
-        <Field
-          label={t("setup.community.name")}
-          value={name}
-          onChange={(e) => setNameDraft(e.target.value)}
-          maxLength={64}
-          disabled={!owner}
-        />
-        {!owner ? <p className="text-sm text-text-muted">{t("settings.server.ownerOnly")}</p> : null}
-        <div>
-          <Button type="submit" disabled={!owner || !name.trim()}>
-            {t("common.save")}
-          </Button>
-        </div>
-      </form>
-      {owner ? <E2eeCard /> : null}
-      {owner ? <VideoLimitsCard /> : null}
-      {owner ? <UploadLimitsCard /> : null}
+        <Panel
+          label={t("settings.server.general")}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void api
+              .renameInstance(name.trim())
+              .then((r) => {
+                setName(r.name);
+                toast(t("settings.saved"));
+              })
+              .catch(toastError);
+          }}
+          footer={
+            owner ? (
+              <>
+                {dirty ? <FooterNote>{t("settings.unsaved")}</FooterNote> : null}
+                <Button type="submit" disabled={!dirty || !name.trim()}>
+                  {t("common.save")}
+                </Button>
+              </>
+            ) : (
+              <FooterNote>{t("settings.server.ownerOnly")}</FooterNote>
+            )
+          }
+        >
+          <Field
+            layout="row"
+            label={t("setup.community.name")}
+            value={name}
+            onChange={(e) => setNameDraft(e.target.value)}
+            maxLength={64}
+            disabled={!owner}
+          />
+          <Row
+            label={t("settings.server.source")}
+            control={
+              <a
+                href={caps?.server.sourceUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="meta max-w-80 truncate"
+              >
+                {caps?.server.sourceUrl}
+              </a>
+            }
+          />
+        </Panel>
+      </SettingsSection>
+      {owner && voiceOn ? (
+        <SettingsSection title={t("settings.voiceVideo")} description={t("settings.voiceVideo.description")}>
+          <E2eeCard />
+          <VideoLimitsCard />
+        </SettingsSection>
+      ) : null}
+      {owner ? (
+        <SettingsSection title={t("settings.uploads")} description={t("settings.uploads.description")}>
+          <UploadLimitsCard />
+        </SettingsSection>
+      ) : null}
       {owner ? <LinkPreviewsCard /> : null}
-      <p className="text-sm text-text-muted">
-        {t("settings.server.source")}:{" "}
-        <a href={caps?.server.sourceUrl} target="_blank" rel="noreferrer noopener">
-          {caps?.server.sourceUrl}
-        </a>
-      </p>
-    </section>
+    </SettingsPage>
   );
 }
 
@@ -92,39 +133,34 @@ function E2eeCard() {
   }, [voiceOn]);
   if (!voiceOn) return null;
   return (
-    <div className={card}>
-      <h3 className="m-0 text-lg">{t("settings.e2ee")}</h3>
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={enabled === true}
-          disabled={enabled === null}
-          onChange={(e) => {
-            const next = e.target.checked;
-            void api
-              .setE2eeDefault(next)
-              .then((r) => {
-                setEnabled(r.enabled);
-                const caps = useSession.getState().capabilities;
-                if (caps)
-                  useSession.setState({
-                    capabilities: {
-                      ...caps,
-                      features: {
-                        ...caps.features,
-                        voice: { ...(caps.features.voice as object), e2ee: r.enabled },
-                      },
+    <Panel label={t("settings.e2ee")}>
+      <SwitchRow
+        label={t("settings.e2ee.default")}
+        description={t("settings.e2ee.hint")}
+        checked={enabled === true}
+        disabled={enabled === null}
+        onChange={(next) => {
+          void api
+            .setE2eeDefault(next)
+            .then((r) => {
+              setEnabled(r.enabled);
+              const caps = useSession.getState().capabilities;
+              if (caps)
+                useSession.setState({
+                  capabilities: {
+                    ...caps,
+                    features: {
+                      ...caps.features,
+                      voice: { ...(caps.features.voice as object), e2ee: r.enabled },
                     },
-                  });
-                toast(t("settings.saved"));
-              })
-              .catch(toastError);
-          }}
-        />
-        {t("settings.e2ee.default")}
-      </label>
-      <p className="m-0 max-w-prose text-sm text-text-muted">{t("settings.e2ee.hint")}</p>
-    </div>
+                  },
+                });
+              toast(t("settings.saved"));
+            })
+            .catch(toastError);
+        }}
+      />
+    </Panel>
   );
 }
 
@@ -161,8 +197,8 @@ function VideoLimitsCard() {
       : null;
 
   return (
-    <form
-      className={card}
+    <Panel
+      label={t("settings.video")}
       onSubmit={(e) => {
         e.preventDefault();
         void api
@@ -170,9 +206,14 @@ function VideoLimitsCard() {
           .then(() => toast(t("settings.saved")))
           .catch(toastError);
       }}
+      footer={
+        <Button type="submit" disabled={!loaded || cameraError !== null || shareError !== null}>
+          {t("common.save")}
+        </Button>
+      }
     >
-      <h3 className="m-0 text-lg">{t("settings.video")}</h3>
       <Field
+        layout="row"
         label={t("settings.video.screenshare")}
         type="number"
         min={0.3}
@@ -184,6 +225,7 @@ function VideoLimitsCard() {
         hint={t("settings.video.screenshare.hint")}
       />
       <Field
+        layout="row"
         label={t("settings.video.camera")}
         type="number"
         min={0.15}
@@ -194,12 +236,7 @@ function VideoLimitsCard() {
         error={cameraError}
         hint={t("settings.video.camera.hint")}
       />
-      <div>
-        <Button type="submit" disabled={!loaded || cameraError !== null || shareError !== null}>
-          {t("common.save")}
-        </Button>
-      </div>
-    </form>
+    </Panel>
   );
 }
 
@@ -239,8 +276,13 @@ function UploadLimitsCard() {
       : null;
 
   return (
-    <form
-      className={card}
+    <Panel
+      label={t("settings.uploads")}
+      footer={
+        <Button type="submit" disabled={maxError !== null || quotaError !== null || ceiling === null}>
+          {t("common.save")}
+        </Button>
+      }
       onSubmit={(e) => {
         e.preventDefault();
         void api
@@ -252,8 +294,8 @@ function UploadLimitsCard() {
           .catch(toastError);
       }}
     >
-      <h3 className="m-0 text-lg">{t("settings.uploads")}</h3>
       <Field
+        layout="row"
         label={t("settings.uploads.maxFile")}
         type="number"
         min={0.001}
@@ -264,6 +306,7 @@ function UploadLimitsCard() {
         hint={t("settings.uploads.maxFile.hint")}
       />
       <Field
+        layout="row"
         label={t("settings.uploads.quota")}
         type="number"
         min={0}
@@ -273,16 +316,17 @@ function UploadLimitsCard() {
         error={quotaError}
         hint={t("settings.uploads.quota.hint")}
       />
-      <div>
-        <Button type="submit" disabled={maxError !== null || quotaError !== null || ceiling === null}>
-          {t("common.save")}
-        </Button>
-      </div>
-    </form>
+    </Panel>
   );
 }
 
 // ---- Channels and their permissions (W-41) ------------------------------------------------------------------------------
+
+const TRI_LOOK: Record<Tri, string> = {
+  deny: "has-checked:bg-danger-bg-subtle has-checked:text-danger-text",
+  inherit: "has-checked:bg-bg-selected has-checked:text-text",
+  allow: "has-checked:bg-success-bg-subtle has-checked:text-success-text",
+};
 
 function OverwriteEditor({ channel }: { channel: Channel }) {
   const t = useT();
@@ -334,29 +378,34 @@ function OverwriteEditor({ channel }: { channel: Channel }) {
 
   const names = channel.type === "text" ? TEXT_PERMISSIONS : VOICE_PERMISSIONS;
   const usedKeys = new Set((rows ?? []).map((o) => `${o.targetType}:${o.targetId}`));
+  const targetName = target
+    ? target.type === "role"
+      ? (roles.find((r) => r.id === target.id)?.name ?? "")
+      : memberName(members[target.id])
+    : "";
   return (
-    <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
-      <div className={card}>
-        <h3 className="text-sm font-semibold">{t("channel.overwrites")}</h3>
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
-          {(rows ?? []).map((o) => (
-            <li key={`${o.targetType}:${o.targetId}`}>
-              <button
-                type="button"
-                aria-current={target?.type === o.targetType && target.id === o.targetId ? "true" : undefined}
-                onClick={() => setTarget({ type: o.targetType, id: o.targetId })}
-                className={`flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${target?.type === o.targetType && target.id === o.targetId ? "bg-bg-selected" : ""}`}
-              >
-                <span className="rounded-sm border border-border px-1 text-xs">
-                  {t(`channel.overwrites.${o.targetType}`)}
-                </span>
-                <bdi className="truncate">{nameOf(o)}</bdi>
-              </button>
-            </li>
-          ))}
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-3">
+        <ul className="m-0 flex list-none flex-col gap-0.5 p-0" aria-label={t("channel.overwrites")}>
+          {(rows ?? []).map((o) => {
+            const active = target?.type === o.targetType && target.id === o.targetId;
+            return (
+              <li key={`${o.targetType}:${o.targetId}`}>
+                <button
+                  type="button"
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => setTarget({ type: o.targetType, id: o.targetId })}
+                  className={listItemClass(active)}
+                >
+                  <bdi className="min-w-0 flex-1 truncate">{nameOf(o)}</bdi>
+                  <span className="meta text-text-muted">{t(`channel.overwrites.${o.targetType}`)}</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
-        <label className="flex flex-col gap-1 text-sm">
-          {t("channel.overwrites.add")}
+        <label className="flex flex-col gap-1.5">
+          <span className="meta text-text-muted">{t("channel.overwrites.add")}</span>
           <select
             value={add}
             onChange={(e) => {
@@ -364,7 +413,7 @@ function OverwriteEditor({ channel }: { channel: Channel }) {
               setAdd("");
               if (type && id) setTarget({ type, id });
             }}
-            className="rounded-md border border-border-control bg-bg-input px-2 py-1.5"
+            className={`${selectClass} w-full`}
           >
             <option value="">{t("channel.overwrites.choose")}</option>
             <optgroup label={t("settings.roles")}>
@@ -389,54 +438,61 @@ function OverwriteEditor({ channel }: { channel: Channel }) {
         </label>
       </div>
       {target ? (
-        <div className={card}>
-          <h3 className="text-lg">
-            {target.type === "role"
-              ? (roles.find((r) => r.id === target.id)?.name ?? "")
-              : memberName(members[target.id])}
-          </h3>
-          <p className="text-sm text-text-muted">{t("channel.overwrites.note")}</p>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {names.map((n) => {
-              const tri = triOf(allow, deny, n);
-              return (
-                <li key={n} className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1 text-sm">{t(`perm.${n}` as MessageKey)}</span>
+        <Panel
+          label={targetName}
+          footer={
+            <>
+              <FooterNote>{t("channel.overwrites.note")}</FooterNote>
+              {current ? (
+                <Button variant="ghost" className="text-danger-text" onClick={() => void remove(current)}>
+                  {t("channel.overwrites.remove")}
+                </Button>
+              ) : null}
+            </>
+          }
+        >
+          <div className="flex items-center gap-2 px-5 py-3">
+            <bdi className="font-display text-base font-bold tracking-tight">{targetName}</bdi>
+            <span className="tag">{t(`channel.overwrites.${target.type}`)}</span>
+          </div>
+          {names.map((n) => {
+            const tri = triOf(allow, deny, n);
+            return (
+              <Row
+                key={n}
+                label={t(`perm.${n}` as MessageKey)}
+                control={
                   <div
                     role="radiogroup"
                     aria-label={t(`perm.${n}` as MessageKey)}
-                    className="flex overflow-hidden rounded-md border border-border-control"
+                    className="inline-flex rounded-md border border-border-control bg-bg-input p-0.5"
                   >
                     {(["deny", "inherit", "allow"] as Tri[]).map((v) => (
-                      <button
+                      <label
                         key={v}
-                        type="button"
-                        role="radio"
-                        aria-checked={tri === v}
-                        onClick={() => {
-                          const next = withTri(allow, deny, n, v);
-                          void set(next.allow, next.deny);
-                        }}
-                        className={`px-2 py-1 text-xs ${tri === v ? (v === "allow" ? "bg-success-bg-subtle text-success-text" : v === "deny" ? "bg-danger-bg-subtle text-danger-text" : "bg-bg-selected") : "hover:bg-bg-hover"}`}
+                        className={`flex min-h-7 cursor-pointer items-center rounded-sm px-2.5 text-xs text-text-muted select-none hover:text-text has-checked:font-medium has-focus-visible:outline-2 has-focus-visible:outline-focus ${TRI_LOOK[v]}`}
                       >
+                        <input
+                          type="radio"
+                          name={`tri-${n}`}
+                          className="sr-only"
+                          checked={tri === v}
+                          onChange={() => {
+                            const next = withTri(allow, deny, n, v);
+                            void set(next.allow, next.deny);
+                          }}
+                        />
                         {t(`channel.tri.${v}`)}
-                      </button>
+                      </label>
                     ))}
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-          {current ? (
-            <div>
-              <Button variant="ghost" className="text-danger-text" onClick={() => void remove(current)}>
-                {t("channel.overwrites.remove")}
-              </Button>
-            </div>
-          ) : null}
-        </div>
+                }
+              />
+            );
+          })}
+        </Panel>
       ) : (
-        <p className="text-text-muted">{t("channel.overwrites.pick")}</p>
+        <EmptyDetail>{t("channel.overwrites.pick")}</EmptyDetail>
       )}
     </div>
   );
@@ -453,55 +509,69 @@ export function ChannelsPane() {
   const [catName, setCatName] = useState("");
   const [delCat, setDelCat] = useState<string | null>(null);
   const selected = channels.find((c) => c.id === id) ?? null;
+  const pick = (c: Channel) => void navigate(`/settings/channels/${c.id}`);
+
+  const group = (key: string, title: string | null, items: Channel[], catId?: string) => (
+    <div key={key} className="flex flex-col gap-0.5">
+      {title !== null ? (
+        <div className="flex min-h-7 items-center gap-2 ps-2.5">
+          <h3 className="meta min-w-0 truncate text-text-muted">{title}</h3>
+          <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-border" />
+          {canManage && catId ? (
+            <button
+              type="button"
+              aria-label={t("channel.category.deleteNamed", { name: title })}
+              className="rounded-md p-1 text-text-muted hover:bg-bg-hover hover:text-danger-text"
+              onClick={() => setDelCat(catId)}
+            >
+              <Trash2 aria-hidden="true" size={13} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+        {items.map((c) => (
+          <ChannelButton key={c.id} c={c} active={selected?.id === c.id} onPick={() => pick(c)} />
+        ))}
+      </ul>
+    </div>
+  );
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-2xl">{t("settings.channels")}</h2>
-      <div className="grid gap-4 md:grid-cols-[18rem_1fr]">
-        <div className={card}>
-          {categories.map((cat) => (
-            <div key={cat.id}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">{cat.name}</h3>
-                {canManage ? (
-                  <button type="button" className="text-xs underline" onClick={() => setDelCat(cat.id)}>
-                    {t("common.delete")}
-                  </button>
-                ) : null}
-              </div>
-              <ul className="m-0 list-none p-0">
-                {channels
-                  .filter((c) => c.categoryId === cat.id)
-                  .map((c) => (
-                    <ChannelButton
-                      key={c.id}
-                      c={c}
-                      active={selected?.id === c.id}
-                      onPick={() => void navigate(`/settings/channels/${c.id}`)}
-                    />
-                  ))}
-              </ul>
-            </div>
-          ))}
-          {channels.some((c) => c.categoryId === null) ? (
-            <ul className="m-0 list-none p-0">
-              {channels
-                .filter((c) => c.categoryId === null)
-                .map((c) => (
-                  <ChannelButton
-                    key={c.id}
-                    c={c}
-                    active={selected?.id === c.id}
-                    onPick={() => void navigate(`/settings/channels/${c.id}`)}
-                  />
-                ))}
-            </ul>
-          ) : null}
-          {canManage ? (
-            <>
-              <Button onClick={() => setDialog({})}>{t("channel.create")}</Button>
+    <SettingsPage
+      wide
+      title={t("settings.channels")}
+      description={t("settings.channels.description")}
+      actions={
+        canManage ? (
+          <Button onClick={() => setDialog({})}>
+            <Plus aria-hidden="true" size={16} />
+            {t("channel.create")}
+          </Button>
+        ) : null
+      }
+    >
+      <MasterDetail
+        list={
+          <nav aria-label={t("channel.list.label")} className="flex flex-col gap-4">
+            {channels.some((c) => c.categoryId === null)
+              ? group(
+                  "loose",
+                  null,
+                  channels.filter((c) => c.categoryId === null),
+                )
+              : null}
+            {categories.map((cat) =>
+              group(
+                cat.id,
+                cat.name,
+                channels.filter((c) => c.categoryId === cat.id),
+                cat.id,
+              ),
+            )}
+            {canManage ? (
               <form
-                className="flex items-end gap-2"
+                className="flex items-end gap-2 border-t border-border pt-4"
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (catName.trim())
@@ -511,42 +581,65 @@ export function ChannelsPane() {
                       .catch(toastError);
                 }}
               >
-                <Field
-                  label={t("channel.category.new")}
-                  value={catName}
-                  onChange={(e) => setCatName(e.target.value)}
-                  maxLength={64}
-                />
-                <Button type="submit" variant="ghost" disabled={!catName.trim()}>
+                <div className="min-w-0 flex-1">
+                  <Field
+                    label={t("channel.category.new")}
+                    value={catName}
+                    onChange={(e) => setCatName(e.target.value)}
+                    maxLength={64}
+                  />
+                </div>
+                <Button type="submit" variant="ghost" className="min-h-10" disabled={!catName.trim()}>
                   {t("common.add")}
                 </Button>
               </form>
-            </>
-          ) : null}
-        </div>
+            ) : null}
+          </nav>
+        }
+      >
         {selected ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <h3 className="flex-1 text-xl">
-                {selected.type === "voice" ? "" : "#"}
-                {selected.name}
-              </h3>
+          <>
+            <DetailHeader
+              icon={
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/12 text-accent-text">
+                  {selected.type === "voice" ? (
+                    <Volume2 aria-hidden="true" size={20} />
+                  ) : (
+                    <Hash aria-hidden="true" size={20} />
+                  )}
+                </span>
+              }
+              title={<bdi>{selected.name}</bdi>}
+              subtitle={
+                <>
+                  {t(selected.type === "voice" ? "channel.detail.voice" : "channel.detail.text")}
+                  {selected.topic ? <span className="text-text-muted"> / {selected.topic}</span> : null}
+                </>
+              }
+              actions={
+                canManage ? (
+                  <Button variant="ghost" onClick={() => setDialog({ edit: selected })}>
+                    <Pencil aria-hidden="true" size={14} />
+                    {t("channel.edit")}
+                  </Button>
+                ) : null
+              }
+            />
+            <div className="flex flex-col gap-4">
+              <SubHeading title={t("channel.overwrites")} description={t("channel.overwrites.description")} />
               {canManage ? (
-                <Button variant="ghost" onClick={() => setDialog({ edit: selected })}>
-                  {t("channel.edit")}
-                </Button>
-              ) : null}
+                <OverwriteEditor channel={selected} />
+              ) : (
+                <Panel>
+                  <PanelNote>{t("channel.overwrites.denied")}</PanelNote>
+                </Panel>
+              )}
             </div>
-            {canManage ? (
-              <OverwriteEditor channel={selected} />
-            ) : (
-              <p className="text-text-muted">{t("channel.overwrites.denied")}</p>
-            )}
-          </div>
+          </>
         ) : (
-          <p className="text-text-muted">{t("channel.pick")}</p>
+          <EmptyDetail>{t("channel.pick")}</EmptyDetail>
         )}
-      </div>
+      </MasterDetail>
       {dialog ? (
         <CreateChannelDialog
           categoryId={dialog.edit?.categoryId ?? null}
@@ -562,7 +655,7 @@ export function ChannelsPane() {
         confirmLabel={t("common.delete")}
         onConfirm={() => (delCat ? api.deleteCategory(delCat).catch(toastError) : undefined)}
       />
-    </section>
+    </SettingsPage>
   );
 }
 
@@ -573,12 +666,12 @@ function ChannelButton({ c, active, onPick }: { c: Channel; active: boolean; onP
         type="button"
         aria-current={active ? "true" : undefined}
         onClick={onPick}
-        className={`flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-start hover:bg-bg-hover ${active ? "bg-bg-selected" : ""}`}
+        className={listItemClass(active)}
       >
         {c.type === "voice" ? (
-          <Volume2 aria-hidden="true" size={14} />
+          <Volume2 aria-hidden="true" size={15} className={active ? "text-accent-text" : ""} />
         ) : (
-          <Hash aria-hidden="true" size={14} />
+          <Hash aria-hidden="true" size={15} className={active ? "text-accent-text" : ""} />
         )}
         <bdi className="truncate">{c.name}</bdi>
       </button>
@@ -627,110 +720,127 @@ export function InvitesPane() {
   };
 
   return (
-    <section className="flex max-w-3xl flex-col gap-6">
-      <h2 className="text-2xl">{t("settings.invites")}</h2>
-      <form
-        className={card}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void create();
-        }}
-      >
-        <h3 className="text-lg">{t("invites.create")}</h3>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          {t("invites.expires")}
-          <select
-            value={expires}
-            onChange={(e) => setExpires(e.target.value)}
-            className="min-h-9 rounded-md border border-border-control bg-bg-input px-2 font-normal"
-          >
-            <option value="1800">{t("invites.expires.30m")}</option>
-            <option value="86400">{t("invites.expires.1d")}</option>
-            <option value="604800">{t("invites.expires.7d")}</option>
-            <option value="2592000">{t("invites.expires.30d")}</option>
-            <option value="">{t("invites.expires.never")}</option>
-          </select>
-        </label>
-        <Field
-          label={t("invites.maxUses")}
-          hint={t("invites.maxUses.hint")}
-          type="number"
-          min={1}
-          value={maxUses}
-          onChange={(e) => setMaxUses(e.target.value)}
-        />
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          {t("invites.role")}
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="min-h-9 rounded-md border border-border-control bg-bg-input px-2 font-normal"
-          >
-            <option value="">{t("invites.role.none")}</option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div>
-          <Button type="submit">{t("invites.create.submit")}</Button>
-        </div>
-      </form>
-      <div className={card}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg">{t("invites.active")}</h3>
-          {canAll ? (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+    <SettingsPage title={t("settings.invites")} description={t("settings.invites.description")}>
+      <SettingsSection title={t("invites.create")} description={t("invites.create.description")}>
+        <Panel
+          label={t("invites.create")}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void create();
+          }}
+          footer={<Button type="submit">{t("invites.create.submit")}</Button>}
+        >
+          <Row
+            label={t("invites.expires")}
+            htmlFor="invite-expires"
+            control={
+              <select
+                id="invite-expires"
+                value={expires}
+                onChange={(e) => setExpires(e.target.value)}
+                className={`${selectClass} w-56`}
+              >
+                <option value="1800">{t("invites.expires.30m")}</option>
+                <option value="86400">{t("invites.expires.1d")}</option>
+                <option value="604800">{t("invites.expires.7d")}</option>
+                <option value="2592000">{t("invites.expires.30d")}</option>
+                <option value="">{t("invites.expires.never")}</option>
+              </select>
+            }
+          />
+          <Field
+            layout="row"
+            label={t("invites.maxUses")}
+            hint={t("invites.maxUses.hint")}
+            type="number"
+            min={1}
+            value={maxUses}
+            onChange={(e) => setMaxUses(e.target.value)}
+          />
+          <Row
+            label={t("invites.role")}
+            htmlFor="invite-role"
+            control={
+              <select
+                id="invite-role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className={`${selectClass} w-56`}
+              >
+                <option value="">{t("invites.role.none")}</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        </Panel>
+      </SettingsSection>
+      <SettingsSection
+        title={t("invites.active")}
+        description={t("invites.active.description")}
+        aside={
+          canAll ? (
+            <label className="flex items-center gap-2.5 text-sm">
+              <Switch checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
               {t("invites.showAll")}
             </label>
-          ) : null}
-        </div>
-        {invites && invites.length === 0 ? <p className="text-text-muted">{t("invites.none")}</p> : null}
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          ) : null
+        }
+      >
+        <Panel label={t("invites.active")}>
+          {invites && invites.length === 0 ? <PanelNote>{t("invites.none")}</PanelNote> : null}
           {(invites ?? []).map((i) => (
-            <li
+            <Row
               key={i.id}
-              className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block break-all font-mono">{link(i.code)}</span>
-                <span className="block text-text-muted">
-                  {i.uses}
-                  {i.maxUses ? ` / ${i.maxUses}` : ""} {t("invites.uses")} ·{" "}
-                  {i.expiresAt
-                    ? t("invites.until", { date: new Date(i.expiresAt).toLocaleString() })
-                    : t("invites.expires.never")}
-                  {showAll && i.createdBy ? ` · ${memberName(members[i.createdBy], "?")}` : ""}
-                  {i.defaultRoleId ? ` · ${roles.find((r) => r.id === i.defaultRoleId)?.name ?? ""}` : ""}
+              label={<span className="meta block text-sm break-all text-text">{link(i.code)}</span>}
+              description={
+                <span className="meta flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span>
+                    {i.uses}
+                    {i.maxUses ? ` / ${i.maxUses}` : ""} {t("invites.uses")}
+                  </span>
+                  <span>
+                    {i.expiresAt
+                      ? t("invites.until", { date: new Date(i.expiresAt).toLocaleString() })
+                      : t("invites.expires.never")}
+                  </span>
+                  {showAll && i.createdBy ? <span>{memberName(members[i.createdBy], "?")}</span> : null}
+                  {i.defaultRoleId ? (
+                    <span className="tag">{roles.find((r) => r.id === i.defaultRoleId)?.name ?? ""}</span>
+                  ) : null}
                 </span>
-              </span>
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  void navigator.clipboard?.writeText(link(i.code)).then(() => toast(t("invites.copied")))
-                }
-              >
-                {t("invites.copy")}
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-danger-text"
-                onClick={() =>
-                  void api
-                    .revokeInvite(i.id)
-                    .then(() => setInvites((cur) => cur?.filter((x) => x.id !== i.id) ?? null))
-                    .catch(toastError)
-                }
-              >
-                {t("invites.revoke")}
-              </Button>
-            </li>
+              }
+              control={
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      void navigator.clipboard?.writeText(link(i.code)).then(() => toast(t("invites.copied")))
+                    }
+                  >
+                    {t("invites.copy")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="text-danger-text"
+                    onClick={() =>
+                      void api
+                        .revokeInvite(i.id)
+                        .then(() => setInvites((cur) => cur?.filter((x) => x.id !== i.id) ?? null))
+                        .catch(toastError)
+                    }
+                  >
+                    {t("invites.revoke")}
+                  </Button>
+                </>
+              }
+            />
           ))}
-        </ul>
-      </div>
-    </section>
+        </Panel>
+      </SettingsSection>
+    </SettingsPage>
   );
 }

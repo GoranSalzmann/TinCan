@@ -39,6 +39,7 @@ import { UpdateBanner, useVersionWatch } from "./UpdateBanner.js";
 const menuContent = "elev-2 z-60 min-w-56 p-1 text-sm text-text";
 const menuItem =
   "flex cursor-default items-center gap-2 rounded-md px-3 py-1.5 outline-none data-[highlighted]:bg-bg-hover data-[disabled]:text-text-disabled";
+const menuLabel = "meta px-3 pt-2 pb-1 text-text-muted";
 
 const REGION_IDS = ["region-sidebar", "main", "region-members"] as const;
 
@@ -96,28 +97,24 @@ function AppearanceItems() {
   const { locale, setLocale } = useLocale();
   return (
     <>
-      <Menu.Label className="px-3 py-1 text-xs font-semibold text-text-muted">
-        {t("appearance.title")}
-      </Menu.Label>
+      <Menu.Label className={menuLabel}>{t("appearance.title")}</Menu.Label>
       <Menu.RadioGroup value={theme} onValueChange={(v) => setTheme(v as ThemePreference)}>
         {(["system", "light", "dark", "hc"] as const).map((v) => (
           <Menu.RadioItem key={v} value={v} className={menuItem}>
             <span className="inline-block w-4 text-center" aria-hidden="true">
-              <Menu.ItemIndicator>•</Menu.ItemIndicator>
+              <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
             </span>
             {t(`appearance.theme.${v}` as MessageKey)}
           </Menu.RadioItem>
         ))}
       </Menu.RadioGroup>
       <Menu.Separator className="my-1 h-px bg-border" />
-      <Menu.Label className="px-3 py-1 text-xs font-semibold text-text-muted">
-        {t("appearance.accent")}
-      </Menu.Label>
+      <Menu.Label className={menuLabel}>{t("appearance.accent")}</Menu.Label>
       <Menu.RadioGroup value={accent} onValueChange={(v) => setAccent(v as (typeof ACCENT_NAMES)[number])}>
         {ACCENT_NAMES.map((v) => (
           <Menu.RadioItem key={v} value={v} className={menuItem}>
             <span className="inline-block w-4 text-center" aria-hidden="true">
-              <Menu.ItemIndicator>•</Menu.ItemIndicator>
+              <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
             </span>
             {t(`accent.${v}` as MessageKey)}
           </Menu.RadioItem>
@@ -126,12 +123,12 @@ function AppearanceItems() {
       {PSEUDO_LOCALES.length > 0 ? (
         <>
           <Menu.Separator className="my-1 h-px bg-border" />
-          <Menu.Label className="px-3 py-1 text-xs font-semibold text-text-muted">Locale (dev)</Menu.Label>
+          <Menu.Label className={menuLabel}>Locale (dev)</Menu.Label>
           <Menu.RadioGroup value={locale} onValueChange={(v) => setLocale(v as Locale)}>
             {(["en", ...PSEUDO_LOCALES] as Locale[]).map((v) => (
               <Menu.RadioItem key={v} value={v} className={menuItem}>
                 <span className="inline-block w-4 text-center" aria-hidden="true">
-                  <Menu.ItemIndicator>•</Menu.ItemIndicator>
+                  <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
                 </span>
                 {v}
               </Menu.RadioItem>
@@ -159,11 +156,11 @@ function ConnectionStatus({ compact = false }: { compact?: boolean }) {
     <span
       role="status"
       title={compact ? t(key) : undefined}
-      className="flex items-center gap-1.5 text-xs text-text-muted"
+      className="meta flex items-center gap-1.5 text-text-muted"
     >
       <span
         aria-hidden="true"
-        className={`inline-block size-2.5 shrink-0 rounded-full border-2 ${gw === "ready" ? "border-presence-online bg-presence-online" : "border-presence-offline"}`}
+        className={`inline-block size-2 shrink-0 rounded-full border-2 ${gw === "ready" ? "border-presence-online bg-presence-online" : "border-presence-offline"}`}
       />
       {/* In the page corner the word shows from 1280 px (xl); below that only the dot, so it never runs into a header's own labels. */}
       <span className={compact ? "max-xl:sr-only" : undefined}>{t(key)}</span>
@@ -238,7 +235,7 @@ export function Landing() {
   return (
     <div className="flex flex-1 items-center justify-center p-6 text-center">
       <div className="flex max-w-prose flex-col gap-2">
-        <h2 className="text-2xl">{t("channel.none.title")}</h2>
+        <h2 className="text-2xl font-bold">{t("channel.none.title")}</h2>
         <p className="text-text-muted">{canManage ? t("channel.none.admin") : t("channel.none.body")}</p>
       </div>
     </div>
@@ -356,10 +353,12 @@ export function AppLayout() {
           <Menu.Root>
             <Menu.Trigger
               aria-label={t("instance.menu")}
-              className="flex h-12 items-center justify-between gap-2 border-b border-border px-4 text-start text-lg hover:bg-bg-hover"
+              className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-4 text-start hover:bg-bg-hover data-[state=open]:bg-bg-hover"
             >
-              <bdi className="truncate">{instanceName}</bdi>
-              <ChevronDown aria-hidden="true" size={16} className="shrink-0" />
+              <bdi className="truncate font-display text-xl leading-none font-bold tracking-tight">
+                {instanceName}
+              </bdi>
+              <ChevronDown aria-hidden="true" size={16} className="shrink-0 text-text-muted" />
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Content align="start" sideOffset={4} className={menuContent}>
@@ -394,7 +393,7 @@ export function AppLayout() {
                     {t("instance.source")}
                   </a>
                 </Menu.Item>
-                <Menu.Label className="px-3 py-1 text-xs text-text-muted">
+                <Menu.Label className={menuLabel}>
                   {t("instance.version", { version: caps?.server.version ?? "" })}
                 </Menu.Label>
               </Menu.Content>
@@ -406,7 +405,7 @@ export function AppLayout() {
           <VoiceDock />
 
           <div
-            className="flex h-13 items-center gap-2 border-t border-border px-3"
+            className="flex h-13 shrink-0 items-center gap-2 border-t border-border bg-bg-rail px-3"
             aria-label={t("user.panel")}
             role="group"
           >
@@ -416,13 +415,16 @@ export function AppLayout() {
                 avatarKey={me?.avatarKey ?? user.avatarKey}
                 size={32}
               />
-              <PresenceDot status={presence} className="absolute -end-0.5 -bottom-0.5 bg-bg-sidebar" />
+              <PresenceDot
+                status={presence}
+                className="absolute -end-1 -bottom-1 outline-2 outline-bg-rail"
+              />
             </span>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-sm font-medium">
                 <bdi>{memberName(me, user.displayName)}</bdi>
               </div>
-              <div className="truncate text-xs text-text-muted">{t(`user.status.${presence}`)}</div>
+              <div className="meta truncate text-text-muted">{t(`user.status.${presence}`)}</div>
             </div>
             <button
               type="button"
@@ -438,9 +440,7 @@ export function AppLayout() {
               </Menu.Trigger>
               <Menu.Portal>
                 <Menu.Content align="end" side="top" sideOffset={4} className={menuContent}>
-                  <Menu.Label className="px-3 py-1 text-xs font-semibold text-text-muted">
-                    {t("user.status")}
-                  </Menu.Label>
+                  <Menu.Label className={menuLabel}>{t("user.status")}</Menu.Label>
                   <Menu.RadioGroup
                     value={presence === "offline" ? "invisible" : chosen}
                     onValueChange={(v) => sendCommand("presence.set", { status: v })}
@@ -448,7 +448,7 @@ export function AppLayout() {
                     {(["online", "idle", "dnd", "invisible"] as const).map((v) => (
                       <Menu.RadioItem key={v} value={v} className={menuItem}>
                         <span className="inline-block w-4 text-center" aria-hidden="true">
-                          <Menu.ItemIndicator>•</Menu.ItemIndicator>
+                          <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
                         </span>
                         {t(`user.status.${v}`)}
                       </Menu.RadioItem>
@@ -479,7 +479,9 @@ export function AppLayout() {
           >
             {drawer ? <X aria-hidden="true" size={20} /> : <MenuIcon aria-hidden="true" size={20} />}
           </button>
-          <span className="flex-1 truncate">{instanceName}</span>
+          <span className="flex-1 truncate font-display text-lg font-bold tracking-tight">
+            {instanceName}
+          </span>
           <ConnectionStatus />
         </div>
         <div className="hidden h-0 md:block" />
@@ -521,7 +523,7 @@ export function AppLayout() {
               max={membersMax}
             />
           ) : null}
-          <div className="flex h-12 items-center justify-between gap-2 border-b border-border ps-4 pe-2 text-sm font-semibold">
+          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border ps-4 pe-2 font-display text-sm font-semibold">
             {t("layout.members")}
             {overlayMembers ? (
               <button

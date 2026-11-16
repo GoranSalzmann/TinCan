@@ -19,6 +19,7 @@ const ALLOWED = new Set([
   "MPL-2.0", // file-level copyleft; allows combination under the AGPL via its secondary-licence clause
   "CC-BY-4.0", // data and documentation only
   "LGPL-3.0-or-later", // reviewed: dynamic linking only
+  "OFL-1.1", // fonts only (the bundled web client typefaces); the OFL allows bundling with software under any licence
 ]);
 
 /** Packages whose metadata has no usable SPDX field but whose licence was read and accepted. */

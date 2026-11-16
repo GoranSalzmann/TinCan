@@ -28,11 +28,16 @@ export function Modal({
         <RadixDialog.Overlay className="fixed inset-0 z-60 bg-overlay" />
         <RadixDialog.Content
           aria-describedby={description ? undefined : undefined}
-          className={`elev-2 fixed start-1/2 top-1/2 z-70 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-5 rtl:translate-x-1/2 ${wide ? "max-w-2xl" : "max-w-md"}`}
+          className={`elev-2 fixed start-1/2 top-1/2 z-70 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-t-2 border-t-accent p-6 rtl:translate-x-1/2 ${wide ? "max-w-2xl" : "max-w-md"}`}
         >
           <div className="mb-3 flex items-start justify-between gap-4">
-            <RadixDialog.Title className="text-lg font-semibold">{title}</RadixDialog.Title>
-            <RadixDialog.Close aria-label={t("dialog.close")} className="rounded-md p-1 hover:bg-bg-hover">
+            <RadixDialog.Title className="font-display text-xl leading-tight font-bold tracking-tight">
+              {title}
+            </RadixDialog.Title>
+            <RadixDialog.Close
+              aria-label={t("dialog.close")}
+              className="-me-1 rounded-md p-1 text-text-muted hover:bg-bg-hover hover:text-text"
+            >
               <X aria-hidden="true" size={18} />
             </RadixDialog.Close>
           </div>

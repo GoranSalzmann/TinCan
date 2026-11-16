@@ -317,7 +317,7 @@ export function Composer({
 
   if (!canSend) {
     return (
-      <div className="border-t border-border px-4 py-3 text-sm text-text-muted" role="note">
+      <div className="border-t border-border px-5 py-3 text-sm text-text-muted" role="note">
         {t("composer.noPermission")}
       </div>
     );
@@ -329,7 +329,7 @@ export function Composer({
     : "";
   return (
     <div
-      className={`relative border-t border-border px-4 pt-2 pb-3 ${dragging ? "bg-bg-selected" : ""}`}
+      className={`relative px-5 pt-1 pb-3 ${dragging ? "bg-bg-selected" : ""}`}
       onDragOver={(e) => {
         if (canAttach) {
           e.preventDefault();
@@ -340,7 +340,7 @@ export function Composer({
       onDrop={onDrop}
     >
       {replyTo ? (
-        <div className="mb-1 flex items-center gap-2 rounded-md bg-bg-sidebar px-3 py-1 text-sm">
+        <div className="mb-1 flex items-center gap-2 rounded-md border-s-2 border-accent bg-bg-sidebar px-3 py-1 text-sm">
           <span className="truncate">{t("composer.replyingTo", { name: replyAuthor })}</span>
           <button
             type="button"
@@ -390,7 +390,7 @@ export function Composer({
           ))}
         </ul>
       ) : null}
-      <div className="relative flex items-end gap-2 rounded-md border border-border-control bg-bg-input px-2 py-1">
+      <div className="relative flex items-end gap-2 rounded-md border border-border-control bg-bg-input px-2 py-1 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
         {canAttach ? (
           <>
             <button
@@ -483,7 +483,7 @@ export function Composer({
           </ul>
         ) : null}
       </div>
-      <div className="mt-1 flex min-h-5 items-center justify-between gap-2 text-xs text-text-muted">
+      <div className="meta mt-1.5 flex min-h-5 items-center justify-between gap-2 text-text-muted">
         <span aria-live="polite">
           {cooldownLeft > 0 ? (
             t("composer.slowmode", { seconds: cooldownLeft })

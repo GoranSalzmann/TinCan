@@ -10,39 +10,78 @@ interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   error?: string | null;
   /** Content to the end of the input, e.g. the Show button. */
   trailing?: ReactNode;
+  /**
+   * `stack` puts the label above the input (forms on their own). `row` is a settings row: label and hint at the start,
+   * the input at the end, inside a settings panel (modules/settings/layout.tsx).
+   */
+  layout?: "stack" | "row";
 }
 
-export function Field({ label, hint, error, trailing, className = "", ...input }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  error,
+  trailing,
+  layout = "stack",
+  className = "",
+  ...input
+}: FieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
+  const control = (
+    <div className="flex items-stretch gap-2">
+      <input
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={`min-h-10 min-w-0 flex-1 rounded-md border border-border-control bg-bg-input px-3 py-2 text-base text-text placeholder:text-text-muted hover:border-text-muted aria-invalid:border-danger ${layout === "row" ? "min-h-9 py-1.5 text-sm" : ""} ${className}`}
+        {...input}
+      />
+      {trailing}
+    </div>
+  );
+  const errorLine = error ? (
+    <p id={errorId} className="flex items-start gap-1.5 text-sm text-danger-text">
+      <AlertCircle aria-hidden="true" size={16} className="mt-0.5 shrink-0" />
+      <span>{error}</span>
+    </p>
+  ) : null;
+
+  if (layout === "row") {
+    return (
+      <div className="flex flex-col gap-2 px-5 py-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] sm:items-start sm:gap-8">
+        <div className="flex min-w-0 flex-col gap-0.5 sm:pt-2">
+          <label htmlFor={id} className="text-sm font-medium text-text">
+            {label}
+          </label>
+          {hint ? (
+            <p id={hintId} className="max-w-prose text-sm text-text-muted">
+              {hint}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          {control}
+          {errorLine}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="text-sm font-medium text-text">
         {label}
       </label>
-      <div className="flex items-stretch gap-2">
-        <input
-          id={id}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          className={`min-h-9 min-w-0 flex-1 rounded-md border border-border-control bg-bg-input px-3 py-1.5 text-base text-text placeholder:text-text-muted ${className}`}
-          {...input}
-        />
-        {trailing}
-      </div>
+      {control}
       {hint ? (
         <p id={hintId} className="max-w-prose text-sm text-text-muted">
           {hint}
         </p>
       ) : null}
-      {error ? (
-        <p id={errorId} className="flex items-start gap-1.5 text-sm text-danger-text">
-          <AlertCircle aria-hidden="true" size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </p>
-      ) : null}
+      {errorLine}
     </div>
   );
 }
@@ -60,7 +99,7 @@ export function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
           type="button"
           aria-pressed={shown}
           onClick={() => setShown((s) => !s)}
-          className="rounded-md px-3 text-sm text-accent-text hover:bg-bg-hover"
+          className="meta rounded-md border border-border px-3 text-accent-text hover:bg-bg-hover"
         >
           {shown ? t("field.hide") : t("field.show")}
         </button>
