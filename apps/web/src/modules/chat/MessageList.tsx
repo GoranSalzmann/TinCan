@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "@tincan/shared";
@@ -11,8 +10,12 @@ import { Button } from "../../ui/Button.js";
 import { MessageItem, PendingItem } from "./MessageItem.js";
 
 const GROUP_MS = 7 * 60_000;
+/** Within this distance of the end counts as following it. */
 const NEAR_BOTTOM_PX = 80;
-const NEAR_TOP_PX = 300;
+/** Fetch the next page while at least this much (or 1.5 screens) is still left before an edge. */
+const PREFETCH_MIN_PX = 1200;
+/** Pause automatic paging this long after a failed page. */
+const RETRY_MS = 3000;
 const day = new Intl.DateTimeFormat(undefined, { dateStyle: "full" });
 
 type Row =
@@ -54,6 +57,20 @@ export function buildRows(
   return rows;
 }
 
+/**
+ * The message feed. Scrolling is anchored to the newest message, with three layers so it holds on
+ * any channel length and any mix of row heights (images, previews and code blocks size themselves late):
+ *
+ * 1. The scroller is `flex-direction: column-reverse` around one content block, so the browser's
+ *    scroll origin is the bottom. A fresh channel paints at its newest message with no script, and
+ *    rows growing above the viewport (older pages, late images) never move what is on screen.
+ * 2. After every change of rows or of size (ResizeObserver), the position is settled before paint:
+ *    pinned to the end while following the live edge, otherwise the top visible row is held exactly
+ *    where it was.
+ * 3. Paging is driven by distance from each edge, measured after every scroll and every settle, so a
+ *    short page simply leads to the next until the screen is full. The loaded window is capped
+ *    (WINDOW_CAP), trimming the end the reader moves away from, so the DOM stays small.
+ */
 export function MessageList({
   channelId,
   selfId,
@@ -80,8 +97,17 @@ export function MessageList({
   const windowFocused = useUi((s) => s.windowFocused);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef<HTMLDivElement>(null);
+  /** Following the newest message: every change ends at the bottom. Cleared only by scrolling away. */
+  const pinned = useRef(true);
+  /** "Jump to latest" (or sending) asked for the end; honoured once the live edge is loaded. */
+  const wantLatest = useRef(false);
+  /** The top visible row and its viewport position, held still while not pinned. */
+  const anchor = useRef<{ key: string; top: number } | null>(null);
+  /** After a failed page, automatic paging waits a moment instead of retrying on every scroll event. */
+  const retryAt = useRef(0);
   const [atBottom, setAtBottom] = useState(true);
-  const atBottomRef = useRef(true);
   const [highlight, setHighlight] = useState<string | null>(null);
 
   // The divider marks where unread messages began when the channel was opened; it stays until you leave.
@@ -100,35 +126,91 @@ export function MessageList({
     [messages, pending, dividerId],
   );
 
-  /** Rows are measured after they render, so the end moves: keep following it for a moment, unless the reader scrolled away. */
-  const scrollToBottom = useCallback(() => {
+  // ---- geometry ----
+
+  /** How much content lies beyond each edge of the viewport (direction-agnostic: measured with rects). */
+  const edges = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    for (const delay of [16, 50, 120, 250, 500]) {
-      setTimeout(() => {
-        if (atBottomRef.current && scrollRef.current === el) el.scrollTop = el.scrollHeight;
-      }, delay);
-    }
+    const content = contentRef.current;
+    if (!el || !content) return null;
+    const view = el.getBoundingClientRect();
+    const box = content.getBoundingClientRect();
+    return { el, viewTop: view.top, fromTop: view.top - box.top, fromBottom: box.bottom - view.bottom };
   }, []);
 
-  const virt = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => (rows[i]?.kind === "message" ? 56 : 32),
-    overscan: 8,
-    getItemKey: (i) => rows[i]?.key ?? i,
-  });
+  const rowNode = useCallback((key: string): HTMLElement | null => {
+    for (const n of rowsRef.current?.children ?? []) {
+      if ((n as HTMLElement).dataset.key === key) return n as HTMLElement;
+    }
+    return null;
+  }, []);
 
-  // Positions are managed here (prepend anchor, live edge); the library's own size-change adjustments fought them.
-  virt.shouldAdjustScrollPositionOnItemSizeChange = () => false;
+  /** Remember the first row whose bottom is below the top of the viewport (binary search: rows are in order). */
+  const captureAnchor = useCallback(() => {
+    const g = edges();
+    const kids = rowsRef.current?.children;
+    if (!g || !kids || kids.length === 0) {
+      anchor.current = null;
+      return;
+    }
+    let lo = 0;
+    let hi = kids.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (kids[mid]!.getBoundingClientRect().bottom > g.viewTop) hi = mid;
+      else lo = mid + 1;
+    }
+    const n = kids[lo] as HTMLElement;
+    anchor.current = { key: n.dataset.key ?? "", top: n.getBoundingClientRect().top };
+  }, [edges]);
 
-  // ---- first paint of a channel: load, then sit at the bottom ----
-  const justOpened = useRef(true);
+  const maybeLoad = useCallback(() => {
+    const g = edges();
+    const s = useChat.getState();
+    const w = s.windows[channelId];
+    if (!g || !w || w.messages.length === 0 || s.loading[channelId] || Date.now() < retryAt.current) return;
+    const ahead = Math.max(PREFETCH_MIN_PX, g.el.clientHeight * 1.5);
+    if (w.hasOlder && g.fromTop < ahead) void loadOlder(channelId);
+    else if (w.hasNewer && g.fromBottom < ahead) void loadNewer(channelId);
+  }, [channelId, edges, loadOlder, loadNewer]);
+
+  /** Put the view where it belongs after anything changed: the end when following, else the anchor row where it was. */
+  const settle = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const live = !useChat.getState().windows[channelId]?.hasNewer;
+    if (live && wantLatest.current) {
+      wantLatest.current = false;
+      pinned.current = true;
+      setAtBottom(true);
+    }
+    if (pinned.current && live) {
+      // Past the end clamps to the end, whichever way the scroll origin runs.
+      el.scrollTop = el.scrollHeight;
+    } else if (anchor.current) {
+      const n = rowNode(anchor.current.key);
+      if (n) {
+        const delta = n.getBoundingClientRect().top - anchor.current.top;
+        if (Math.abs(delta) >= 0.5) el.scrollTop += delta;
+      }
+    }
+    captureAnchor();
+    maybeLoad();
+  }, [channelId, rowNode, captureAnchor, maybeLoad]);
+
+  const onScroll = useCallback(() => {
+    const g = edges();
+    if (!g) return;
+    const bottom = g.fromBottom < NEAR_BOTTOM_PX && !useChat.getState().windows[channelId]?.hasNewer;
+    pinned.current = bottom;
+    setAtBottom(bottom);
+    captureAnchor();
+    maybeLoad();
+  }, [channelId, edges, captureAnchor, maybeLoad]);
+
+  // ---- loading ----
+
   useEffect(() => {
-    justOpened.current = true;
-    atBottomRef.current = true;
-    setAtBottom(true);
     void open(channelId);
   }, [channelId, open]);
 
@@ -142,54 +224,71 @@ export function MessageList({
     }
   }, [readyCount, channelId, open]);
 
-  useLayoutEffect(() => {
-    if (justOpened.current && rows.length > 0) {
-      scrollToBottom();
-      justOpened.current = false;
-    }
-  }, [rows.length, scrollToBottom]);
+  useEffect(() => {
+    if (loadError) retryAt.current = Date.now() + RETRY_MS;
+  }, [loadError]);
 
-  // ---- keep following the live edge; preserve position when older pages arrive ----
-  const anchor = useRef<{ key: string; offset: number } | null>(null);
-  const lastCount = useRef(0);
-  /** Set when "jump to latest" replaces the window: the new rows may not outnumber the old, so scroll regardless. */
-  const forceBottom = useRef(false);
+  // ---- jump to a message (search result, reply reference): before the settle below, same commit ----
   useLayoutEffect(() => {
-    if (forceBottom.current) {
-      forceBottom.current = false;
-      lastCount.current = rows.length;
-      anchor.current = null;
-      scrollToBottom();
-      return;
-    }
-    const grew = rows.length > lastCount.current;
-    lastCount.current = rows.length;
-    if (anchor.current) {
-      const i = rows.findIndex((r) => r.key === anchor.current!.key);
-      if (i >= 0) {
-        const [offset] = virt.getOffsetForIndex(i, "start") ?? [0];
-        scrollRef.current?.scrollTo({ top: offset - anchor.current.offset });
-      }
-      anchor.current = null;
-      return;
-    }
-    if (grew && atBottomRef.current && !justOpened.current) scrollToBottom();
-  }, [rows, virt, scrollToBottom]);
+    if (!focusId) return;
+    const n = rowNode(focusId);
+    if (!n) return;
+    n.scrollIntoView({ block: "center" });
+    pinned.current = false;
+    wantLatest.current = false;
+    setAtBottom(false);
+    anchor.current = { key: focusId, top: n.getBoundingClientRect().top };
+    setHighlight(focusId);
+    clearFocus();
+  }, [focusId, rows, rowNode, clearFocus]);
 
-  const onScroll = useCallback(() => {
+  useEffect(() => {
+    if (!highlight) return;
+    const timer = setTimeout(() => setHighlight(null), 2000);
+    return () => clearTimeout(timer);
+  }, [highlight]);
+
+  // ---- sending your own message always brings you to the newest ----
+  const pendingCount = pending?.length ?? 0;
+  const lastPending = useRef(pendingCount);
+  useLayoutEffect(() => {
+    const grew = pendingCount > lastPending.current;
+    lastPending.current = pendingCount;
+    if (!grew) return;
+    wantLatest.current = true;
+    if (useChat.getState().windows[channelId]?.hasNewer) void jumpToLatest(channelId);
+  }, [pendingCount, channelId, jumpToLatest]);
+
+  // ---- every change of rows settles before paint ----
+  // The anchor must describe the view the instant before the rows change: a scroll can land after the
+  // last scroll event was handled, and restoring an older snapshot would undo it. Store updates
+  // render synchronously, so measuring here is measuring right before the commit.
+  useEffect(
+    () =>
+      useChat.subscribe((s, prev) => {
+        if (
+          s.windows[channelId] !== prev.windows[channelId] ||
+          s.pending[channelId] !== prev.pending[channelId]
+        )
+          captureAnchor();
+      }),
+    [channelId, captureAnchor],
+  );
+  useLayoutEffect(() => {
+    settle();
+  }, [rows, settle]);
+
+  // ---- and so does every change of size: late images, previews, a resized window or composer ----
+  const hasWindow = !!win;
+  useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
-    atBottomRef.current = bottom && !useChat.getState().windows[channelId]?.hasNewer;
-    setAtBottom(atBottomRef.current);
-    if (el.scrollTop < NEAR_TOP_PX && !justOpened.current) {
-      const first = virt.getVirtualItems()[0];
-      if (first && rows[first.index])
-        anchor.current = { key: rows[first.index]!.key, offset: first.start - el.scrollTop };
-      void loadOlder(channelId);
-    }
-    if (bottom && useChat.getState().windows[channelId]?.hasNewer) void loadNewer(channelId);
-  }, [channelId, loadNewer, loadOlder, rows, virt]);
+    const content = contentRef.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => settle());
+    ro.observe(el);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [hasWindow, settle]);
 
   // ---- reading the channel: on screen, window focused, at the bottom (12 §5.4) ----
   useEffect(() => {
@@ -204,17 +303,7 @@ export function MessageList({
     }
   }, [atBottom, windowFocused, channelId, messages, markRead]);
 
-  // ---- jump to a message (search result, reply reference) ----
-  useEffect(() => {
-    if (!focusId || !messages) return;
-    const i = rows.findIndex((r) => r.key === focusId);
-    if (i < 0) return;
-    virt.scrollToIndex(i, { align: "center" });
-    setHighlight(focusId);
-    clearFocus();
-    const timer = setTimeout(() => setHighlight(null), 2000);
-    return () => clearTimeout(timer);
-  }, [focusId, rows, messages, virt, clearFocus]);
+  const onJump = useCallback((id: string) => void jumpTo(channelId, id), [channelId, jumpTo]);
 
   if (!win) {
     return (
@@ -241,44 +330,40 @@ export function MessageList({
         aria-busy={loading}
         aria-label={t("message.feed")}
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        className="flex min-h-0 flex-1 flex-col-reverse overflow-x-hidden overflow-y-auto"
       >
-        {win.hasOlder ? (
-          <div className="p-2 text-center text-sm text-text-muted" role="status">
-            {loading ? (
-              t("message.loadingOlder")
-            ) : (
-              <button type="button" onClick={() => void loadOlder(channelId)}>
-                {t("message.loadOlder")}
-              </button>
-            )}
-          </div>
-        ) : null}
-        {empty ? (
-          <div className="relative overflow-hidden px-5 pt-16 pb-6">
-            <div aria-hidden="true" className="grille-soft absolute inset-0" />
-            <div className="relative flex max-w-prose flex-col gap-2">
-              <h2 className="text-3xl leading-tight font-bold">{t("message.empty.title")}</h2>
-              <p className="text-text-muted">{t("message.empty.body")}</p>
+        {/* One block inside the reversed scroller: the scroll origin is the bottom, the reading order is unchanged. */}
+        <div ref={contentRef} className="shrink-0 pb-2">
+          {win.hasOlder ? (
+            <div className="p-2 text-center text-sm text-text-muted" role="status">
+              {loading ? (
+                t("message.loadingOlder")
+              ) : loadError ? (
+                <span className="inline-flex items-center gap-2">
+                  {loadError}
+                  <button type="button" className="underline" onClick={() => void loadOlder(channelId)}>
+                    {t("connect.failed.retry")}
+                  </button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => void loadOlder(channelId)}>
+                  {t("message.loadOlder")}
+                </button>
+              )}
             </div>
-          </div>
-        ) : null}
-        <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>
-          {virt.getVirtualItems().map((item) => {
-            const row = rows[item.index]!;
-            return (
-              <div
-                key={item.key}
-                data-index={item.index}
-                ref={virt.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
+          ) : null}
+          {empty ? (
+            <div className="relative overflow-hidden px-5 pt-16 pb-6">
+              <div aria-hidden="true" className="grille-soft absolute inset-0" />
+              <div className="relative flex max-w-prose flex-col gap-2">
+                <h2 className="text-3xl leading-tight font-bold">{t("message.empty.title")}</h2>
+                <p className="text-text-muted">{t("message.empty.body")}</p>
+              </div>
+            </div>
+          ) : null}
+          <div ref={rowsRef}>
+            {rows.map((row) => (
+              <div key={row.key} data-key={row.key}>
                 {row.kind === "date" ? (
                   <div
                     className="meta mt-4 mb-1 flex items-center gap-3 px-5 text-text-muted"
@@ -304,28 +389,29 @@ export function MessageList({
                     selfId={selfId}
                     perms={perms}
                     onReply={onReply}
-                    onJump={(id) => void jumpTo(channelId, id)}
+                    onJump={onJump}
                   />
                 ) : (
                   <PendingItem p={row.pending} selfName={selfName} selfAvatar={selfAvatar} />
                 )}
               </div>
-            );
-          })}
+            ))}
+          </div>
+          {win.hasNewer && loading ? (
+            <div className="p-2 text-center text-sm text-text-muted" role="status">
+              {t("app.loading")}
+            </div>
+          ) : null}
         </div>
       </div>
       {!atBottom || win.hasNewer ? (
         <Button
           onClick={() => {
-            atBottomRef.current = true;
+            pinned.current = true;
+            wantLatest.current = true;
             setAtBottom(true);
-            if (win.hasNewer) {
-              forceBottom.current = true;
-              void jumpToLatest(channelId).finally(() => {
-                // A failed load leaves the window as it was: nothing will re-render to consume the flag.
-                if (useChat.getState().windows[channelId]?.hasNewer) forceBottom.current = false;
-              });
-            } else scrollToBottom();
+            if (win.hasNewer) void jumpToLatest(channelId);
+            else settle();
           }}
           className="absolute end-5 bottom-3 shadow-lg"
         >

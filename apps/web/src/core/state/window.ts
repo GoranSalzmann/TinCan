@@ -17,8 +17,11 @@ export interface MessageWindow {
 
 export const EMPTY_WINDOW: MessageWindow = { messages: [], hasOlder: false, hasNewer: false };
 
-/** At most this many messages stay in memory when the user is following the live edge. */
-export const WINDOW_CAP = 600;
+/**
+ * At most this many messages stay loaded (and rendered). Paging further trims the far end, which
+ * is fetched again when the reader scrolls back to it, so a channel of any length stays light.
+ */
+export const WINDOW_CAP = 400;
 
 /** Merges by ID (the incoming copy wins, so edits replace), sorted. */
 export function mergeMessages(existing: readonly Message[], incoming: readonly Message[]): Message[] {
@@ -46,20 +49,30 @@ export function fromAround(page: readonly Message[], limit: number, aroundId: st
   };
 }
 
-export function prependOlder(w: MessageWindow, page: readonly Message[], limit: number): MessageWindow {
-  return {
-    messages: mergeMessages(w.messages, page),
-    hasOlder: page.length >= limit,
-    hasNewer: w.hasNewer,
-  };
+/** An older page joins at the top; past the cap the newest messages are dropped (the reader is scrolling away from them). */
+export function prependOlder(
+  w: MessageWindow,
+  page: readonly Message[],
+  limit: number,
+  cap = WINDOW_CAP,
+): MessageWindow {
+  const messages = mergeMessages(w.messages, page);
+  const hasOlder = page.length >= limit;
+  if (messages.length > cap) return { messages: messages.slice(0, cap), hasOlder, hasNewer: true };
+  return { messages, hasOlder, hasNewer: w.hasNewer };
 }
 
-export function appendNewer(w: MessageWindow, page: readonly Message[], limit: number): MessageWindow {
-  return {
-    messages: mergeMessages(w.messages, page),
-    hasOlder: w.hasOlder,
-    hasNewer: page.length >= limit,
-  };
+/** A newer page joins at the bottom; past the cap the oldest messages are dropped. */
+export function appendNewer(
+  w: MessageWindow,
+  page: readonly Message[],
+  limit: number,
+  cap = WINDOW_CAP,
+): MessageWindow {
+  const messages = mergeMessages(w.messages, page);
+  const hasNewer = page.length >= limit;
+  if (messages.length > cap) return { messages: messages.slice(-cap), hasOlder: true, hasNewer };
+  return { messages, hasOlder: w.hasOlder, hasNewer };
 }
 
 /** A live MESSAGE_CREATE: appended when the window reaches the newest message, otherwise it only marks that there is more. */

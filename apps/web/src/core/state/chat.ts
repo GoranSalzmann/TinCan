@@ -126,7 +126,8 @@ export const useChat = create<ChatState>((set, get) => {
         // Keep what is already loaded when the live edge is contiguous with it; otherwise start from the latest page.
         const latest = fromLatest(page, PAGE);
         const keep = have && !have.hasNewer && have.messages.length > 0 ? have : undefined;
-        setWindow(channelId, keep ? { ...appendNewer(keep, page, PAGE), hasNewer: false } : latest);
+        // No trim here: a reconnect must not pull rows out from under the reader.
+        setWindow(channelId, keep ? { ...appendNewer(keep, page, PAGE, Infinity), hasNewer: false } : latest);
       } catch (e) {
         fail(channelId, e);
       } finally {
@@ -138,9 +139,14 @@ export const useChat = create<ChatState>((set, get) => {
       const w = get().windows[channelId];
       if (!w || !w.hasOlder || get().loading[channelId] || w.messages.length === 0) return;
       setLoading(channelId, true);
+      set((s) => ({ loadError: { ...s.loadError, [channelId]: undefined } }));
       try {
-        const page = await api.history(channelId, { before: w.messages[0]!.id, limit: PAGE });
-        setWindow(channelId, prependOlder(get().windows[channelId] ?? w, page, PAGE));
+        const before = w.messages[0]!.id;
+        const page = await api.history(channelId, { before, limit: PAGE });
+        // The window may have been replaced meanwhile (jump, re-entry); joining onto it would leave a gap.
+        const cur = get().windows[channelId];
+        if (cur?.messages[0]?.id !== before) return;
+        setWindow(channelId, prependOlder(cur, page, PAGE));
       } catch (e) {
         fail(channelId, e);
       } finally {
@@ -152,12 +158,13 @@ export const useChat = create<ChatState>((set, get) => {
       const w = get().windows[channelId];
       if (!w || !w.hasNewer || get().loading[channelId] || w.messages.length === 0) return;
       setLoading(channelId, true);
+      set((s) => ({ loadError: { ...s.loadError, [channelId]: undefined } }));
       try {
-        const page = await api.history(channelId, {
-          after: w.messages[w.messages.length - 1]!.id,
-          limit: PAGE,
-        });
-        setWindow(channelId, appendNewer(get().windows[channelId] ?? w, page, PAGE));
+        const after = w.messages[w.messages.length - 1]!.id;
+        const page = await api.history(channelId, { after, limit: PAGE });
+        const cur = get().windows[channelId];
+        if (!cur?.hasNewer || cur.messages[cur.messages.length - 1]?.id !== after) return;
+        setWindow(channelId, appendNewer(cur, page, PAGE));
       } catch (e) {
         fail(channelId, e);
       } finally {

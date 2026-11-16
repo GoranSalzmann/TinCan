@@ -22,7 +22,7 @@ renderer (ADR-012). Desktop-only capabilities are reached through a
 | Server-state | Light custom layer (REST fetch + gateway-driven cache) | TanStack Query is acceptable for REST caching if it earns its keep; gateway events remain the invalidation source |
 | Routing | React Router (or TanStack Router) | URLs: `/channels/:id`, `/invite/:code`, `/settings/*` |
 | Styling | Tailwind + CSS variables for themes | Radix UI primitives for accessible dialogs, menus, tooltips, popovers |
-| Lists | Virtualised (TanStack Virtual or equivalent) | Message list must handle tens of thousands of messages with stable scroll |
+| Lists | Message list: a bounded window in a bottom-anchored native scroller; member list: virtualised | Message list must handle tens of thousands of messages with stable scroll (§5.3) |
 | Markdown | `remark/rehype` pipeline with strict allow-list, or a small safe parser | Never `dangerouslySetInnerHTML` of untrusted HTML; sanitised AST only |
 | i18n | `i18next`-style message catalogs (ICU plural support) | English only at launch; all strings externalised |
 | Icons/emoji | Lucide icons, bundled (design U10); native emoji picker data bundled | No third-party CDNs at runtime (privacy, offline-friendly) |
@@ -70,7 +70,7 @@ A module exports `ClientModule` (04 §10). The shell loads
 ┌───┬──────────────┬───────────────────────────────┬──────────────┐
 │ S │ Channel list │  Channel header (name, topic) │ Member list  │
 │ e │  Text        │───────────────────────────────│ (owner/roles)│
-│ r │   # general  │  Message list (virtualised)   │  online/off) │
+│ r │   # general  │  Message list (windowed)      │  online/off) │
 │ v │   # random   │                               │              │
 │ e │  Voice       │                               │              │
 │ r │   🔊 Lounge  │                               │              │
@@ -104,7 +104,8 @@ channel, panels), `settings` (persisted locally).
 - After a non-resumable reconnect: refetch channels/roles/presence; **keep** cached message windows but verify the latest page; mark stale voice presence until the new READY lands.
 
 ### 5.3 Messages
-- Per channel: a window of loaded messages (contiguous ID range). Scroll up loads older (`before`), reaching the live edge sets "at bottom" and auto-follows new messages; "jump to latest" and "new messages" divider supported.
+- Per channel: a window of loaded messages (contiguous ID range, at most `WINDOW_CAP` = 400). A channel opens on its newest page, at the bottom. Scrolling up loads older (`before`) about 1.5 screens ahead; past the cap the far end is trimmed and fetched again (`after`) on the way back. Reaching the live edge sets "at bottom" and auto-follows new messages; sending a message returns there. "Jump to latest" and the "new messages" divider are supported. A page that arrives after the window was replaced is dropped rather than leaving a gap.
+- Scroll stability (`MessageList.tsx`): the scroller is `flex-direction: column-reverse` around one content block, so the browser anchors it at the bottom and growth above the viewport (older pages, late images) never moves the view. After every change of rows or size (ResizeObserver) the position is settled before paint: pinned to the end while following, otherwise the top visible row is held where it was (its position is measured the instant the store changes).
 - Optimistic send with `nonce`; failed send shows retry/delete inline.
 - Edits/deletes update in place; deleted messages show "message deleted" only when moderators see them (policy choice).
 - Jump-to-message (search results, reply references) loads `around=<id>` and replaces the window.
@@ -205,9 +206,9 @@ limits ("Push-to-talk only works while Tin Can is focused in the browser").
 ## 10. Performance
 
 - Initial load budget: shell + text chat < ~300 KB gz JS; voice chunk lazy (livekit-client ≈ hundreds of KB, denoiser WASM/model several MB loaded on first voice join).
-- Virtualised message and member lists; memoised message rows; image lazy loading with fixed placeholders.
+- Bounded message window (§5.3) and virtualised member list; memoised message rows; image lazy loading with fixed placeholders.
 - Avoid global rerenders: selector-based Zustand subscriptions; gateway events batched per animation frame.
-- Memory: cap loaded messages per channel (e.g. 500 in memory outside the viewport window), release video elements on unwatch.
+- Memory: cap loaded messages per channel (400, §5.3), release video elements on unwatch.
 - Idle CPU target: < 1% with an open window and no activity; no polling timers beyond the gateway heartbeat.
 - Measure with Lighthouse for web, plus custom marks (time-to-READY, time-to-first-message-render, voice-join latency).
 

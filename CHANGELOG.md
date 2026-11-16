@@ -28,6 +28,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 - **Link previews in other apps.** A Tin Can link pasted into WhatsApp, Discord, Slack or iMessage now shows a card with the Tin Can logo instead of a bare address. Invite links say which community they lead to and how many members it has. An invite that is unknown, expired, revoked or used up shows only the generic card. Nothing else is visible to link crawlers, because every other page needs a sign-in.
 
+### Fixed
+
+- **Long text channels** open on the newest message and stay at the very bottom, even while images and link previews load. Older messages load only when you scroll up, without the view jumping, and at most 400 messages stay loaded however long the channel is.
+
 ## [2.0.0] - 2026-11-16
 
 ### Before you upgrade

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Message } from "@tincan/shared";
 import { api } from "../api/client.js";
 import { PAGE, useChat } from "./chat.js";
+import { WINDOW_CAP } from "./window.js";
 
 const msg = (n: number): Message =>
   ({
@@ -46,5 +47,49 @@ describe("open", () => {
     useChat.setState({ windows: { c1: { messages: range(1, 1000), hasOlder: true, hasNewer: false } } });
     await useChat.getState().open("c1", { resume: true });
     expect(useChat.getState().windows.c1!.messages).toHaveLength(1000);
+  });
+});
+
+describe("paging", () => {
+  it("loads the page before the oldest loaded message and caps the window from the newer end", async () => {
+    useChat.setState({
+      windows: { c1: { messages: range(601, 1000), hasOlder: true, hasNewer: false } },
+    });
+    vi.mocked(api.history).mockResolvedValueOnce(range(601 - PAGE, 600));
+    await useChat.getState().loadOlder("c1");
+    expect(api.history).toHaveBeenCalledWith("c1", { before: msg(601).id, limit: PAGE });
+    const w = useChat.getState().windows.c1!;
+    expect(w.messages).toHaveLength(WINDOW_CAP);
+    expect(w.messages[0]!.id).toBe(msg(601 - PAGE).id);
+    expect(w.hasOlder).toBe(true);
+    // The newest messages were dropped, so the window no longer reaches the live edge.
+    expect(w.hasNewer).toBe(true);
+  });
+
+  it("loads newer pages after the newest loaded message and caps from the older end", async () => {
+    useChat.setState({
+      windows: { c1: { messages: range(1, WINDOW_CAP), hasOlder: false, hasNewer: true } },
+    });
+    vi.mocked(api.history).mockResolvedValueOnce(range(WINDOW_CAP + 1, WINDOW_CAP + 10));
+    await useChat.getState().loadNewer("c1");
+    const w = useChat.getState().windows.c1!;
+    expect(w.messages).toHaveLength(WINDOW_CAP);
+    expect(w.messages.at(-1)!.id).toBe(msg(WINDOW_CAP + 10).id);
+    expect(w.hasOlder).toBe(true);
+    expect(w.hasNewer).toBe(false);
+  });
+
+  it("drops a page that arrives after the window was replaced, instead of leaving a gap", async () => {
+    useChat.setState({
+      windows: { c1: { messages: range(100, 149), hasOlder: true, hasNewer: true } },
+    });
+    let resolve!: (m: Message[]) => void;
+    vi.mocked(api.history).mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const p = useChat.getState().loadOlder("c1");
+    const latest = { messages: range(951, 1000), hasOlder: true, hasNewer: false };
+    useChat.setState({ windows: { c1: latest } });
+    resolve(range(50, 99));
+    await p;
+    expect(useChat.getState().windows.c1).toBe(latest);
   });
 });

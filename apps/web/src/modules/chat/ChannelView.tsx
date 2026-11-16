@@ -184,6 +184,7 @@ export function ChannelView() {
         ) : null}
       </header>
       <MessageList
+        key={channel.id}
         channelId={channel.id}
         selfId={user.id}
         selfName={memberName(me, user.displayName)}
