@@ -1,0 +1,33 @@
+[package]
+name = "tincan-denoise"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "DeepFilterNet3 as an import-free WebAssembly module for the Tin Can voice pipeline (09 §3, tier A)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+# DeepFilterNet (Hendrik Schröter; code and model weights MIT OR Apache-2.0). Pinned to the upstream commit that put the
+# weights under the same licences. The build script takes the model archive from this same checkout.
+deep_filter = { git = "https://github.com/Rikorose/DeepFilterNet", rev = "7b14b895fe7fc42cab72b4a4c1e49c982bd6404b", default-features = false, features = ["tract"] }
+ndarray = "0.15"
+# libDF asks for tract ^0.21.4 but only builds against 0.21.4, the version in upstream's own lockfile: later 0.21.x
+# releases renamed `Graph::symbol_table`. These exact pins hold every tract crate there.
+tract-core = "=0.21.4"
+tract-onnx = "=0.21.4"
+tract-pulse = "=0.21.4"
+tract-hir = "=0.21.4"
+# tract pulls in getrandom; on wasm32-unknown-unknown it needs a source, and ours is a fixed one (see src/lib.rs).
+getrandom = { version = "0.2", features = ["custom"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

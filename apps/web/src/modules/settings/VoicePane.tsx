@@ -11,13 +11,14 @@ import {
 } from "../../core/voice/diagnostics.js";
 import { useDevices, useSavedDeviceMissing } from "../../core/voice/devices.js";
 import { createPipeline, type Pipeline } from "../../core/voice/pipeline.js";
-import { PRESETS, useAudioPrefs, type NoiseTier, type Preset } from "../../core/voice/prefs.js";
+import { NOISE_TIERS, PRESETS, useAudioPrefs, type NoiseTier, type Preset } from "../../core/voice/prefs.js";
 import { useVoice } from "../../core/voice/store.js";
 import { Banner } from "../../ui/Banner.js";
 import { CameraSection } from "./CameraSection.js";
 import { Button } from "../../ui/Button.js";
 import { Segmented, selectClass } from "../../ui/Controls.js";
 import { toast, toastError } from "../../ui/toast.js";
+import { DeepFilterNote, DeepFilterProgress } from "../voice/DeepFilterProgress.js";
 import { FooterNote, Panel, Row, SettingsPage, SettingsSection, SwitchRow } from "./layout.js";
 
 const PRESET_ORDER: Preset[] = ["standard", "aggressive", "natural", "studio", "custom"];
@@ -47,7 +48,9 @@ function MicTest() {
   const prefs = useAudioPrefs((s) => s.prefs);
   const [secs, setSecs] = useState<number | null>(null);
   const [level, setLevel] = useState(0);
-  const [clips, setClips] = useState<{ processed: string; raw: string } | null>(null);
+  const [clips, setClips] = useState<{ processed: string; raw: string; tier: NoiseTier } | null>(null);
+  /** From the click until the clips are ready, including the first-use DeepFilterNet download. */
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const urls = useRef<string[]>([]);
 
@@ -60,6 +63,7 @@ function MicTest() {
 
   const record = async () => {
     setError(null);
+    setBusy(true);
     for (const u of urls.current.splice(0)) URL.revokeObjectURL(u);
     setClips(null);
     let pipeline: Pipeline | null = null;
@@ -90,11 +94,12 @@ function MicTest() {
       }, 100);
       const [processed, raw] = await pending;
       clearInterval(tick);
-      setClips({ processed, raw });
+      setClips({ processed, raw, tier: pipeline.tier });
     } catch (e) {
       setError((e as Error).message);
     } finally {
       pipeline?.stop();
+      setBusy(false);
       setSecs(null);
       setLevel(0);
     }
@@ -105,13 +110,14 @@ function MicTest() {
       <Panel label={t("voice.pane.micTest")} footer={<FooterNote>{t("voice.pane.micTestNote")}</FooterNote>}>
         <div className="flex flex-col gap-4 px-5 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" disabled={secs !== null} onClick={() => void record()}>
+            <Button variant="ghost" disabled={busy} onClick={() => void record()}>
               {secs !== null ? t("voice.pane.recording", { s: secs }) : t("voice.pane.record")}
             </Button>
             <div className="min-w-40 flex-1">
               <Meter level={level} label={t("voice.pane.level")} />
             </div>
           </div>
+          <DeepFilterProgress />
           {clips ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <span className="flex flex-col gap-1.5 text-sm">
@@ -123,6 +129,11 @@ function MicTest() {
                 <audio controls src={clips.raw} className="h-9 w-full" />
               </span>
             </div>
+          ) : null}
+          {clips ? (
+            <p className="m-0 text-sm text-text-muted">
+              {t("voice.pane.recordedWith", { tier: t(`voice.noise.${clips.tier}` as MessageKey) })}
+            </p>
           ) : null}
           {error ? <Banner tone="error">{t("voice.pane.micError", { reason: error })}</Banner> : null}
         </div>
@@ -233,8 +244,9 @@ export function VoicePane() {
   const localLevel = useVoice((s) => s.localLevel);
   const [capturing, setCapturing] = useState(false);
   const canSink = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
-  const tier = useVoice.getState().notice === "denoiser_downgraded" ? "browser" : prefs.noiseTier;
   const effective = prefs.preset === "custom" ? prefs : { ...prefs, ...PRESETS[prefs.preset] };
+  // In a call, what really runs (a tier that failed has stepped down); otherwise what is chosen.
+  const tier = useVoice((s) => s.denoiser) ?? effective.noiseTier;
 
   // Pressing a key sets the push-to-talk key.
   useEffect(() => {
@@ -371,14 +383,21 @@ export function VoicePane() {
                 value={effective.noiseTier}
                 onChange={(e) => setAdvanced({ noiseTier: e.target.value as NoiseTier })}
               >
-                {(["rnnoise", "browser", "off"] as const).map((n) => (
+                {NOISE_TIERS.map((n) => (
                   <option key={n} value={n}>
                     {t(`voice.noise.${n}` as MessageKey)}
                   </option>
                 ))}
               </select>
             }
-          />
+          >
+            {/* Below the choice, full width: beside it, the text squeezes into a narrow column. */}
+            {effective.noiseTier === "deepfilternet" ? (
+              <p className="m-0 max-w-prose text-sm text-text-muted">
+                <DeepFilterNote />
+              </p>
+            ) : null}
+          </Row>
           <SwitchRow
             label={t("voice.pane.gate")}
             checked={effective.noiseGate}

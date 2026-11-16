@@ -6,6 +6,20 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Before you upgrade
+
+- Source deployments that want the new DeepFilterNet 3 noise suppression run `sh scripts/build-deepfilternet.sh` (needs Rust with the `wasm32-unknown-unknown` target) before building the PWA. Without it the option still shows, and choosing it falls back to RNNoise with a notice. The web image includes it. No CSP change: it loads from this origin and uses the `'wasm-unsafe-eval'` RNNoise already needs.
+
+### Added
+
+- **DeepFilterNet 3 noise suppression** under Settings → Voice & audio → Advanced. A neural denoiser that handles keyboards, fans and other changing noise better than RNNoise, at more CPU, about 40 ms of added delay and a one-time download the first time it is used (an 8 MB model plus an 11 MB module that compresses to 2.7 MB). Built from upstream DeepFilterNet and served by your own server: nothing is fetched from a third party. If it cannot load or uses too much CPU it steps down to RNNoise, then to the browser's own, and says which one runs. Presets still use RNNoise.
+- Choosing DeepFilterNet shows how much the first use downloads, or that the server does not have it. While it downloads and starts, the voice dock and the mic test show progress, and the mic test's Record button waits for it.
+- The mic test says which noise suppression it recorded with.
+
+### Fixed
+
+- The notice that noise suppression fell back now also appears when the denoiser fails to load at the start of a call, not only when it uses too much CPU later.
+
 ## [1.3.0] - 2026-11-13
 
 Nothing to do when upgrading except the CSP change below.
