@@ -6,6 +6,10 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+### Fixed
+
+- **Long text channels** open on the newest message and stay at the very bottom, even while images and link previews load. Older messages load only when you scroll up, without the view jumping, and at most 400 messages stay loaded however long the channel is.
+
 ## [2.0.0] - 2026-11-16
 
 ### Before you upgrade

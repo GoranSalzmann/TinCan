@@ -547,7 +547,7 @@ Built in `apps/web/src/ui/` (12 §3) on Radix Primitives plus Tailwind. Radix Th
 | Tabs | `Tabs` | Source picker (Screens/Windows), role editor, channel settings | |
 | Accordion | `Accordion` | Advanced audio, permission groups | |
 | Collapsible | `Collapsible` | Channel categories | |
-| Scroll area | `ScrollArea` | Channel list, member list, settings navigation | Not the message list (native scroll + virtualiser) |
+| Scroll area | `ScrollArea` | Channel list, member list, settings navigation | Not the message list (native bottom-anchored scroll) |
 | Avatar | `Avatar` | Messages, lists, tiles | Initials fallback; presence shape cut into the end-bottom corner |
 | Progress | `Progress` | Uploads, quota, connection test | |
 | Meter | Custom (`role="meter"`) | Mic level, quota | Radix has none; clipping marker at the end |
@@ -563,7 +563,7 @@ Built in `apps/web/src/ui/` (12 §3) on Radix Primitives plus Tailwind. Radix Th
 | Keyboard chip | Custom (`<kbd>`) | Keybinds, shortcut list, hints | |
 | Keybind recorder | Custom on Button | Keybinds | Records keys or mouse buttons; Esc cancels, Backspace clears |
 | Channel tree | Custom (`role="tree"`, roving tabindex) | Channel list | Categories expand/collapse; voice participants are nested items; type-ahead |
-| Message feed | Custom on the virtualiser (`role="feed"`, `article` per message) | Message list | New messages announced through a separate polite live region, not the feed itself |
+| Message feed | Custom, bottom-anchored native scroll (`role="feed"`, `article` per message) | Message list | New messages announced through a separate polite live region, not the feed itself |
 | Composer | Custom on `textarea` | Text channels | Rich editor vs textarea is an open item; textarea recommended for v1 (IME and RTL safety) |
 | Video tile | Custom | Call view, stream view, filmstrip | Focusable; Enter focuses the stream; controls appear on hover and on focus |
 | Source card | `RadioGroup.Item` | Source picker | Thumbnail, title, app icon |
