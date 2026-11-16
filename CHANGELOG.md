@@ -6,9 +6,20 @@ The release workflow copies the section for the tagged version into the GitHub R
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-16
+
 ### Before you upgrade
 
 - Source deployments that want the new DeepFilterNet 3 noise suppression run `sh scripts/build-deepfilternet.sh` (needs Rust with the `wasm32-unknown-unknown` target) before building the PWA. Without it the option still shows, and choosing it falls back to RNNoise with a notice. The web image includes it. No CSP change: it loads from this origin and uses the `'wasm-unsafe-eval'` RNNoise already needs.
+
+- **Accent colour:** Amber is gone. Ember is the new default, and a stored Amber choice falls back to Ember. Choose another accent in Settings if you want one.
+
+### Changed
+
+- **New look:** warm graphite surfaces with hairline borders, Ember accent, near-square corners and mono metadata. Light, dark and high-contrast themes are all updated. Fonts are bundled with the app, so nothing is fetched from a third party.
+- **Sign-in screens** show the instance name large over a dot-matrix pattern.
+- **Settings are reorganised:** every page has a header and sections with one panel of settings each, one Save per panel, switches instead of checkboxes, and picture cards for theme and accent. Channels, roles and members are list-and-detail views. On narrow screens the settings navigation becomes a strip across the top.
+- **Sessions:** the session list shows this device and the four most recent, with "Show all".
 
 ### Added
 
