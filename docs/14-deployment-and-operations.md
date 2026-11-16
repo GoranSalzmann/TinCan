@@ -45,6 +45,7 @@ IPv4 (or IPv6 with working inbound). The doctor command detects CGNAT symptoms
 | Path | Target |
 |---|---|
 | `/api/*`, `/gateway`, `/files/*` | `tincan:3000` (WebSocket upgrade supported) |
+| `/` and `/invite/*` | `tincan:3000`, which serves the web shell with link-preview tags (§2.4); if it answers 404, the static shell from `/srv/web` |
 | `/livekit/rtc*` (signalling WSS only) | LiveKit at `host.docker.internal:7880`. Other LiveKit HTTP routes, including the Twirp RoomService admin API, are not proxied (18 T26) |
 | everything else | static web client (`/srv/web`) with SPA fallback |
 | `/api/internal/*` | **blocked** from the public; LiveKit (host networking) posts webhooks to the app's loopback-published port `127.0.0.1:3000` (T5, T26) |
@@ -59,6 +60,13 @@ chat.example.com {
   handle /gateway { reverse_proxy tincan:3000 }
   handle /files/* { reverse_proxy tincan:3000 }
   handle /livekit/rtc* { uri strip_prefix /livekit; reverse_proxy host.docker.internal:7880 }
+  @page path / /invite/*
+  handle @page {
+    reverse_proxy tincan:3000 {
+      @noshell status 404
+      handle_response @noshell { root * /srv/web; rewrite * /index.html; file_server }
+    }
+  }
   handle { root * /srv/web; try_files {path} /index.html; file_server }
   header { Strict-Transport-Security "max-age=31536000"; ... }
 }
@@ -94,6 +102,14 @@ webhook:
 - Primary web/WSS traffic is TLS-terminated by Caddy on 443.
 - LiveKit's TURN/TLS needs its own certificate. v1 approach: a `turn.example.com` name served by Caddy only for certificate issuance; the issued cert/key files are made available to LiveKit through a shared read-only volume (a small helper copies Caddy's certificate files for that hostname). LiveKit reads the certificate only at start (no hot reload; verify in D6), and restarting it drops every call (§5), so the helper **defers the reload** (18 T30): after a renewal it restarts LiveKit only when no rooms are active (checked through LiveKit's `ListRooms` API), or, if rooms never empty, once the certificate LiveKit is using is within 7 days of expiry, preferring a configured quiet window. Caddy renews about 30 days before expiry, so in practice the restart lands in an empty moment. TURN/TLS listens on **5349**.
 - Many restrictive networks only allow outbound 443. Advanced option: serve TURN/TLS on 443 on a **separate IP** or via an SNI-based TCP router (Caddy layer4 plugin / HAProxy / nginx stream). Documented as optional; validated in spike D6. Real-world impact is measured by the connectivity diagnostics (08 §10): the percentage of users who need TURN/TLS on 443 will be small.
+
+### 2.4 Link previews in other apps
+
+WhatsApp, Discord, Slack and iMessage show a card for a pasted link from the Open Graph tags in the HTML; their crawlers run no JavaScript. The web shell (`apps/web/index.html`) carries generic tags and the share card `/brand/og-image.png` (1200×630, rendered by `apps/web/scripts/gen-icons.mjs`), so every path gets at least the Tin Can card.
+
+For `/` and `/invite/<code>` the app serves the shell itself, with absolute URLs on `instance.publicUrl` and the community name (`apps/server/src/http/shell.ts`). A valid invite adds "Join <name> on Tin Can" and the member count, the same facts as the public `GET /api/v1/invites/:code`. An unknown, expired, revoked or used-up code, or more than 120 page fetches in 15 minutes from one address, gives the generic tags; the page itself always loads. Channel and message pages need a sign-in and keep the generic tags, so no chat content reaches a crawler.
+
+The server image ships the shell at `/app/web/index.html` (`server.webIndex`). Without the file the app registers no page routes, answers 404, and Caddy serves the static shell, so a server without it behaves as before. Installs made before this change keep the static card until the `@page` block (§2.1) is added to their Caddyfile.
 
 ## 3. Firewall / network checklist
 

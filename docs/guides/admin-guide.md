@@ -104,6 +104,24 @@ Rehearsed with the real previous release (`node tools/upgrade-rehearsal/run.mjs 
 
 **Rollback.** An older release **refuses to start** on a database a newer one has changed ("Refusing to start so nothing is damaged"): that is on purpose. To go back: stop, `tincan restore` the pre-upgrade backup into a new directory (or, if you only have the automatic snapshot, copy `pre-migrate-….db` over `data/app.db` with the server stopped), set the previous image tags, `docker compose up -d`. Anything written after the backup is lost; members' messages from that period are gone, so roll back early or not at all.
 
+**Invite link previews** (since the release after 2.0.0). Pasted into WhatsApp, Discord, Slack or iMessage, an invite link shows a card with your community's name and member count; other links show a generic Tin Can card. Anyone holding a valid invite link can see those two facts, which the invite page already showed. Installs made before that release add this block to the `Caddyfile`, above the `# Build files carry a hash` line, then `docker compose up -d`. Without it, links show only the generic card:
+
+```
+	@page path / /invite/*
+	handle @page {
+		reverse_proxy tincan:3000 {
+			@noshell status 404
+			handle_response @noshell {
+				root * /srv/web
+				rewrite * /index.html
+				file_server
+			}
+		}
+	}
+```
+
+Chat apps keep a card for a long time once they have fetched it, so try the change with a new invite.
+
 LiveKit restarts drop calls; the app restarting does not (people stay in the call and rejoin the gateway).
 
 ## 6. Metrics and dashboards

@@ -63,6 +63,7 @@ Headers on every response: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-
 |---|---|
 | GET `/capabilities` | Feature flags, limits, auth methods, API version, source-code URL (AGPL) |
 | GET `/healthz`, `/readyz` | Liveness / readiness |
+| GET `/`, `/invite/:code` | Not API: the web shell as HTML with link-preview tags, at the root (14 §2.4) |
 | GET `/metrics` | Prometheus text (module `metrics`, restricted by IP/token) |
 | POST `/internal/livekit/webhook` | LiveKit webhook receiver (signature-verified; not for clients) |
 
