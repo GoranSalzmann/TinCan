@@ -77,6 +77,7 @@ function skinDeclarations(name: SkinName, theme: "light" | "dark", indent: strin
   const skin = SKINS[name];
   const lines = Object.entries(skin[theme]).map(([k, v]) => `${indent}${k}: ${v};`);
   lines.push(`${indent}--shadow-elev: ${skin.shadow[theme]};`);
+  for (const [k, v] of Object.entries(skin.fx?.[theme] ?? {})) lines.push(`${indent}${k}: ${v};`);
   return lines.join("\n");
 }
 

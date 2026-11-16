@@ -104,6 +104,8 @@ export interface Skin {
   dark: SkinColors;
   /** `--shadow-elev` per mode. */
   shadow: { light: string; dark: string };
+  /** Per-mode effect variables (`--fx-*`) that skins.css uses: glows, textures, backdrops. */
+  fx?: { light: Record<string, string>; dark: Record<string, string> };
   /** Mode-independent tokens: faces, radii, heading tracking. */
   props: Record<string, string>;
 }
@@ -182,6 +184,24 @@ export const SKINS: Record<SkinName, Skin> = {
       light: "0 10px 28px -14px #0B220F59",
       dark: "0 0 0 1px #39FF7A2E, 0 0 28px -6px #39FF7A4D",
     },
+    fx: {
+      light: {
+        "--fx-text-glow": "none",
+        "--fx-heading-glow": "none",
+        "--fx-button-glow": "none",
+        "--fx-scanline": "#0B220F0F",
+        "--fx-vignette": "#0B220F1A",
+        "--fx-bar": "#E5F0DC",
+      },
+      dark: {
+        "--fx-text-glow": "0 0 3px #39FF7A4D",
+        "--fx-heading-glow": "0 0 10px #39FF7A8C",
+        "--fx-button-glow": "0 0 16px -2px #39FF7A99",
+        "--fx-scanline": "#00000066",
+        "--fx-vignette": "#000000C0",
+        "--fx-bar": "#0D150D",
+      },
+    },
     props: {
       "--font-sans": MONO,
       "--font-display": MONO,
@@ -235,6 +255,16 @@ export const SKINS: Record<SkinName, Skin> = {
       "--color-focus": "#7EB0FF",
     },
     shadow: { light: "3px 3px 0 #1513101F", dark: "3px 3px 0 #00000080" },
+    fx: {
+      light: {
+        "--fx-paper":
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 0 0.05 0 0 0 .10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+      },
+      dark: {
+        "--fx-paper":
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+      },
+    },
     props: {
       "--font-sans": SERIF_TEXT,
       "--font-display": SERIF_DISPLAY,
@@ -290,6 +320,16 @@ export const SKINS: Record<SkinName, Skin> = {
     shadow: {
       light: "0 18px 40px -16px #B8328040, 0 2px 6px #2A1B2E14",
       dark: "0 18px 48px -16px #000000CC",
+    },
+    fx: {
+      light: {
+        "--fx-backdrop": "linear-gradient(135deg, #F6D5EA 0%, #E4DAFB 50%, #D3EEF4 100%)",
+        "--fx-card-shadow": "0 10px 30px -14px #B8328059, 0 1px 3px #2A1B2E14",
+      },
+      dark: {
+        "--fx-backdrop": "linear-gradient(135deg, #2E1433 0%, #1B1433 50%, #102330 100%)",
+        "--fx-card-shadow": "0 14px 40px -16px #000000D9",
+      },
     },
     props: {
       "--font-sans": ROUNDED,
@@ -350,6 +390,18 @@ export const SKINS: Record<SkinName, Skin> = {
       light: "0 14px 34px -14px #C2177F4D",
       dark: "0 0 0 1px #FF3EA540, 0 0 36px -8px #FF3EA599",
     },
+    fx: {
+      light: {
+        "--fx-sky": "linear-gradient(180deg, #F8F3FF 0%, #F6EDFF 55%, #FFE3F2 100%)",
+        "--fx-heading-filter": "none",
+        "--fx-grid": "#C2177F2E",
+      },
+      dark: {
+        "--fx-sky": "linear-gradient(180deg, #140C2A 0%, #1A0D33 55%, #33103F 100%)",
+        "--fx-heading-filter": "drop-shadow(0 0 10px #FF3EA5B3)",
+        "--fx-grid": "#FF3EA540",
+      },
+    },
     props: {
       "--tracking-display": "0.03em",
       "--radius-sm": "2px",
@@ -406,6 +458,18 @@ export const SKINS: Record<SkinName, Skin> = {
     shadow: {
       light: "0 10px 28px -12px #1B243029, 0 1px 2px #1B243014",
       dark: "0 14px 36px -12px #000000A6",
+    },
+    fx: {
+      light: {
+        "--fx-aurora":
+          "radial-gradient(ellipse 120% 60% at 30% 0%, #9CC9E833, transparent 70%), radial-gradient(ellipse 90% 50% at 90% 0%, #B9A6E633, transparent 70%)",
+        "--fx-header-shadow": "0 1px 0 #D2DBE5, 0 8px 18px -14px #1B243040",
+      },
+      dark: {
+        "--fx-aurora":
+          "radial-gradient(ellipse 120% 60% at 30% 0%, #3FB8A529, transparent 70%), radial-gradient(ellipse 90% 50% at 90% 0%, #8C6CE629, transparent 70%)",
+        "--fx-header-shadow": "0 1px 0 #333D4A, 0 8px 18px -14px #000000B3",
+      },
     },
     props: {
       "--font-display": FONTS.sans,

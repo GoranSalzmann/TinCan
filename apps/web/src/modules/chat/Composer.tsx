@@ -390,7 +390,7 @@ export function Composer({
           ))}
         </ul>
       ) : null}
-      <div className="relative flex items-end gap-2 rounded-md border border-border-control bg-bg-input px-2 py-1 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
+      <div className="composer relative flex items-end gap-2 rounded-md border border-border-control bg-bg-input px-2 py-1 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
         {canAttach ? (
           <>
             <button

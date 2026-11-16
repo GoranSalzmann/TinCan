@@ -151,7 +151,7 @@ export function ChannelView() {
 
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border ps-4 pe-4 md:pe-56">
+      <header className="channel-header flex h-12 shrink-0 items-center gap-2 border-b border-border ps-4 pe-4 md:pe-56">
         <Hash aria-hidden="true" size={18} strokeWidth={2.25} className="shrink-0 text-accent-text" />
         <h1 className="truncate text-lg font-bold">
           <bdi>{channel.name}</bdi>

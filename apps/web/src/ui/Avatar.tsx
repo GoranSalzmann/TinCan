@@ -43,7 +43,7 @@ export function Avatar({
         loading="lazy"
         onError={() => setFailed(true)}
         style={style}
-        className={`shrink-0 rounded-md bg-bg-input object-cover ${className}`}
+        className={`avatar shrink-0 rounded-md bg-bg-input object-cover ${className}`}
       />
     );
   }
@@ -51,7 +51,7 @@ export function Avatar({
     <span
       aria-hidden="true"
       style={style}
-      className={`flex shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/12 font-display font-bold text-accent-text ${className}`}
+      className={`avatar flex shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/12 font-display font-bold text-accent-text ${className}`}
     >
       <bdi>{[...name][0]?.toUpperCase() ?? "?"}</bdi>
     </span>

@@ -351,6 +351,12 @@
   --color-border-control: #6A876F;
   --color-focus: #1F5FD1;
   --shadow-elev: 0 10px 28px -14px #0B220F59;
+  --fx-text-glow: none;
+  --fx-heading-glow: none;
+  --fx-button-glow: none;
+  --fx-scanline: #0B220F0F;
+  --fx-vignette: #0B220F1A;
+  --fx-bar: #E5F0DC;
 }
 [data-skin="phosphor"][data-theme="dark"] {
   --color-bg-rail: #040704;
@@ -373,6 +379,12 @@
   --color-border-control: #3F7A4C;
   --color-focus: #E8FF5A;
   --shadow-elev: 0 0 0 1px #39FF7A2E, 0 0 28px -6px #39FF7A4D;
+  --fx-text-glow: 0 0 3px #39FF7A4D;
+  --fx-heading-glow: 0 0 10px #39FF7A8C;
+  --fx-button-glow: 0 0 16px -2px #39FF7A99;
+  --fx-scanline: #00000066;
+  --fx-vignette: #000000C0;
+  --fx-bar: #0D150D;
 }
 @media (prefers-color-scheme: dark) {
   [data-skin="phosphor"]:root:not([data-theme]) {
@@ -396,6 +408,12 @@
     --color-border-control: #3F7A4C;
     --color-focus: #E8FF5A;
     --shadow-elev: 0 0 0 1px #39FF7A2E, 0 0 28px -6px #39FF7A4D;
+    --fx-text-glow: 0 0 3px #39FF7A4D;
+    --fx-heading-glow: 0 0 10px #39FF7A8C;
+    --fx-button-glow: 0 0 16px -2px #39FF7A99;
+    --fx-scanline: #00000066;
+    --fx-vignette: #000000C0;
+    --fx-bar: #0D150D;
   }
 }
 [data-skin="broadsheet"] {
@@ -428,6 +446,7 @@
   --color-border-control: #7A7265;
   --color-focus: #1F5FD1;
   --shadow-elev: 3px 3px 0 #1513101F;
+  --fx-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 0 0.05 0 0 0 .10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 [data-skin="broadsheet"][data-theme="dark"] {
   --color-bg-rail: #0E0E0D;
@@ -450,6 +469,7 @@
   --color-border-control: #7A766C;
   --color-focus: #7EB0FF;
   --shadow-elev: 3px 3px 0 #00000080;
+  --fx-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 @media (prefers-color-scheme: dark) {
   [data-skin="broadsheet"]:root:not([data-theme]) {
@@ -473,6 +493,7 @@
     --color-border-control: #7A766C;
     --color-focus: #7EB0FF;
     --shadow-elev: 3px 3px 0 #00000080;
+    --fx-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }
 [data-skin="marshmallow"] {
@@ -505,6 +526,8 @@
   --color-border-control: #8F7A93;
   --color-focus: #4F4FD0;
   --shadow-elev: 0 18px 40px -16px #B8328040, 0 2px 6px #2A1B2E14;
+  --fx-backdrop: linear-gradient(135deg, #F6D5EA 0%, #E4DAFB 50%, #D3EEF4 100%);
+  --fx-card-shadow: 0 10px 30px -14px #B8328059, 0 1px 3px #2A1B2E14;
 }
 [data-skin="marshmallow"][data-theme="dark"] {
   --color-bg-rail: #140E18;
@@ -527,6 +550,8 @@
   --color-border-control: #806B87;
   --color-focus: #A5B4FF;
   --shadow-elev: 0 18px 48px -16px #000000CC;
+  --fx-backdrop: linear-gradient(135deg, #2E1433 0%, #1B1433 50%, #102330 100%);
+  --fx-card-shadow: 0 14px 40px -16px #000000D9;
 }
 @media (prefers-color-scheme: dark) {
   [data-skin="marshmallow"]:root:not([data-theme]) {
@@ -550,6 +575,8 @@
     --color-border-control: #806B87;
     --color-focus: #A5B4FF;
     --shadow-elev: 0 18px 48px -16px #000000CC;
+    --fx-backdrop: linear-gradient(135deg, #2E1433 0%, #1B1433 50%, #102330 100%);
+    --fx-card-shadow: 0 14px 40px -16px #000000D9;
   }
 }
 [data-skin="synthwave"] {
@@ -580,6 +607,9 @@
   --color-border-control: #8875AD;
   --color-focus: #0060DF;
   --shadow-elev: 0 14px 34px -14px #C2177F4D;
+  --fx-sky: linear-gradient(180deg, #F8F3FF 0%, #F6EDFF 55%, #FFE3F2 100%);
+  --fx-heading-filter: none;
+  --fx-grid: #C2177F2E;
 }
 [data-skin="synthwave"][data-theme="dark"] {
   --color-bg-rail: #0A0614;
@@ -602,6 +632,9 @@
   --color-border-control: #7B65B9;
   --color-focus: #FFE45E;
   --shadow-elev: 0 0 0 1px #FF3EA540, 0 0 36px -8px #FF3EA599;
+  --fx-sky: linear-gradient(180deg, #140C2A 0%, #1A0D33 55%, #33103F 100%);
+  --fx-heading-filter: drop-shadow(0 0 10px #FF3EA5B3);
+  --fx-grid: #FF3EA540;
 }
 @media (prefers-color-scheme: dark) {
   [data-skin="synthwave"]:root:not([data-theme]) {
@@ -625,6 +658,9 @@
     --color-border-control: #7B65B9;
     --color-focus: #FFE45E;
     --shadow-elev: 0 0 0 1px #FF3EA540, 0 0 36px -8px #FF3EA599;
+    --fx-sky: linear-gradient(180deg, #140C2A 0%, #1A0D33 55%, #33103F 100%);
+    --fx-heading-filter: drop-shadow(0 0 10px #FF3EA5B3);
+    --fx-grid: #FF3EA540;
   }
 }
 [data-skin="fjord"] {
@@ -656,6 +692,8 @@
   --color-border-control: #7A8898;
   --color-focus: #7A3FD1;
   --shadow-elev: 0 10px 28px -12px #1B243029, 0 1px 2px #1B243014;
+  --fx-aurora: radial-gradient(ellipse 120% 60% at 30% 0%, #9CC9E833, transparent 70%), radial-gradient(ellipse 90% 50% at 90% 0%, #B9A6E633, transparent 70%);
+  --fx-header-shadow: 0 1px 0 #D2DBE5, 0 8px 18px -14px #1B243040;
 }
 [data-skin="fjord"][data-theme="dark"] {
   --color-bg-rail: #151A21;
@@ -678,6 +716,8 @@
   --color-border-control: #728195;
   --color-focus: #D7A6FF;
   --shadow-elev: 0 14px 36px -12px #000000A6;
+  --fx-aurora: radial-gradient(ellipse 120% 60% at 30% 0%, #3FB8A529, transparent 70%), radial-gradient(ellipse 90% 50% at 90% 0%, #8C6CE629, transparent 70%);
+  --fx-header-shadow: 0 1px 0 #333D4A, 0 8px 18px -14px #000000B3;
 }
 @media (prefers-color-scheme: dark) {
   [data-skin="fjord"]:root:not([data-theme]) {
@@ -701,6 +741,8 @@
     --color-border-control: #728195;
     --color-focus: #D7A6FF;
     --shadow-elev: 0 14px 36px -12px #000000A6;
+    --fx-aurora: radial-gradient(ellipse 120% 60% at 30% 0%, #3FB8A529, transparent 70%), radial-gradient(ellipse 90% 50% at 90% 0%, #8C6CE629, transparent 70%);
+    --fx-header-shadow: 0 1px 0 #333D4A, 0 8px 18px -14px #000000B3;
   }
 }
 [data-skin="brutalist"] {

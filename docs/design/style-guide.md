@@ -248,8 +248,13 @@ edit by hand). High contrast is checked against the same minimums but is designe
 Besides the mode (light, dark, high contrast), each user picks a **theme** from a curated set (12 §13; U6, approved,
 widened from accent presets to whole themes in 2026-11). A theme is more than a colour: it sets the surface, text and
 accent tokens for light and dark, and the type faces, corner radii, floating-surface shadow (`--shadow-elev`) and
-heading tracking (`--tracking-display`). A few touches that tokens cannot express (scanlines, glows, offset shadows,
-pill buttons) live in `styles.css` under `[data-skin="…"]`; buttons carry `btn btn-<variant>` as hooks for them.
+heading tracking (`--tracking-display`), plus per-mode effect variables (`--fx-*`: glows, textures, backdrops).
+Each theme also reshapes the shell in `apps/web/src/theme/skins.css` under `[data-skin="…"]`: pane borders and
+layout (Marshmallow floats the panes as cards), surface textures, the selected channel, message authors, avatars,
+the composer, buttons and the grille. Components carry unstyled hook classes for this (`shell`, `shell-sidebar`,
+`shell-main`, `shell-members`, `shell-brand`, `shell-pane-header`, `shell-userbar`, `channel-header`, `channel-row`,
+`msg`, `msg-head`, `msg-author`, `avatar`, `composer`, `btn`, `btn-<variant>`). Motion (Phosphor's cursor, Synthwave's
+grid) stops under reduced motion.
 
 The palettes live in `apps/web/src/theme/tokens.ts` (`SKINS`; "skin" in code so it never collides with the mode,
 which the code calls theme). Status colours (danger, warning, success, presence, video) come from the mode.

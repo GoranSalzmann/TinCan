@@ -106,7 +106,7 @@ function ChannelRow({
           onClick={() => void joinVoice(channel.id).catch(toastError)}
           aria-label={t("channel.voice.join", { name: channel.name })}
           className={({ isActive }) =>
-            `group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : "text-text-muted"}`
+            `channel-row group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : "text-text-muted"}`
           }
         >
           {label}
@@ -115,7 +115,7 @@ function ChannelRow({
         <NavLink
           to={`/channels/${channel.id}`}
           className={({ isActive }) =>
-            `group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base no-underline hover:bg-bg-hover hover:text-text ${isActive ? "bg-bg-selected text-text before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : unread || mentions > 0 ? "text-text" : "text-text-muted"} ${muted ? "text-text-muted" : ""}`
+            `channel-row group/row relative flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-base no-underline hover:bg-bg-hover hover:text-text ${isActive ? "bg-bg-selected text-text before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : unread || mentions > 0 ? "text-text" : "text-text-muted"} ${muted ? "text-text-muted" : ""}`
           }
           aria-label={
             mentions > 0

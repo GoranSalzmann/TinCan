@@ -316,7 +316,7 @@ export function AppLayout() {
   const chosen = presence === "offline" ? "online" : presence;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg text-text">
+    <div className="shell flex h-dvh overflow-hidden bg-bg text-text">
       <a
         href="#main"
         className="absolute start-2 top-2 z-80 -translate-y-16 rounded-md bg-bg-elevated px-3 py-2 text-sm focus:translate-y-0"
@@ -339,7 +339,7 @@ export function AppLayout() {
           tabIndex={-1}
           aria-label={t("layout.sidebar")}
           style={medium ? { width: sidebarPanel.width } : undefined}
-          className={`flex shrink-0 flex-col bg-bg-sidebar ${medium ? "relative border-e border-border" : "elev-2 fixed inset-y-0 start-0 z-50 w-60 rounded-none"}`}
+          className={`shell-sidebar flex shrink-0 flex-col bg-bg-sidebar ${medium ? "relative border-e border-border" : "elev-2 fixed inset-y-0 start-0 z-50 w-60 rounded-none"}`}
         >
           {medium ? (
             <ResizeHandle
@@ -353,7 +353,7 @@ export function AppLayout() {
           <Menu.Root>
             <Menu.Trigger
               aria-label={t("instance.menu")}
-              className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-4 text-start hover:bg-bg-hover data-[state=open]:bg-bg-hover"
+              className="shell-brand flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-4 text-start hover:bg-bg-hover data-[state=open]:bg-bg-hover"
             >
               <bdi className="truncate font-display text-xl leading-none font-bold tracking-tight">
                 {instanceName}
@@ -405,7 +405,7 @@ export function AppLayout() {
           <VoiceDock />
 
           <div
-            className="flex h-13 shrink-0 items-center gap-2 border-t border-border bg-bg-rail px-3"
+            className="shell-userbar flex h-13 shrink-0 items-center gap-2 border-t border-border bg-bg-rail px-3"
             aria-label={t("user.panel")}
             role="group"
           >
@@ -466,7 +466,7 @@ export function AppLayout() {
         </nav>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="shell-main flex min-w-0 flex-1 flex-col">
         <UpdateBanner />
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:hidden">
           <button
@@ -512,7 +512,7 @@ export function AppLayout() {
           tabIndex={-1}
           aria-label={t("layout.members")}
           style={medium ? { width: membersPanel.width } : undefined}
-          className={`flex shrink-0 flex-col bg-bg-sidebar ${wide ? "relative border-s border-border" : "elev-2 fixed inset-y-0 end-0 z-50 rounded-none"} ${medium ? "" : "w-60"}`}
+          className={`shell-members flex shrink-0 flex-col bg-bg-sidebar ${wide ? "relative border-s border-border" : "elev-2 fixed inset-y-0 end-0 z-50 rounded-none"} ${medium ? "" : "w-60"}`}
         >
           {medium ? (
             <ResizeHandle
@@ -523,7 +523,7 @@ export function AppLayout() {
               max={membersMax}
             />
           ) : null}
-          <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border ps-4 pe-2 font-display text-base font-semibold">
+          <div className="shell-pane-header flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border ps-4 pe-2 font-display text-base font-semibold">
             {t("layout.members")}
             {overlayMembers ? (
               <button
