@@ -20,6 +20,13 @@ COPY LICENSE LICENSE
 RUN cargo build --locked --release --manifest-path apps/audio-helper/Cargo.toml \
  && sh scripts/package-audio-helper.sh apps/audio-helper/target/release/tincan-audio /out/helpers
 
+# DeepFilterNet3 noise suppression (09 §3, tier A): WebAssembly, so one build serves every architecture.
+FROM --platform=linux/amd64 rust:1.100-alpine AS denoise-build
+WORKDIR /repo
+COPY apps/denoise-wasm apps/denoise-wasm
+COPY scripts/build-deepfilternet.sh scripts/build-deepfilternet.sh
+RUN sh scripts/build-deepfilternet.sh /out/denoise
+
 FROM node:${NODE_VERSION}-bookworm-slim AS build
 # Only needed if a native dependency has no prebuilt binary for this platform.
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
@@ -45,4 +52,5 @@ CMD ["node", "dist/cli.js", "serve"]
 FROM caddy:2 AS web
 COPY --from=build /repo/apps/web/dist /srv/web
 COPY --from=audio-helper-build /out/helpers /srv/web/helpers
+COPY --from=denoise-build /out/denoise /srv/web/denoise/deepfilternet3
 COPY LICENSE /srv/web/LICENSE.txt

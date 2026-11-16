@@ -6,8 +6,11 @@ import { create } from "zustand";
  * transmit mode follow the person across devices through synced settings (the server registered `audio.*`).
  */
 export type Preset = "standard" | "aggressive" | "natural" | "studio" | "custom";
-/** 09 §3: A = DeepFilterNet-class (not shipped in M3, D2), B = RNNoise, C = browser, D = off. */
-export type NoiseTier = "rnnoise" | "browser" | "off";
+/** 09 §3: A = DeepFilterNet3 (opt-in, needs the self-hosted build), B = RNNoise, C = browser, D = off. */
+export type NoiseTier = "deepfilternet" | "rnnoise" | "browser" | "off";
+
+/** Best first; the order a failing tier steps down in. */
+export const NOISE_TIERS: readonly NoiseTier[] = ["deepfilternet", "rnnoise", "browser", "off"];
 export type TransmitMode = "vad" | "ptt";
 
 export interface AudioPrefs {
@@ -94,7 +97,7 @@ export function effectiveSettings(p: AudioPrefs): PresetSettings {
   };
 }
 
-/** `getUserMedia` audio constraints. Our own chain replaces the browser's noise suppression when the tier is RNNoise (09 §2). */
+/** `getUserMedia` audio constraints. Our own chain replaces the browser's noise suppression in tiers A and B (09 §2). */
 export function captureConstraints(p: AudioPrefs): MediaTrackConstraints {
   const s = effectiveSettings(p);
   return {

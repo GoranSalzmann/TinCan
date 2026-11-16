@@ -167,7 +167,7 @@ class VoiceManager {
       }
     }
     this.#pipeline = pipeline;
-    pipeline?.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
+    if (pipeline) watchPipeline(pipeline);
 
     const settings = effectiveSettings(prefs);
     // Our own context for playback, so a per-person gain above 1 is possible (HTMLMediaElement.volume stops at 1).
@@ -274,7 +274,7 @@ class VoiceManager {
     if (!this.#pipeline) {
       try {
         this.#pipeline = await createPipeline(prefs);
-        this.#pipeline.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
+        watchPipeline(this.#pipeline);
       } catch {
         return;
       }
@@ -551,7 +551,7 @@ class VoiceManager {
       const old = this.#pipeline;
       await local.replaceTrack(next.track, false);
       this.#pipeline = next;
-      next.onDowngrade(() => useVoice.getState().patch({ notice: "denoiser_downgraded" }));
+      watchPipeline(next);
       old?.stop();
       this.#startMeter();
       this.#startTransmitGate(prefs);
@@ -1195,6 +1195,12 @@ class VoiceManager {
       // diagnostics only
     }
   }
+}
+
+/** Keeps the store's `denoiser` on what the pipeline really runs and tells the person when it had to fall back. */
+function watchPipeline(p: Pipeline): void {
+  useVoice.getState().patch({ denoiser: p.tier });
+  p.onDowngrade((_from, to) => useVoice.getState().patch({ notice: "denoiser_downgraded", denoiser: to }));
 }
 
 const captureKey = (p: AudioPrefs) => ({

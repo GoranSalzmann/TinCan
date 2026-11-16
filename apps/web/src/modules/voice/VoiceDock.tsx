@@ -14,7 +14,7 @@ const btn = "shrink-0 rounded-md p-1.5 hover:bg-bg-hover focus-visible:outline-2
 /** Voice panel at the bottom of the channel list (W-06): state, mute, deafen, leave; notices when a call ends. */
 export function VoiceDock() {
   const t = useT();
-  const { status, channelId, notice, muted, deafened, transport, transmitting } = useVoice();
+  const { status, channelId, notice, denoiser, muted, deafened, transport, transmitting } = useVoice();
   const channelName = useCommunity((s) => s.channels.find((c) => c.id === channelId)?.name ?? "");
   const mode = useAudioPrefs((s) => s.prefs.transmitMode);
   const pttKey = useAudioPrefs((s) => s.prefs.pttKey);
@@ -24,7 +24,11 @@ export function VoiceDock() {
   const notices = notice ? (
     <Banner tone={noticeTone}>
       <div className="flex items-start gap-2">
-        <span className="flex-1">{t(`voice.notice.${notice}` as MessageKey)}</span>
+        <span className="flex-1">
+          {t(`voice.notice.${notice}` as MessageKey, {
+            tier: t(`voice.noise.${denoiser ?? "browser"}` as MessageKey),
+          })}
+        </span>
         <button
           type="button"
           aria-label={t("voice.notice.dismiss")}

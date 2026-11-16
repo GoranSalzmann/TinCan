@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
 import type { VoiceParticipant } from "@tincan/shared";
+import type { NoiseTier } from "./prefs.js";
 import type { StreamQuality, VideoCodecName } from "./video.js";
 
 /** What was asked of the encoder for a camera or a share (video.ts `resolveVideo`), kept for the UI. */
@@ -63,6 +64,8 @@ interface VoiceState {
   status: VoiceStatus;
   channelId: string | null;
   notice: VoiceNotice;
+  /** The noise suppression the microphone pipeline really runs, after any fallback (09 §3); null without a pipeline. */
+  denoiser: NoiseTier | null;
   muted: boolean;
   deafened: boolean;
   /** Push to talk: true while the key is held (or the release delay runs). */
@@ -112,6 +115,7 @@ const initial = {
   status: "idle" as VoiceStatus,
   channelId: null as string | null,
   notice: null as VoiceNotice,
+  denoiser: null as NoiseTier | null,
   muted: false,
   deafened: false,
   transmitting: false,

@@ -11,7 +11,7 @@ import {
 } from "../../core/voice/diagnostics.js";
 import { useDevices, useSavedDeviceMissing } from "../../core/voice/devices.js";
 import { createPipeline, type Pipeline } from "../../core/voice/pipeline.js";
-import { PRESETS, useAudioPrefs, type NoiseTier, type Preset } from "../../core/voice/prefs.js";
+import { NOISE_TIERS, PRESETS, useAudioPrefs, type NoiseTier, type Preset } from "../../core/voice/prefs.js";
 import { useVoice } from "../../core/voice/store.js";
 import { Banner } from "../../ui/Banner.js";
 import { CameraSection } from "./CameraSection.js";
@@ -45,7 +45,7 @@ function MicTest() {
   const prefs = useAudioPrefs((s) => s.prefs);
   const [secs, setSecs] = useState<number | null>(null);
   const [level, setLevel] = useState(0);
-  const [clips, setClips] = useState<{ processed: string; raw: string } | null>(null);
+  const [clips, setClips] = useState<{ processed: string; raw: string; tier: NoiseTier } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const urls = useRef<string[]>([]);
 
@@ -88,7 +88,7 @@ function MicTest() {
       }, 100);
       const [processed, raw] = await pending;
       clearInterval(tick);
-      setClips({ processed, raw });
+      setClips({ processed, raw, tier: pipeline.tier });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -121,6 +121,11 @@ function MicTest() {
         ) : null}
       </div>
       <Meter level={level} label={t("voice.pane.level")} />
+      {clips ? (
+        <p className="m-0 text-sm text-text-muted">
+          {t("voice.pane.recordedWith", { tier: t(`voice.noise.${clips.tier}` as MessageKey) })}
+        </p>
+      ) : null}
       {error ? <Banner tone="error">{t("voice.pane.micError", { reason: error })}</Banner> : null}
       <p className="m-0 text-sm text-text-muted">{t("voice.pane.micTestNote")}</p>
     </section>
@@ -222,8 +227,9 @@ export function VoicePane() {
   const localLevel = useVoice((s) => s.localLevel);
   const [capturing, setCapturing] = useState(false);
   const canSink = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
-  const tier = useVoice.getState().notice === "denoiser_downgraded" ? "browser" : prefs.noiseTier;
   const effective = prefs.preset === "custom" ? prefs : { ...prefs, ...PRESETS[prefs.preset] };
+  // In a call, what really runs (a tier that failed has stepped down); otherwise what is chosen.
+  const tier = useVoice((s) => s.denoiser) ?? effective.noiseTier;
 
   // Pressing a key sets the push-to-talk key.
   useEffect(() => {
@@ -337,7 +343,7 @@ export function VoicePane() {
               value={effective.noiseTier}
               onChange={(e) => setAdvanced({ noiseTier: e.target.value as NoiseTier })}
             >
-              {(["rnnoise", "browser", "off"] as const).map((n) => (
+              {NOISE_TIERS.map((n) => (
                 <option key={n} value={n}>
                   {t(`voice.noise.${n}` as MessageKey)}
                 </option>

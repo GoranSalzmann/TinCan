@@ -10,3 +10,5 @@ data/
 /apps/audio-helper/target/
 /apps/web/public/helpers/tincan-audio-linux-amd64.tar.gz
 /apps/web/public/helpers/SHA256SUMS
+/apps/denoise-wasm/target/
+/apps/web/public/denoise/

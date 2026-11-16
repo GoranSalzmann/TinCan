@@ -40,6 +40,8 @@ describe("presets (09 §6)", () => {
   it("asks the browser for its own noise suppression only in the browser tier", () => {
     const c = (p: AudioPrefs) => captureConstraints(p);
     expect(c(DEFAULT_PREFS).noiseSuppression).toBe(false); // RNNoise runs in our chain instead
+    // DeepFilterNet too; the browser's own suppression would only fight it.
+    expect(c(withAdvancedChange(DEFAULT_PREFS, { noiseTier: "deepfilternet" })).noiseSuppression).toBe(false);
     expect(c({ ...DEFAULT_PREFS, preset: "natural" }).noiseSuppression).toBe(true);
     expect(c({ ...DEFAULT_PREFS, preset: "studio" })).toMatchObject({
       echoCancellation: false,
@@ -48,6 +50,16 @@ describe("presets (09 §6)", () => {
     });
     expect(c({ ...DEFAULT_PREFS, inputDeviceId: "abc" }).deviceId).toEqual({ exact: "abc" });
     expect(c(DEFAULT_PREFS).deviceId).toBeUndefined();
+  });
+
+  it("DeepFilterNet is opt-in: no preset picks it, Custom keeps it", () => {
+    for (const p of Object.values(PRESETS)) expect(p.noiseTier).not.toBe("deepfilternet");
+    const p = withAdvancedChange(DEFAULT_PREFS, { noiseTier: "deepfilternet" });
+    expect(effectiveSettings(p)).toMatchObject({
+      noiseTier: "deepfilternet",
+      echoCancellation: true,
+      dtx: true,
+    });
   });
 
   it("changing an advanced control switches to Custom and keeps the rest of the preset", () => {
