@@ -19,7 +19,7 @@ ndarray = "0.15"
 # libDF asks for tract ^0.21.4 but only builds against 0.21.4, the version in upstream's own lockfile: later 0.21.x
 # releases renamed `Graph::symbol_table`. These exact pins hold every tract crate there.
 tract-core = "=0.21.4"
-tract-onnx = "=0.21.4"
+tract-onnx = "=0.23.10"
 tract-pulse = "=0.21.4"
 tract-hir = "=0.21.4"
 # tract pulls in getrandom; on wasm32-unknown-unknown it needs a source, and ours is a fixed one (see src/lib.rs).
