@@ -148,14 +148,14 @@ export const MessageItem = memo(function MessageItem({
       id={`m-${m.id}`}
       data-testid="message"
       aria-label={t("message.aria", { name, time: time.format(new Date(m.createdAt)) })}
-      className={`group relative flex gap-3 px-4 ${grouped ? "py-0.5" : "pt-2 pb-0.5"} ${mentioned ? "border-s-4 border-accent bg-bg-mention" : ""} ${highlight ? "bg-bg-selected" : "hover:bg-bg-hover"}`}
+      className={`group relative flex gap-3 px-5 ${grouped ? "py-0.5" : "pt-3 pb-0.5"} ${mentioned ? "bg-bg-mention before:absolute before:inset-y-0 before:start-0 before:w-0.75 before:bg-warning" : ""} ${highlight ? "bg-bg-selected" : "hover:bg-bg-hover"}`}
     >
       <div className="w-10 shrink-0">
         {grouped ? (
           <time
             dateTime={m.createdAt}
             title={full.format(new Date(m.createdAt))}
-            className="hidden whitespace-nowrap pt-1 text-end text-xs leading-4 text-text-muted group-hover:block"
+            className="meta hidden whitespace-nowrap pt-1 text-end text-[0.6875rem] text-text-muted group-hover:block"
           >
             {time.format(new Date(m.createdAt))}
           </time>
@@ -182,12 +182,12 @@ export const MessageItem = memo(function MessageItem({
           </button>
         ) : null}
         {!grouped ? (
-          <div className="flex items-baseline gap-2">
-            <bdi className="font-semibold">{name}</bdi>
+          <div className="flex items-baseline gap-2.5">
+            <bdi className="font-semibold tracking-[-0.005em]">{name}</bdi>
             <time
               dateTime={m.createdAt}
               title={full.format(new Date(m.createdAt))}
-              className="text-xs text-text-muted"
+              className="meta text-text-muted"
             >
               {time.format(new Date(m.createdAt))}
             </time>
@@ -210,7 +210,7 @@ export const MessageItem = memo(function MessageItem({
               rows={Math.min(8, draft.split("\n").length + 1)}
               className="w-full resize-none rounded-md border border-border-control bg-bg-input p-2"
             />
-            <div className="flex items-center gap-2 text-xs text-text-muted">
+            <div className="meta flex items-center gap-2 text-text-muted">
               {t("message.edit.hint")}
               <Button variant="ghost" className="min-h-6 px-2 py-0 text-xs" onClick={() => setEditing(false)}>
                 {t("common.cancel")}
@@ -226,7 +226,7 @@ export const MessageItem = memo(function MessageItem({
               <div>
                 <Markdown text={m.content} ctx={ctx} />
                 {m.editedAt ? (
-                  <span className="text-xs text-text-muted" title={full.format(new Date(m.editedAt))}>
+                  <span className="meta text-text-muted" title={full.format(new Date(m.editedAt))}>
                     {" "}
                     {t("message.edited")}
                   </span>

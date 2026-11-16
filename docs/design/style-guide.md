@@ -10,10 +10,10 @@ Everything here becomes CSS variables and Tailwind theme entries in M1 (12 §2, 
 
 ## 1. Principles
 
-1. **Content first, chrome quiet.** Neutral surfaces, one accent colour, colour reserved for state (speaking, live, unread, error).
+1. **Content first, chrome quiet.** Warm graphite surfaces separated by hairlines, near-square corners, one accent colour, colour reserved for state (speaking, live, unread, error). The one loud moment is the sign-in screen (§5.4).
 2. **State is never shown by colour alone.** Every coloured state also has a shape, icon, text or position (WCAG 1.4.1). See §4.
 3. **Keyboard-first.** Every action is reachable and visible-focusable from the keyboard; pointer and touch are equals, not the default (N-011).
-4. **Local only.** No fonts, icons, emoji or scripts from third-party CDNs at runtime (12 §2, 15). System fonts, bundled icons.
+4. **Local only.** No fonts, icons, emoji or scripts from third-party CDNs at runtime (12 §2, 15). Bundled fonts and icons, served from our own origin.
 5. **Built for translation and RTL from day one.** Logical CSS properties, no fixed-width labels, no string concatenation (N-012).
 6. **Calm motion.** Short, purposeful transitions; none at all when the user or OS asks for reduced motion.
 7. **Restrained design system.** A small set of tokens and components (17 §5). New tokens need a reason.
@@ -39,45 +39,45 @@ are translucent (`#RRGGBBAA`).
 
 | Colour token | Light | Dark | High contrast | Use |
 |---|---|---|---|---|
-| `--color-bg-rail` | `#E2E5EA` | `#0E1014` | `#000000` | Instance rail (desktop) |
-| `--color-bg-sidebar` | `#F1F3F6` | `#16191E` | `#000000` | Channel list, member list, settings navigation |
-| `--color-bg` | `#FFFFFF` | `#1D2026` | `#000000` | Main column: messages, settings content |
-| `--color-bg-elevated` | `#FFFFFF` | `#262A31` | `#000000` | Popovers, menus, dialogs, toasts (HC adds a 2 px border) |
-| `--color-bg-input` | `#F3F4F7` | `#2A2E36` | `#000000` | Text fields, composer, selects |
-| `--color-bg-hover` | `#E7EAEF` | `#2C3038` | `#1F1F1F` | Hovered row, ghost button hover |
-| `--color-bg-selected` | `#DADFE6` | `#353A44` | `#2E2E2E` | Selected channel, active navigation item (HC adds a start-edge bar) |
-| `--color-bg-mention` | `#FDF3DC` | `#3A3222` | `#2B2300` | Message that mentions you (with a `--color-warning` start bar) |
-| `--color-bg-video` | `#0A0B0D` | `#000000` | `#000000` | Stream and camera tiles, letterboxing |
+| `--color-bg-rail` | `#E5E0D7` | `#0A0908` | `#000000` | Instance rail (desktop) |
+| `--color-bg-sidebar` | `#EFEBE4` | `#0F0E0C` | `#000000` | Channel list, member list, settings navigation |
+| `--color-bg` | `#F8F6F2` | `#151412` | `#000000` | Main column: messages, settings content |
+| `--color-bg-elevated` | `#FFFFFF` | `#1C1A17` | `#000000` | Popovers, menus, dialogs, toasts (HC adds a 2 px border) |
+| `--color-bg-input` | `#EEEAE3` | `#1A1916` | `#000000` | Text fields, composer, selects |
+| `--color-bg-hover` | `#E8E3DB` | `#211F1C` | `#1F1F1F` | Hovered row, ghost button hover |
+| `--color-bg-selected` | `#DFD9CF` | `#2A2723` | `#2E2E2E` | Selected channel, active navigation item (HC adds a start-edge bar) |
+| `--color-bg-mention` | `#FBE7D5` | `#2C1D11` | `#2B1600` | Message that mentions you (with a `--color-warning` start bar) |
+| `--color-bg-video` | `#0A0908` | `#000000` | `#000000` | Stream and camera tiles, letterboxing |
 | `--color-bg-video-label` | `#000000B8` | `#000000B8` | `#000000E0` | Name and status chips over video |
-| `--color-overlay` | `#0A0B0D99` | `#000000B3` | `#000000D9` | Scrim behind dialogs, drawers and sheets |
-| `--color-text` | `#11161C` | `#ECEFF3` | `#FFFFFF` | Primary text and icons |
-| `--color-text-muted` | `#4B5462` | `#A9B1BE` | `#D9D9D9` | Timestamps, secondary labels, read channels, offline members |
-| `--color-text-disabled` | `#8C95A2` | `#6C7482` | `#9E9E9E` | Disabled labels (exempt from contrast minimums; always paired with a reason) |
-| `--color-text-link` | `#0B6A62` | `#63DCCB` | `#8CD3FF` | Links in messages; always underlined |
+| `--color-overlay` | `#0F0E0C99` | `#000000B3` | `#000000D9` | Scrim behind dialogs, drawers and sheets |
+| `--color-text` | `#0F0E0C` | `#EDEAE5` | `#FFFFFF` | Primary text and icons |
+| `--color-text-muted` | `#5C5852` | `#A39E96` | `#D9D9D9` | Timestamps, secondary labels, read channels, offline members |
+| `--color-text-disabled` | `#9C978F` | `#67625B` | `#9E9E9E` | Disabled labels (exempt from contrast minimums; always paired with a reason) |
+| `--color-text-link` | `#983D00` | `#FF9450` | `#FFB870` | Links in messages; always underlined |
 | `--color-text-on-video` | `#FFFFFF` | `#FFFFFF` | `#FFFFFF` | Text on `--color-bg-video-label` |
-| `--color-accent` | `#0F766E` | `#34C3B0` | `#5CC8FF` | Primary buttons, switch on-state, slider fill, selected radio |
-| `--color-accent-hover` | `#0B5F58` | `#5ED6C5` | `#9ADEFF` | Hover and pressed accent fills |
-| `--color-accent-text` | `#0B6A62` | `#63DCCB` | `#5CC8FF` | Accent-coloured text: active tab, link-style buttons |
-| `--color-text-on-accent` | `#FFFFFF` | `#04211D` | `#000000` | Labels on accent fills |
-| `--color-border` | `#DADFE6` | `#30353E` | `#8A8A8A` | Dividers and card outlines (decorative) |
-| `--color-border-control` | `#7B8595` | `#7C8595` | `#FFFFFF` | Outlines of inputs, checkboxes, radios, switch and slider tracks |
+| `--color-accent` | `#C24E00` | `#E86101` | `#FF9F43` | Primary buttons, switch on-state, slider fill, selected radio |
+| `--color-accent-hover` | `#A04000` | `#FF7A1F` | `#FFB870` | Hover and pressed accent fills |
+| `--color-accent-text` | `#983D00` | `#FF9450` | `#FF9F43` | Accent-coloured text: active tab, link-style buttons |
+| `--color-text-on-accent` | `#FFFFFF` | `#0F0E0C` | `#000000` | Labels on accent fills |
+| `--color-border` | `#DCD6CC` | `#2A2723` | `#8A8A8A` | Dividers and card outlines (decorative) |
+| `--color-border-control` | `#86807A` | `#6F6A63` | `#FFFFFF` | Outlines of inputs, checkboxes, radios, switch and slider tracks |
 | `--color-focus` | `#1F5FD1` | `#7EB0FF` | `#FFD60A` | Focus ring; deliberately not the accent, so focus never looks like selection |
-| `--color-danger` | `#C4261C` | `#D02F25` | `#FF6B6B` | Destructive buttons, mention badges, muted-mic icons |
+| `--color-danger` | `#C8262E` | `#D7303A` | `#FF6B6B` | Destructive buttons, mention badges, muted-mic icons |
 | `--color-text-on-danger` | `#FFFFFF` | `#FFFFFF` | `#000000` | Labels on danger fills |
-| `--color-danger-text` | `#B42318` | `#FF8F85` | `#FF8F8F` | Error messages, destructive text buttons |
-| `--color-danger-bg-subtle` | `#FDECEA` | `#3D1F1E` | `#330000` | Error banner background |
-| `--color-warning` | `#B54708` | `#F6BE5C` | `#FFD60A` | Mention start bar, warning icons |
-| `--color-warning-text` | `#8F3A06` | `#F6BE5C` | `#FFD60A` | Warning text |
-| `--color-warning-bg-subtle` | `#FEF2DF` | `#3A2D15` | `#332B00` | Warning banner background |
-| `--color-success-text` | `#067647` | `#52E0A0` | `#5CFF9D` | Success text ("Connected", test passed) |
-| `--color-success-bg-subtle` | `#E5F5EC` | `#15301F` | `#00331A` | Success banner background |
-| `--color-speaking` | `#0C8A4C` | `#3DDC84` | `#5CFF9D` | Speaking ring around avatars and tiles (2 px; HC 3 px) |
-| `--color-live` | `#C4261C` | `#D02F25` | `#FF6B6B` | LIVE badge fill |
+| `--color-danger-text` | `#B0202A` | `#FF8A85` | `#FF8F8F` | Error messages, destructive text buttons |
+| `--color-danger-bg-subtle` | `#F9E3E0` | `#321613` | `#330000` | Error banner background |
+| `--color-warning` | `#9A6400` | `#F2C14E` | `#FFD60A` | Mention start bar, warning icons |
+| `--color-warning-text` | `#7A5000` | `#F2C14E` | `#FFD60A` | Warning text |
+| `--color-warning-bg-subtle` | `#F7EDD5` | `#2D2410` | `#332B00` | Warning banner background |
+| `--color-success-text` | `#14713D` | `#5ED38A` | `#5CFF9D` | Success text ("Connected", test passed) |
+| `--color-success-bg-subtle` | `#E2F0E4` | `#13261A` | `#00331A` | Success banner background |
+| `--color-speaking` | `#16853F` | `#4ADE80` | `#5CFF9D` | Speaking ring around avatars and tiles (2 px; HC 3 px) |
+| `--color-live` | `#C8262E` | `#D7303A` | `#FF6B6B` | LIVE badge fill |
 | `--color-text-on-live` | `#FFFFFF` | `#FFFFFF` | `#000000` | LIVE badge label |
-| `--color-presence-online` | `#12854C` | `#3DDC84` | `#5CFF9D` | Online: filled circle |
-| `--color-presence-idle` | `#A65A06` | `#F6BE5C` | `#FFD60A` | Idle: crescent |
-| `--color-presence-dnd` | `#C4261C` | `#F2555A` | `#FF6B6B` | Do not disturb: circle with a bar |
-| `--color-presence-offline` | `#737D8C` | `#808999` | `#BDBDBD` | Offline and invisible: hollow ring |
+| `--color-presence-online` | `#16853F` | `#4ADE80` | `#5CFF9D` | Online: filled circle |
+| `--color-presence-idle` | `#9A6400` | `#F2C14E` | `#FFD60A` | Idle: crescent |
+| `--color-presence-dnd` | `#C8262E` | `#F2555A` | `#FF6B6B` | Do not disturb: circle with a bar |
+| `--color-presence-offline` | `#7C776F` | `#857F77` | `#BDBDBD` | Offline and invisible: hollow ring |
 
 Role colours (06 `role.color`) are user-chosen, so they are **never used for text**. A role
 shows its colour as a small dot beside the role name and in the role pill border; member
@@ -170,87 +170,89 @@ edit by hand). High contrast is checked against the same minimums but is designe
 <!-- contrast:begin -->
 | Foreground | Background | Min | Light | Dark | High contrast |
 |---|---|---|---|---|---|
-| `--color-text` | `--color-bg` | 4.5 | 18.18 | 14.15 | 21.00 |
-| `--color-text` | `--color-bg-sidebar` | 4.5 | 16.35 | 15.28 | 21.00 |
-| `--color-text` | `--color-bg-rail` | 4.5 | 14.39 | 16.51 | 21.00 |
-| `--color-text` | `--color-bg-elevated` | 4.5 | 18.18 | 12.49 | 21.00 |
-| `--color-text` | `--color-bg-input` | 4.5 | 16.53 | 11.80 | 21.00 |
-| `--color-text` | `--color-bg-hover` | 4.5 | 15.07 | 11.47 | 16.48 |
-| `--color-text` | `--color-bg-selected` | 4.5 | 13.57 | 9.89 | 13.58 |
-| `--color-text` | `--color-bg-mention` | 4.5 | 16.47 | 10.97 | 15.64 |
-| `--color-text` | `--color-danger-bg-subtle` | 4.5 | 15.89 | 12.88 | 18.41 |
-| `--color-text` | `--color-warning-bg-subtle` | 4.5 | 16.43 | 11.63 | 14.13 |
-| `--color-text` | `--color-success-bg-subtle` | 4.5 | 16.10 | 12.35 | 14.11 |
-| `--color-text-muted` | `--color-bg` | 4.5 | 7.65 | 7.55 | 14.88 |
-| `--color-text-muted` | `--color-bg-sidebar` | 4.5 | 6.89 | 8.15 | 14.88 |
-| `--color-text-muted` | `--color-bg-elevated` | 4.5 | 7.65 | 6.67 | 14.88 |
-| `--color-text-muted` | `--color-bg-input` | 4.5 | 6.96 | 6.30 | 14.88 |
-| `--color-text-muted` | `--color-bg-hover` | 4.5 | 6.35 | 6.12 | 11.68 |
-| `--color-text-muted` | `--color-bg-selected` | 4.5 | 5.71 | 5.28 | 9.62 |
-| `--color-text-muted` | `--color-bg-mention` | 4.5 | 6.94 | 5.86 | 11.08 |
-| `--color-text-link` | `--color-bg` | 4.5 | 6.46 | 9.81 | 12.88 |
-| `--color-text-link` | `--color-bg-hover` | 4.5 | 5.35 | 7.96 | 10.11 |
-| `--color-text-link` | `--color-bg-mention` | 4.5 | 5.85 | 7.61 | 9.59 |
-| `--color-text-link` | `--color-bg-elevated` | 4.5 | 6.46 | 8.66 | 12.88 |
-| `--color-accent-text` | `--color-bg` | 4.5 | 6.46 | 9.81 | 11.16 |
-| `--color-accent-text` | `--color-bg-sidebar` | 4.5 | 5.81 | 10.60 | 11.16 |
-| `--color-accent-text` | `--color-bg-elevated` | 4.5 | 6.46 | 8.66 | 11.16 |
-| `--color-accent-text` | `--color-bg-hover` | 4.5 | 5.35 | 7.96 | 8.76 |
-| `--color-accent-text` | `--color-bg-selected` | 4.5 | 4.82 | 6.86 | 7.22 |
-| `--color-text-on-accent` | `--color-accent` | 4.5 | 5.47 | 7.72 | 11.16 |
-| `--color-text-on-accent` | `--color-accent-hover` | 4.5 | 7.52 | 9.59 | 14.27 |
-| `--color-text-on-danger` | `--color-danger` | 4.5 | 5.77 | 5.10 | 7.57 |
-| `--color-text-on-live` | `--color-live` | 4.5 | 5.77 | 5.10 | 7.57 |
-| `--color-danger-text` | `--color-bg` | 4.5 | 6.57 | 7.40 | 9.58 |
-| `--color-danger-text` | `--color-bg-sidebar` | 4.5 | 5.91 | 7.99 | 9.58 |
-| `--color-danger-text` | `--color-bg-elevated` | 4.5 | 6.57 | 6.53 | 9.58 |
-| `--color-danger-text` | `--color-danger-bg-subtle` | 4.5 | 5.75 | 6.74 | 8.40 |
-| `--color-warning-text` | `--color-bg` | 4.5 | 7.57 | 9.67 | 14.88 |
-| `--color-warning-text` | `--color-bg-elevated` | 4.5 | 7.57 | 8.53 | 14.88 |
-| `--color-warning-text` | `--color-warning-bg-subtle` | 4.5 | 6.84 | 7.94 | 10.01 |
-| `--color-success-text` | `--color-bg` | 4.5 | 5.69 | 9.74 | 16.25 |
-| `--color-success-text` | `--color-bg-sidebar` | 4.5 | 5.12 | 10.51 | 16.25 |
-| `--color-success-text` | `--color-bg-elevated` | 4.5 | 5.69 | 8.59 | 16.25 |
-| `--color-success-text` | `--color-success-bg-subtle` | 4.5 | 5.04 | 8.50 | 10.91 |
+| `--color-text` | `--color-bg` | 4.5 | 17.87 | 15.34 | 21.00 |
+| `--color-text` | `--color-bg-sidebar` | 4.5 | 16.24 | 16.08 | 21.00 |
+| `--color-text` | `--color-bg-rail` | 4.5 | 14.68 | 16.58 | 21.00 |
+| `--color-text` | `--color-bg-elevated` | 4.5 | 19.29 | 14.47 | 21.00 |
+| `--color-text` | `--color-bg-input` | 4.5 | 16.09 | 14.65 | 21.00 |
+| `--color-text` | `--color-bg-hover` | 4.5 | 15.11 | 13.70 | 16.48 |
+| `--color-text` | `--color-bg-selected` | 4.5 | 13.75 | 12.39 | 13.58 |
+| `--color-text` | `--color-bg-mention` | 4.5 | 16.07 | 13.56 | 17.25 |
+| `--color-text` | `--color-danger-bg-subtle` | 4.5 | 15.70 | 13.89 | 18.41 |
+| `--color-text` | `--color-warning-bg-subtle` | 4.5 | 16.56 | 12.76 | 14.13 |
+| `--color-text` | `--color-success-bg-subtle` | 4.5 | 16.37 | 13.26 | 14.11 |
+| `--color-text-muted` | `--color-bg` | 4.5 | 6.54 | 6.92 | 14.88 |
+| `--color-text-muted` | `--color-bg-sidebar` | 4.5 | 5.95 | 7.25 | 14.88 |
+| `--color-text-muted` | `--color-bg-elevated` | 4.5 | 7.06 | 6.52 | 14.88 |
+| `--color-text-muted` | `--color-bg-input` | 4.5 | 5.89 | 6.60 | 14.88 |
+| `--color-text-muted` | `--color-bg-hover` | 4.5 | 5.53 | 6.18 | 11.68 |
+| `--color-text-muted` | `--color-bg-selected` | 4.5 | 5.03 | 5.58 | 9.62 |
+| `--color-text-muted` | `--color-bg-mention` | 4.5 | 5.88 | 6.11 | 12.22 |
+| `--color-text-link` | `--color-bg` | 4.5 | 6.48 | 8.42 | 12.34 |
+| `--color-text-link` | `--color-bg-hover` | 4.5 | 5.48 | 7.52 | 9.69 |
+| `--color-text-link` | `--color-bg-mention` | 4.5 | 5.83 | 7.44 | 10.14 |
+| `--color-text-link` | `--color-bg-elevated` | 4.5 | 6.99 | 7.94 | 12.34 |
+| `--color-accent-text` | `--color-bg` | 4.5 | 6.48 | 8.42 | 10.29 |
+| `--color-accent-text` | `--color-bg-sidebar` | 4.5 | 5.89 | 8.82 | 10.29 |
+| `--color-accent-text` | `--color-bg-elevated` | 4.5 | 6.99 | 7.94 | 10.29 |
+| `--color-accent-text` | `--color-bg-hover` | 4.5 | 5.48 | 7.52 | 8.08 |
+| `--color-accent-text` | `--color-bg-selected` | 4.5 | 4.98 | 6.80 | 6.66 |
+| `--color-text-on-accent` | `--color-accent` | 4.5 | 4.79 | 5.64 | 10.29 |
+| `--color-text-on-accent` | `--color-accent-hover` | 4.5 | 6.51 | 7.40 | 12.34 |
+| `--color-text-on-danger` | `--color-danger` | 4.5 | 5.57 | 4.80 | 7.57 |
+| `--color-text-on-live` | `--color-live` | 4.5 | 5.57 | 4.80 | 7.57 |
+| `--color-danger-text` | `--color-bg` | 4.5 | 6.30 | 8.09 | 9.58 |
+| `--color-danger-text` | `--color-bg-sidebar` | 4.5 | 5.73 | 8.48 | 9.58 |
+| `--color-danger-text` | `--color-bg-elevated` | 4.5 | 6.80 | 7.63 | 9.58 |
+| `--color-danger-text` | `--color-danger-bg-subtle` | 4.5 | 5.54 | 7.32 | 8.40 |
+| `--color-warning-text` | `--color-bg` | 4.5 | 6.54 | 10.97 | 14.88 |
+| `--color-warning-text` | `--color-bg-elevated` | 4.5 | 7.06 | 10.35 | 14.88 |
+| `--color-warning-text` | `--color-warning-bg-subtle` | 4.5 | 6.06 | 9.12 | 10.01 |
+| `--color-success-text` | `--color-bg` | 4.5 | 5.62 | 9.78 | 16.25 |
+| `--color-success-text` | `--color-bg-sidebar` | 4.5 | 5.11 | 10.25 | 16.25 |
+| `--color-success-text` | `--color-bg-elevated` | 4.5 | 6.07 | 9.23 | 16.25 |
+| `--color-success-text` | `--color-success-bg-subtle` | 4.5 | 5.15 | 8.46 | 10.91 |
 | `--color-text-on-video` | `--color-bg-video-label` | 4.5 | 9.29 | 9.29 | 16.48 |
-| `--color-focus` | `--color-bg` | 3 | 5.81 | 7.41 | 14.88 |
-| `--color-focus` | `--color-bg-sidebar` | 3 | 5.22 | 8.00 | 14.88 |
-| `--color-focus` | `--color-bg-rail` | 3 | 4.60 | 8.65 | 14.88 |
-| `--color-focus` | `--color-bg-elevated` | 3 | 5.81 | 6.54 | 14.88 |
-| `--color-focus` | `--color-bg-input` | 3 | 5.28 | 6.19 | 14.88 |
-| `--color-focus` | `--color-bg-selected` | 3 | 4.34 | 5.19 | 9.62 |
-| `--color-focus` | `--color-bg-video` | 3 | 3.39 | 9.54 | 14.88 |
-| `--color-border-control` | `--color-bg` | 3 | 3.73 | 4.39 | 21.00 |
-| `--color-border-control` | `--color-bg-sidebar` | 3 | 3.35 | 4.74 | 21.00 |
-| `--color-border-control` | `--color-bg-elevated` | 3 | 3.73 | 3.87 | 21.00 |
-| `--color-border-control` | `--color-bg-input` | 3 | 3.39 | 3.66 | 21.00 |
-| `--color-accent` | `--color-bg` | 3 | 5.47 | 7.44 | 11.16 |
-| `--color-accent` | `--color-bg-sidebar` | 3 | 4.92 | 8.04 | 11.16 |
-| `--color-accent` | `--color-bg-elevated` | 3 | 5.47 | 6.57 | 11.16 |
-| `--color-speaking` | `--color-bg-sidebar` | 3 | 3.97 | 9.87 | 16.25 |
-| `--color-speaking` | `--color-bg` | 3 | 4.42 | 9.15 | 16.25 |
-| `--color-speaking` | `--color-bg-video` | 3 | 4.46 | 11.77 | 16.25 |
-| `--color-presence-online` | `--color-bg-sidebar` | 3 | 4.21 | 9.87 | 16.25 |
-| `--color-presence-online` | `--color-bg-elevated` | 3 | 4.68 | 8.07 | 16.25 |
-| `--color-presence-idle` | `--color-bg-sidebar` | 3 | 4.62 | 10.44 | 14.88 |
-| `--color-presence-idle` | `--color-bg-elevated` | 3 | 5.14 | 8.53 | 14.88 |
-| `--color-presence-dnd` | `--color-bg-sidebar` | 3 | 5.19 | 5.22 | 7.57 |
-| `--color-presence-dnd` | `--color-bg-elevated` | 3 | 5.77 | 4.27 | 7.57 |
-| `--color-presence-offline` | `--color-bg-sidebar` | 3 | 3.75 | 5.00 | 11.18 |
-| `--color-presence-offline` | `--color-bg-elevated` | 3 | 4.17 | 4.09 | 11.18 |
-| `--color-danger` | `--color-bg-sidebar` | 3 | 5.19 | 3.45 | 7.57 |
-| `--color-danger` | `--color-bg` | 3 | 5.77 | 3.20 | 7.57 |
-| `--color-warning` | `--color-bg-mention` | 3 | 4.92 | 7.50 | 11.07 |
+| `--color-focus` | `--color-bg` | 3 | 5.38 | 8.36 | 14.88 |
+| `--color-focus` | `--color-bg-sidebar` | 3 | 4.89 | 8.77 | 14.88 |
+| `--color-focus` | `--color-bg-rail` | 3 | 4.42 | 9.04 | 14.88 |
+| `--color-focus` | `--color-bg-elevated` | 3 | 5.81 | 7.89 | 14.88 |
+| `--color-focus` | `--color-bg-input` | 3 | 4.84 | 7.99 | 14.88 |
+| `--color-focus` | `--color-bg-selected` | 3 | 4.14 | 6.75 | 9.62 |
+| `--color-focus` | `--color-bg-video` | 3 | 3.43 | 9.54 | 14.88 |
+| `--color-border-control` | `--color-bg` | 3 | 3.61 | 3.43 | 21.00 |
+| `--color-border-control` | `--color-bg-sidebar` | 3 | 3.28 | 3.60 | 21.00 |
+| `--color-border-control` | `--color-bg-elevated` | 3 | 3.90 | 3.24 | 21.00 |
+| `--color-border-control` | `--color-bg-input` | 3 | 3.25 | 3.28 | 21.00 |
+| `--color-accent` | `--color-bg` | 3 | 4.44 | 5.38 | 10.29 |
+| `--color-accent` | `--color-bg-sidebar` | 3 | 4.03 | 5.64 | 10.29 |
+| `--color-accent` | `--color-bg-elevated` | 3 | 4.79 | 5.08 | 10.29 |
+| `--color-speaking` | `--color-bg-sidebar` | 3 | 3.96 | 11.07 | 16.25 |
+| `--color-speaking` | `--color-bg` | 3 | 4.36 | 10.57 | 16.25 |
+| `--color-speaking` | `--color-bg-video` | 3 | 4.23 | 12.05 | 16.25 |
+| `--color-presence-online` | `--color-bg-sidebar` | 3 | 3.96 | 11.07 | 16.25 |
+| `--color-presence-online` | `--color-bg-elevated` | 3 | 4.71 | 9.96 | 16.25 |
+| `--color-presence-idle` | `--color-bg-sidebar` | 3 | 4.21 | 11.50 | 14.88 |
+| `--color-presence-idle` | `--color-bg-elevated` | 3 | 5.00 | 10.35 | 14.88 |
+| `--color-presence-dnd` | `--color-bg-sidebar` | 3 | 4.68 | 5.72 | 7.57 |
+| `--color-presence-dnd` | `--color-bg-elevated` | 3 | 5.57 | 5.14 | 7.57 |
+| `--color-presence-offline` | `--color-bg-sidebar` | 3 | 3.74 | 4.87 | 11.18 |
+| `--color-presence-offline` | `--color-bg-elevated` | 3 | 4.44 | 4.38 | 11.18 |
+| `--color-danger` | `--color-bg-sidebar` | 3 | 4.68 | 4.02 | 7.57 |
+| `--color-danger` | `--color-bg` | 3 | 5.16 | 3.83 | 7.57 |
+| `--color-warning` | `--color-bg-mention` | 3 | 4.17 | 9.69 | 12.22 |
 <!-- contrast:end -->
 
 ### 3.2 Accent presets
 
 The accent is customisable per user (12 §13) from a **curated set** rather than a free colour
 picker (U6, approved), so every option is checked in advance. The high-contrast theme keeps its own accent.
-Teal is the default and matches the token table above.
+Ember (the orange of the Tin Can mark) is the default and matches the token table above. It replaced Teal as the default and Amber as a preset in the 2026-11 visual overhaul; a stored Amber falls back to Ember.
 
 | Accent preset | Theme | `--color-accent` | `--color-accent-hover` | `--color-accent-text` | `--color-text-on-accent` |
 |---|---|---|---|---|---|
+| Ember | Light | `#C24E00` | `#A04000` | `#983D00` | `#FFFFFF` |
+| Ember | Dark | `#E86101` | `#FF7A1F` | `#FF9450` | `#0F0E0C` |
 | Teal | Light | `#0F766E` | `#0B5F58` | `#0B6A62` | `#FFFFFF` |
 | Teal | Dark | `#34C3B0` | `#5ED6C5` | `#63DCCB` | `#04211D` |
 | Blue | Light | `#2557D6` | `#1C45AD` | `#1F4FC4` | `#FFFFFF` |
@@ -259,32 +261,30 @@ Teal is the default and matches the token table above.
 | Violet | Dark | `#A58BFF` | `#BDA9FF` | `#B9A5FF` | `#160B33` |
 | Rose | Light | `#C0245C` | `#9C1C4A` | `#AE1F53` | `#FFFFFF` |
 | Rose | Dark | `#FF7AA8` | `#FF9DBE` | `#FF94B9` | `#33081A` |
-| Amber | Light | `#A34F00` | `#853F00` | `#8F4500` | `#FFFFFF` |
-| Amber | Dark | `#F2B13D` | `#F6C467` | `#F6BE5C` | `#2B1A00` |
 | Green | Light | `#13773F` | `#0E5F32` | `#0F6D39` | `#FFFFFF` |
 | Green | Dark | `#45C97A` | `#6CD898` | `#62D690` | `#052211` |
-| Graphite | Light | `#39414D` | `#262C35` | `#39414D` | `#FFFFFF` |
-| Graphite | Dark | `#B8C0CC` | `#D0D6DE` | `#C3CAD4` | `#11161C` |
+| Graphite | Light | `#3A3631` | `#26231F` | `#3A3631` | `#FFFFFF` |
+| Graphite | Dark | `#C9C3BA` | `#DDD8D0` | `#D2CCC3` | `#0F0E0C` |
 
 Each preset is checked against every accent pairing in §3.1 for its theme:
 
 <!-- accents:begin -->
 | Preset | Theme | Pairings | Lowest ratio | Lowest pairing |
 |---|---|---|---|---|
-| Teal | Light | 10 | 4.82 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Teal | Dark | 10 | 6.86 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Blue | Light | 10 | 5.27 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Blue | Dark | 10 | 5.36 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Violet | Light | 10 | 5.55 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Violet | Dark | 10 | 5.37 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Rose | Light | 10 | 5.02 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Rose | Dark | 10 | 5.54 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Amber | Light | 10 | 5.19 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Amber | Dark | 10 | 6.76 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Green | Light | 10 | 4.80 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Green | Dark | 10 | 6.27 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Graphite | Light | 10 | 7.70 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
-| Graphite | Dark | 10 | 6.91 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Ember | Light | 10 | 4.79 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Ember | Dark | 10 | 5.64 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Teal | Light | 10 | 4.60 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Teal | Dark | 10 | 7.72 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Blue | Light | 10 | 5.03 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Blue | Dark | 10 | 6.77 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Violet | Light | 10 | 5.30 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Violet | Dark | 10 | 6.85 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Rose | Light | 10 | 4.80 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Rose | Dark | 10 | 7.21 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Green | Light | 10 | 4.58 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Green | Dark | 10 | 7.95 (min 4.5) | `--color-text-on-accent` on `--color-accent` |
+| Graphite | Light | 10 | 8.54 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
+| Graphite | Dark | 10 | 9.32 (min 4.5) | `--color-accent-text` on `--color-bg-selected` |
 <!-- accents:end -->
 
 ## 4. State without colour
@@ -307,19 +307,24 @@ Each preset is checked against every accent pairing in §3.1 for its theme:
 
 ## 5. Typography
 
-### 5.1 Font stacks (system only, nothing downloaded)
+### 5.1 Typefaces (bundled, served from our own origin)
+
+| Token | Face | Use |
+|---|---|---|
+| `--font-display` | Space Grotesk (variable) | Instance name, page and dialog titles, channel header, headings `h1`–`h3` |
+| `--font-sans` | Inter (variable) | Interface and message text |
+| `--font-mono` | IBM Plex Mono 400 / 500 | Metadata: timestamps, counts, category and section labels, hints, code |
 
 ```css
---font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell,
-             "Helvetica Neue", Arial, sans-serif,
-             "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
---font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas,
-             "Liberation Mono", "DejaVu Sans Mono", Menlo, monospace;
+--font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, …, sans-serif, emoji fonts;
+--font-sans:    "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, …, sans-serif, emoji fonts;
+--font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", …, monospace;
 ```
 
-- `system-ui` picks the right face per script and locale (CJK, Arabic, Hebrew, Cyrillic), which a single bundled Latin font cannot.
+- The faces come from the `@fontsource` packages (SIL OFL 1.1) and are bundled by Vite; the CSP's `font-src 'self'` needs nothing else. Each face loads only the unicode ranges a page uses.
+- The system stack stays behind each face, so scripts the bundled faces do not cover (CJK, Arabic, Hebrew, Thai) and emoji still render with the OS fonts.
 - Emoji render with the OS emoji font. Emoji picker data is bundled (12 §2); no emoji images are fetched.
-- No bundled text font in v1 (U11, approved).
+- Supersedes U11 ("no bundled text font in v1") with the 2026-11 visual overhaul.
 
 ### 5.2 Type scale
 
@@ -338,10 +343,22 @@ scales the whole UI. Line heights are on a 2 px grid.
 
 Rules:
 - Weights in use: 400, 500, 600, 700. Synthetic bold is avoided by sticking to these.
-- Category labels ("Text channels") use `--text-xs`, weight 600, muted, letter-spacing 0.02em and **no uppercase transform** (scripts without case; screen readers spelling words out).
+- Category labels ("Text channels"), member group labels, timestamps and hints use the `meta` utility: `--font-mono`, `--text-xs`, muted, letter-spacing 0.02em, tabular figures and **no uppercase transform** (scripts without case; screen readers spelling words out). A hairline rule usually runs from the label to the end of the row.
 - `font-variant-numeric: tabular-nums` for timers, meters, counts, file sizes and latency.
 - Text containers never have a fixed height; tall scripts (Thai, Devanagari) must not clip.
 - Description text in settings and dialogs is capped at 65ch.
+
+### 5.3 Type in use
+
+- Display headings are set tight (letter-spacing −0.02em; the sign-in instance name −0.045em) and bold.
+- The channel header pairs the display name with an accent `#`; the selected channel, the active settings page and the dialog top edge carry a 2 px accent bar.
+- Tags (owner, roles) use the `tag` utility: mono text on a 10 % accent wash with a hairline in the accent.
+
+### 5.4 The grille
+
+The one decorative device: a dot matrix like the perforated face of a speaker (`grille`, `grille-soft`, `glow`
+utilities in `styles.css`). It sits behind the instance name on the sign-in screens and, softened, behind an empty
+channel. It is hidden in high contrast and forced colours. Nothing else in the app is decorative.
 
 ## 6. Spacing, sizing and layout
 
@@ -386,11 +403,13 @@ targets to 44 px.
 
 | Token | Value | Use |
 |---|---|---|
-| `--radius-sm` | 4px | Badges, checkboxes, keyboard chips |
-| `--radius-md` | 6px | Buttons, inputs, menu items, channel rows |
-| `--radius-lg` | 8px | Cards, popovers, menus, filmstrip tiles |
-| `--radius-xl` | 12px | Dialogs, sheets (top corners only on compact), stream tiles, instance icons |
-| `--radius-full` | 9999px | Avatars, presence, pills, switch |
+| `--radius-sm` | 1px | Badges, tags, checkboxes, keyboard chips |
+| `--radius-md` | 2px | Buttons, inputs, menu items, channel rows, avatars |
+| `--radius-lg` | 2px | Cards, popovers, menus, filmstrip tiles |
+| `--radius-xl` | 3px | Dialogs, sheets, stream tiles, instance icons |
+| `--radius-full` | 9999px | Presence, switch (shapes whose roundness carries meaning) |
+
+Corners are near-square throughout; avatars are square tiles.
 
 Instance icons keep one shape (no morph-on-hover animation).
 

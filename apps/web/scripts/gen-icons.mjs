@@ -13,7 +13,7 @@ const sharp = server("sharp");
 const pub = (name) => fileURLToPath(new URL(`../public/${name}`, import.meta.url));
 
 /** The page colour of the light theme. Only the maskable icon sits on it: the OS crops that one to its own shape. */
-const BACKDROP = "#F1F3F6";
+const BACKDROP = "#EFEBE4";
 const logo = await readFile(pub("brand/logo.svg"));
 
 /**

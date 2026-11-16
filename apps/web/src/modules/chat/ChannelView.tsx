@@ -152,12 +152,12 @@ export function ChannelView() {
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border ps-4 pe-4 md:pe-56">
-        <Hash aria-hidden="true" size={20} className="shrink-0 text-text-muted" />
-        <h1 className="truncate text-lg">
+        <Hash aria-hidden="true" size={18} strokeWidth={2.25} className="shrink-0 text-accent-text" />
+        <h1 className="truncate text-lg font-bold">
           <bdi>{channel.name}</bdi>
         </h1>
         {channel.topic ? (
-          <p className="hidden min-w-0 flex-1 truncate border-s border-border ps-3 text-sm text-text-muted md:block">
+          <p className="ms-1 hidden min-w-0 flex-1 truncate border-s border-border ps-3 text-sm text-text-muted md:block">
             {channel.topic}
           </p>
         ) : (

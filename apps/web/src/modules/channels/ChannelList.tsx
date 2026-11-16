@@ -77,9 +77,19 @@ function ChannelRow({
   const label = (
     <>
       {isVoice ? (
-        <Volume2 aria-hidden="true" size={16} className="shrink-0" />
+        <Volume2
+          aria-hidden="true"
+          size={16}
+          strokeWidth={1.75}
+          className="shrink-0 opacity-70 group-aria-[current=page]/row:text-accent-text group-aria-[current=page]/row:opacity-100"
+        />
       ) : (
-        <Hash aria-hidden="true" size={16} className="shrink-0" />
+        <Hash
+          aria-hidden="true"
+          size={16}
+          strokeWidth={1.75}
+          className="shrink-0 opacity-70 group-aria-[current=page]/row:text-accent-text group-aria-[current=page]/row:opacity-100"
+        />
       )}
       <bdi className={`min-w-0 flex-1 truncate ${unread || mentions > 0 ? "font-semibold" : ""}`}>
         {channel.name}
@@ -96,7 +106,7 @@ function ChannelRow({
           onClick={() => void joinVoice(channel.id).catch(toastError)}
           aria-label={t("channel.voice.join", { name: channel.name })}
           className={({ isActive }) =>
-            `flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""}`
+            `group/row relative flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : "text-text-muted"}`
           }
         >
           {label}
@@ -105,7 +115,7 @@ function ChannelRow({
         <NavLink
           to={`/channels/${channel.id}`}
           className={({ isActive }) =>
-            `flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-text no-underline hover:bg-bg-hover ${isActive ? "bg-bg-selected" : ""} ${muted ? "text-text-muted" : ""}`
+            `group/row relative flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-sm no-underline hover:bg-bg-hover hover:text-text ${isActive ? "bg-bg-selected text-text before:absolute before:inset-y-1.5 before:start-0 before:w-0.5 before:bg-accent" : unread || mentions > 0 ? "text-text" : "text-text-muted"} ${muted ? "text-text-muted" : ""}`
           }
           aria-label={
             mentions > 0
@@ -116,13 +126,13 @@ function ChannelRow({
           }
         >
           {unread && mentions === 0 ? (
-            <span aria-hidden="true" className="absolute -start-1 size-2 rounded-full bg-text" />
+            <span aria-hidden="true" className="absolute -start-2 size-1.5 bg-text" />
           ) : null}
           {label}
           {mentions > 0 ? (
             <span
               aria-hidden="true"
-              className="ms-auto min-w-5 rounded-full bg-danger px-1.5 text-center text-xs font-semibold text-text-on-danger"
+              className="meta ms-auto min-w-5 rounded-sm bg-danger px-1 text-center font-medium text-text-on-danger"
             >
               {mentions}
             </span>
@@ -195,7 +205,7 @@ function ChannelRow({
                         {(["default", "all", "mentions", "none"] as const).map((v) => (
                           <Menu.RadioItem key={v} value={v} className={menuItem}>
                             <span className="inline-block w-4 text-center" aria-hidden="true">
-                              <Menu.ItemIndicator>•</Menu.ItemIndicator>
+                              <Menu.ItemIndicator className="inline-block size-1.5 bg-accent align-middle" />
                             </span>
                             {t(`notifications.level.${v}`)}
                           </Menu.RadioItem>
@@ -276,23 +286,22 @@ function CategoryGroup({
   const unreadInside = channels.some((c) => isUnread(read[c.id]) || (read[c.id]?.mentionCount ?? 0) > 0);
   const name = category?.name ?? t("channel.uncategorised");
   return (
-    <section aria-label={name} className="mb-2">
-      <div className="flex items-center gap-1 px-1">
+    <section aria-label={name} className="mb-3">
+      <div className="flex items-center gap-1 ps-2 pe-1">
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen(!open)}
-          className="flex min-h-7 flex-1 items-center gap-1 rounded-md px-1 text-xs font-semibold uppercase tracking-wide text-text-muted hover:text-text"
+          className="meta flex min-h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-text-muted hover:text-text"
         >
           {open ? (
-            <ChevronDown aria-hidden="true" size={14} />
+            <ChevronDown aria-hidden="true" size={12} className="shrink-0" />
           ) : (
-            <ChevronRight aria-hidden="true" size={14} />
+            <ChevronRight aria-hidden="true" size={12} className="shrink-0 rtl:-scale-x-100" />
           )}
           <bdi className="truncate">{name}</bdi>
-          {!open && unreadInside ? (
-            <span aria-hidden="true" className="ms-1 size-2 rounded-full bg-text" />
-          ) : null}
+          {!open && unreadInside ? <span aria-hidden="true" className="size-1.5 shrink-0 bg-text" /> : null}
+          <span aria-hidden="true" className="ms-1 h-px min-w-4 flex-1 bg-border" />
         </button>
         {canManage ? (
           <button
@@ -339,7 +348,7 @@ export function ChannelList() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto py-2" role="navigation" aria-label={t("channel.list")}>
+    <div className="flex-1 overflow-y-auto py-3" role="navigation" aria-label={t("channel.list")}>
       {loose.length > 0 ? (
         <CategoryGroup
           category={null}

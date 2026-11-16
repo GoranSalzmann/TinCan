@@ -6,8 +6,11 @@ import { ACCENT_NAMES, ACCENT_PRESETS, COLOR_TOKENS, type ThemeName } from "./to
  * rewrites the file; `theme.test.ts` fails when it is stale.
  */
 
-const FONT_SANS = `system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
-const FONT_MONO = `ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", "DejaVu Sans Mono", Menlo, monospace`;
+// Bundled faces first (src/fonts.css, served from our own origin: the CSP allows `font-src 'self'` only), then the
+// system stack, which still covers scripts the bundled faces do not (CJK, Arabic, Hebrew, Thai) and emoji.
+const FONT_DISPLAY = `"Space Grotesk Variable", "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
+const FONT_SANS = `"Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
+const FONT_MONO = `"IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", "DejaVu Sans Mono", Menlo, monospace`;
 
 /** Style guide §5.2: size, line height, weight. */
 const TYPE_SCALE: [string, string, string, number][] = [
@@ -19,12 +22,12 @@ const TYPE_SCALE: [string, string, string, number][] = [
   ["2xl", "1.5rem", "2rem", 700],
 ];
 
-/** Style guide §7. */
+/** Style guide §7: near-square corners everywhere; only shapes that carry meaning (presence, switch) stay round. */
 const RADII: [string, string][] = [
-  ["sm", "4px"],
-  ["md", "6px"],
-  ["lg", "8px"],
-  ["xl", "12px"],
+  ["sm", "1px"],
+  ["md", "2px"],
+  ["lg", "2px"],
+  ["xl", "3px"],
   ["full", "9999px"],
 ];
 
@@ -86,7 +89,11 @@ export function renderTokensCss(): string {
   // Tailwind theme: semantic names only. Clearing the default palette means raw classes such as bg-gray-800 cannot exist.
   out.push("@theme {", "  --color-*: initial;");
   for (const row of COLOR_TOKENS) out.push(`  ${row[0]}: ${row[1]};`);
-  out.push(`  --font-sans: ${FONT_SANS};`, `  --font-mono: ${FONT_MONO};`);
+  out.push(
+    `  --font-sans: ${FONT_SANS};`,
+    `  --font-display: ${FONT_DISPLAY};`,
+    `  --font-mono: ${FONT_MONO};`,
+  );
   for (const [n, size, lh, weight] of TYPE_SCALE) {
     out.push(
       `  --text-${n}: ${size};`,
@@ -119,7 +126,7 @@ export function renderTokensCss(): string {
 
   out.push("/* Accent presets (style guide §3.2). High contrast keeps its own accent. */");
   for (const name of ACCENT_NAMES) {
-    if (name === "teal") continue; // the default values above
+    if (name === "ember") continue; // the default values above
     out.push(
       `[data-accent="${name}"]:is(:root, [data-theme="light"]) {\n${accentDeclarations("light", name, "  ")}\n}`,
     );

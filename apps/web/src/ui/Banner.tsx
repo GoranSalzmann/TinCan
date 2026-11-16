@@ -5,9 +5,9 @@ import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 type Tone = "error" | "warning" | "success";
 
 const TONES: Record<Tone, { box: string; Icon: typeof XCircle }> = {
-  error: { box: "bg-danger-bg-subtle text-text", Icon: XCircle },
-  warning: { box: "bg-warning-bg-subtle text-text", Icon: AlertTriangle },
-  success: { box: "bg-success-bg-subtle text-text", Icon: CheckCircle2 },
+  error: { box: "border-danger bg-danger-bg-subtle text-text", Icon: XCircle },
+  warning: { box: "border-warning bg-warning-bg-subtle text-text", Icon: AlertTriangle },
+  success: { box: "border-success-text bg-success-bg-subtle text-text", Icon: CheckCircle2 },
 };
 
 const ICON_COLOUR: Record<Tone, string> = {
@@ -22,7 +22,7 @@ export function Banner({ tone, children }: { tone: Tone; children: ReactNode }) 
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${box}`}
+      className={`flex items-start gap-2 rounded-md border-s-2 px-3 py-2 text-sm ${box}`}
     >
       <Icon aria-hidden="true" size={16} className={`mt-0.5 shrink-0 ${ICON_COLOUR[tone]}`} />
       <div>{children}</div>

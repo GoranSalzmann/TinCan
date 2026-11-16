@@ -4,9 +4,10 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-accent text-text-on-accent hover:bg-accent-hover",
-  ghost: "bg-transparent text-text hover:bg-bg-hover border border-border-control",
-  danger: "bg-danger text-text-on-danger hover:opacity-90",
+  primary:
+    "border border-accent bg-accent text-text-on-accent hover:border-accent-hover hover:bg-accent-hover",
+  ghost: "border border-border-control bg-transparent text-text hover:border-text-muted hover:bg-bg-hover",
+  danger: "border border-danger bg-danger text-text-on-danger hover:opacity-90",
 };
 
 export function Button({
@@ -18,7 +19,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex min-h-8 items-center justify-center gap-2 rounded-md px-4 py-1.5 text-base font-medium disabled:cursor-not-allowed disabled:bg-bg-hover disabled:text-text-disabled ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-4 py-1.5 text-sm font-semibold tracking-[0.005em] transition-colors duration-(--duration-fast) disabled:cursor-not-allowed disabled:border-border disabled:bg-bg-hover disabled:text-text-disabled ${VARIANTS[variant]} ${className}`}
       {...rest}
     />
   );

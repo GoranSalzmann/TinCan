@@ -5,7 +5,9 @@ import { applyCameraPrefs } from "../../core/voice/actions.js";
 import { useDevices } from "../../core/voice/devices.js";
 import { useVideoPrefs } from "../../core/voice/video.js";
 import { Button } from "../../ui/Button.js";
+import { selectClass } from "../../ui/Controls.js";
 import { QualityControls } from "../voice/QualityControls.js";
+import { Panel, Row, SettingsSection, SwitchRow } from "./layout.js";
 
 /** Camera device, quality and auto-watch (W-21 video part, 08 §5.2). Changes apply live when the camera is on. */
 export function CameraSection() {
@@ -15,7 +17,6 @@ export function CameraSection() {
   const [preview, setPreview] = useState(false);
   const [failed, setFailed] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
-  const select = "min-h-8 rounded-md border border-border-control bg-bg-input px-2";
 
   const change = (patch: Partial<typeof prefs>) => {
     const prev = prefs;
@@ -46,52 +47,57 @@ export function CameraSection() {
   }, [preview, prefs.cameraDeviceId]);
 
   return (
-    <section aria-labelledby="camera-pane" className="flex flex-col gap-3">
-      <h3 id="camera-pane" className="m-0 text-lg font-semibold">
-        {t("video.pane.title")}
-      </h3>
-      <div className="grid grid-cols-[12rem_1fr] items-center gap-3">
-        <label htmlFor="cam-dev">{t("video.pane.device")}</label>
-        <select
-          id="cam-dev"
-          className={select}
-          value={prefs.cameraDeviceId ?? ""}
-          onChange={(e) => change({ cameraDeviceId: e.target.value || null })}
-        >
-          <option value="">{t("video.pane.default")}</option>
-          {devices.cameras.map((d) => (
-            <option key={d.deviceId} value={d.deviceId}>
-              {d.label || d.deviceId.slice(0, 8)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <QualityControls source="camera" onChanged={(prev) => void applyCameraPrefs(prev)} />
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={prefs.autoWatchCameras}
-          onChange={(e) => set({ autoWatchCameras: e.target.checked })}
+    <SettingsSection title={t("video.pane.title")} description={t("video.pane.description")}>
+      <Panel label={t("video.pane.title")}>
+        <Row
+          label={t("video.pane.device")}
+          htmlFor="cam-dev"
+          control={
+            <select
+              id="cam-dev"
+              className={`${selectClass} w-64`}
+              value={prefs.cameraDeviceId ?? ""}
+              onChange={(e) => change({ cameraDeviceId: e.target.value || null })}
+            >
+              <option value="">{t("video.pane.default")}</option>
+              {devices.cameras.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || d.deviceId.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+          }
         />
-        {t("video.pane.autoWatch")}
-      </label>
-      <p className="m-0 text-sm text-text-muted">{t("video.pane.autoWatchHint")}</p>
-      <div className="flex flex-col items-start gap-2">
-        <Button variant="ghost" onClick={() => setPreview(!preview)}>
-          {preview ? t("video.pane.previewOff") : t("video.pane.previewOn")}
-        </Button>
-        {preview ? (
-          <video
-            ref={video}
-            autoPlay
-            playsInline
-            muted
-            aria-label={t("video.pane.preview")}
-            className="aspect-video w-72 -scale-x-100 rounded-md bg-black object-cover"
-          />
-        ) : null}
-        {failed ? <p className="m-0 text-sm text-danger-text">{t("voice.notice.camera_denied")}</p> : null}
-      </div>
-    </section>
+        <div className="px-5 py-4">
+          <QualityControls source="camera" onChanged={(prev) => void applyCameraPrefs(prev)} />
+        </div>
+        <SwitchRow
+          label={t("video.pane.autoWatch")}
+          description={t("video.pane.autoWatchHint")}
+          checked={prefs.autoWatchCameras}
+          onChange={(v) => set({ autoWatchCameras: v })}
+        />
+        <Row
+          label={t("video.pane.preview")}
+          control={
+            <Button variant="ghost" onClick={() => setPreview(!preview)}>
+              {preview ? t("video.pane.previewOff") : t("video.pane.previewOn")}
+            </Button>
+          }
+        >
+          {preview ? (
+            <video
+              ref={video}
+              autoPlay
+              playsInline
+              muted
+              aria-label={t("video.pane.preview")}
+              className="aspect-video w-full max-w-md -scale-x-100 rounded-md bg-bg-video object-cover"
+            />
+          ) : null}
+          {failed ? <p className="m-0 text-sm text-danger-text">{t("voice.notice.camera_denied")}</p> : null}
+        </Row>
+      </Panel>
+    </SettingsSection>
   );
 }

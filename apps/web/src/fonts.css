@@ -1,0 +1,12 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/*
+ * Bundled typefaces (style guide §5.1), all SIL Open Font License 1.1. Vite copies the woff2 files next to the build,
+ * so they come from our own origin (CSP `font-src 'self'`); each face loads only the unicode ranges a page uses.
+ *   Space Grotesk: display (instance name, headings, channel header)
+ *   Inter: interface and message text
+ *   IBM Plex Mono: metadata (timestamps, counts, labels, code)
+ */
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/inter";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
